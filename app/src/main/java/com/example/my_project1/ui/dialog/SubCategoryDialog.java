@@ -215,6 +215,12 @@ public class SubCategoryDialog extends Dialog {
         Window window = getWindow();
         if (window == null) return;
 
+        int statusBarHeight = 0;
+        int resourceId = getContext().getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            statusBarHeight = getContext().getResources().getDimensionPixelSize(resourceId);
+        }
+
         int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
         float density = getContext().getResources().getDisplayMetrics().density;
         int screenMarginPx = (int) (SCREEN_MARGIN * density);
@@ -244,7 +250,7 @@ public class SubCategoryDialog extends Dialog {
         WindowManager.LayoutParams params = window.getAttributes();
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = realX;
-        params.y = anchorLoc[1] + anchorView.getHeight() + 10;
+        params.y = anchorLoc[1] + anchorView.getHeight() + 10 - statusBarHeight;
         window.setAttributes(params);
 
         positionArrowImmediate(anchorCenterX, realX, popupW, arrowWidth, arrowPaddingPx);
