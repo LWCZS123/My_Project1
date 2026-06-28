@@ -3,8 +3,10 @@ package com.example.my_project1;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.fragment.app.Fragment;
@@ -59,13 +61,34 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+//        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         // 设置状态栏图标为深色（因为背景是浅色 #F0F4FF）
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
 
+        binding.getRoot().setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            // 获取系统底部手势栏高度
+            int bottomSafeHeight = windowInsets.getSystemWindowInsetBottom();
+            // 你想要整体向上偏移的固定距离
+            int offsetUp = 32;
+
+            // 导航整体上移：系统安全高度 + 自定义向上偏移量
+            CoordinatorLayout.LayoutParams navParams = (CoordinatorLayout.LayoutParams) binding.bottomBarContainer.getLayoutParams();
+            navParams.bottomMargin = bottomSafeHeight + offsetUp;
+            binding.bottomBarContainer.setLayoutParams(navParams);
+
+            // FAB同步相同偏移，保持对齐
+            CoordinatorLayout.LayoutParams fabParams = (CoordinatorLayout.LayoutParams) binding.fab.getLayoutParams();
+            fabParams.bottomMargin = bottomSafeHeight + offsetUp;
+            binding.fab.setLayoutParams(fabParams);
+
+            return windowInsets;
+        });
+
+
+        View content = findViewById(R.id.nav_host_fragment);
 
 
 
