@@ -611,13 +611,11 @@ public class LocationPickerActivity extends AppCompatActivity
 
     @Override
     protected void onPause() {
-        // 🔴 修复：mapView.onPause() 必须在 super 之前
         if (binding != null && binding.mapView != null) {
             binding.mapView.onPause();
         }
-        // 🔴 提前断开 aMap 渲染引用，防止 onDestroy 时 GL 线程还在渲染
-        // 小米 MIUI 等 ROM 上高德地图存在 GLThread 指针标签 bug，
-        // 提前设 null 可减少 GL 资源被意外访问的窗口期
+        // 提前断开定位回调，防止 onPause 后定位线程仍向地图写入数据
+        locationChangedListener = null;
         if (aMap != null) {
             aMap.setMyLocationEnabled(false);
         }
@@ -646,35 +644,46 @@ public class LocationPickerActivity extends AppCompatActivity
     protected void onDestroy() {
         Log.d(TAG, "Activity销毁，清理资源");
 
-        // 先停所有异步回调，防止销毁后回调访问已释放的资源
+        // 第一步：停所有异步回调
         if (searchHandler != null) {
             searchHandler.removeCallbacksAndMessages(null);
+            searchHandler = null;
         }
         if (mainHandler != null) {
             mainHandler.removeCallbacksAndMessages(null);
+            mainHandler = null;
         }
 
-        // 🔴 核心修复：先停定位，再销毁地图，最后才调 super.onDestroy()
-        //    高德地图 GLThread 必须在 super.onDestroy() 之前结束，
-        //    否则 GL 上下文已被系统回收，GL 线程清理时触发 native SIGABRT crash，
-        //    进程被杀后 app 重启直接显示首页，看起来像"闪退回首页"。
+        // 第二步：停定位客户端
         if (locationClient != null) {
             locationClient.stopLocation();
             locationClient.onDestroy();
             locationClient = null;
         }
 
-        // 🔴 核心：用 try-catch 包住 mapView.onDestroy()
-        // 高德地图在小米 MIUI 等 ROM 上存在已知 native GLThread bug：
-        // 即使 Java 生命周期顺序正确，GL 线程销毁时仍可能因 "Pointer tag truncated"
-        // 触发 SIGABRT 导致进程崩溃。try-catch 可捕获 Java 层异常；
-        // 对于 native SIGABRT，通过提前在 onPause 里禁用 MyLocation 来降低触发概率。
-        if (binding != null && binding.mapView != null) {
+        // 第三步：清理 aMap 监听器引用
+        // 必须在 mapView.onDestroy() 之前断开，防止渲染线程销毁期间回调空悬引用
+        if (aMap != null) {
             try {
-                binding.mapView.onDestroy();
-            } catch (Exception mapDestroyEx) {
-                Log.e(TAG, "⚠️ mapView.onDestroy() 异常（已忽略）: " + mapDestroyEx.getMessage());
+                aMap.setMyLocationEnabled(false);
+                aMap.setLocationSource(null);
+                aMap.setOnCameraChangeListener(null);
+                if (centerMarker != null) {
+                    centerMarker.destroy();
+                    centerMarker = null;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "清理 aMap 监听器异常: " + e.getMessage());
             }
+            aMap = null;
+        }
+
+        // 第四步：销毁 TextureMapView
+        // TextureMapView 使用 TextureView 渲染，不依赖 GLSurfaceView，
+        // 从根本上规避了 GLThread "Pointer tag truncated" SIGABRT 崩溃。
+        // 无需 try-catch，直接调用即可。
+        if (binding != null && binding.mapView != null) {
+            binding.mapView.onDestroy();
         }
 
         geocodeSearch = null;
@@ -684,7 +693,6 @@ public class LocationPickerActivity extends AppCompatActivity
         }
         isLocationStarted = false;
 
-        // 🔴 必须最后调用
         super.onDestroy();
     }
 }

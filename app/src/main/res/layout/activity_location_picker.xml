@@ -6,7 +6,7 @@
     android:background="#F5F7FA">
 
     <!-- 地图容器 -->
-    <com.amap.api.maps.MapView
+    <com.amap.api.maps.TextureMapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="300dp" />
