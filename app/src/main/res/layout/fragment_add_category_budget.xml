@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="none"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_bottom_sheet1"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="24dp">
+
+            <!-- 拖拽把手 -->
+            <View
+                android:layout_width="36dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/bg_drag_handle"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- ══════════════════════════════════════════
+                 ① 已选分类展示卡片
+            ══════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#F6F7FB">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="14dp">
+
+                    <!-- 分类图标 -->
+                    <FrameLayout
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_circle_icon">
+
+                        <ImageView
+                            android:id="@+id/iv_selected_icon"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_category_default"
+                            android:scaleType="centerInside"
+                            android:contentDescription="已选分类图标"/>
+                    </FrameLayout>
+
+                    <!-- 分类名称 + 提示 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:id="@+id/tv_selected_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="请选择分类"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="#333333"/>
+
+                        <TextView
+                            android:id="@+id/tv_selected_hint"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="从下方列表中选择"
+                            android:textSize="12sp"
+                            android:textColor="#AAAAAA"
+                            android:layout_marginTop="2dp"/>
+                    </LinearLayout>
+
+                    <!-- 已选标记 -->
+                    <ImageView
+                        android:id="@+id/iv_selected_check"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_check_circle"
+                        android:visibility="gone"
+                        android:contentDescription="已选中"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ══════════════════════════════════════════
+                 ② 预算金额输入卡片
+            ══════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- 标题行 + 剩余可分配提示 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="10dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="预算金额"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="#333333"/>
+
+                        <!--
+                            剩余可分配提示。
+                            由 Fragment 观察 vm.getRemainingAllocation() 后动态更新：
+                              ≥ 0 → 蓝色 "剩余可分配：¥xxx"
+                              < 0 → 红色 "已超分配：¥xxx"
+                            无总预算时隐藏（GONE）。
+                        -->
+                        <TextView
+                            android:id="@+id/tv_remaining_hint"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="剩余可分配：¥—"
+                            android:textSize="12sp"
+                            android:textColor="#5B8DEF"/>
+                    </LinearLayout>
+
+                    <!-- 金额输入框（带 ¥ 前缀） -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_et_amount"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="¥"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="#333333"
+                            android:layout_marginEnd="4dp"/>
+
+                        <EditText
+                            android:id="@+id/et_amount"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@null"
+                            android:inputType="numberDecimal"
+                            android:hint="0.00"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="#222222"
+                            android:textColorHint="#CCCCCC"
+                            android:digits="0123456789."
+                            android:maxLength="10"
+                            android:imeOptions="actionDone"/>
+                    </LinearLayout>
+
+                    <!--
+                        超额警告（输入值超过剩余可分配时显示）。
+                        由 Fragment 在 et_amount TextWatcher 中控制可见性。
+                    -->
+                    <LinearLayout
+                        android:id="@+id/ll_over_warning"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:visibility="gone"
+                        android:layout_marginTop="8dp">
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:src="@drawable/ic_warning"
+                            android:contentDescription="警告"/>
+
+                        <TextView
+                            android:id="@+id/tv_over_warning"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="输入金额超过剩余可分配预算"
+                            android:textSize="12sp"
+                            android:textColor="#FF5252"
+                            android:layout_marginStart="4dp"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ══════════════════════════════════════════
+                 ③ 周期选择胶囊
+            ══════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="预算周期"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="#333333"
+                        android:layout_marginBottom="12dp"/>
+
+                    <!-- 周期胶囊（日 / 周 / 月 / 年） -->
+                    <LinearLayout
+                        android:id="@+id/ll_period_tabs"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:orientation="horizontal"
+                        android:background="@drawable/bg_capsule1"
+                        android:padding="4dp">
+
+                        <TextView
+                            android:id="@+id/tab_period_day"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:text="日"
+                            android:textSize="13sp"
+                            android:textColor="#888888"/>
+
+                        <TextView
+                            android:id="@+id/tab_period_week"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:text="周"
+                            android:textSize="13sp"
+                            android:textColor="#888888"/>
+
+                        <TextView
+                            android:id="@+id/tab_period_month"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:text="月"
+                            android:textSize="13sp"
+                            android:background="@drawable/bg_tab_selected1"
+                            android:textColor="#333333"/>
+
+                        <TextView
+                            android:id="@+id/tab_period_year"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:text="年"
+                            android:textSize="13sp"
+                            android:textColor="#888888"/>
+                    </LinearLayout>
+
+                    <!--
+                        周期约束提示（当所选周期超过总预算周期时显示）。
+                        由 Fragment 在 Tab 点击回调中控制可见性。
+                    -->
+                    <TextView
+                        android:id="@+id/tv_period_constraint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="* 分类预算周期不能超过总预算周期"
+                        android:textSize="11sp"
+                        android:textColor="#FF9800"
+                        android:visibility="gone"
+                        android:layout_marginTop="8dp"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ══════════════════════════════════════════
+                 ④ 分类列表卡片
+            ══════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- 标题 + 一级/二级分类胶囊切换 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="选择分类"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="#333333"/>
+
+                        <!-- 一级 / 二级 切换胶囊 -->
+                        <LinearLayout
+                            android:id="@+id/ll_level_tabs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:orientation="horizontal"
+                            android:background="@drawable/bg_capsule_small"
+                            android:padding="3dp">
+
+                            <TextView
+                                android:id="@+id/tab_level_main"
+                                android:layout_width="44dp"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:text="一级"
+                                android:textSize="11sp"
+                                android:background="@drawable/bg_tab_selected_blue"
+                                android:textColor="#FFFFFF"/>
+
+                            <TextView
+                                android:id="@+id/tab_level_sub"
+                                android:layout_width="44dp"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:text="二级"
+                                android:textSize="11sp"
+                                android:textColor="#888888"/>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- 分类 RecyclerView（不嵌套滚动，由外层 NestedScrollView 处理） -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rv_categories"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        tools:listitem="@layout/item_category_budget_selector"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ══════════════════════════════════════════
+                 ⑤ 确定按钮
+            ══════════════════════════════════════════ -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_confirm"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="确 定"
+                android:textSize="15sp"
+                android:textColor="@android:color/white"
+                app:cornerRadius="26dp"
+                app:backgroundTint="#304FFE"
+                android:layout_marginTop="4dp"/>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

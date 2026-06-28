@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    节假日标签背景（"休" 用橙红色，"班" 用灰蓝色）
+    此文件为"休"的默认样式（橙红色），"班"的颜色由代码动态更改
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FF7043"/>
+    <corners android:radius="4dp"/>
+</shape>

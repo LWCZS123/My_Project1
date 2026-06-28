@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">My_Project1</string>
+    <string name="title_activity_login">LoginActivity</string>
+    <string name="prompt_email">Email</string>
+    <string name="prompt_password">Password</string>
+    <string name="action_sign_in">Sign in or register</string>
+    <string name="action_sign_in_short">Sign in</string>
+    <string name="welcome">"Welcome !"</string>
+    <string name="invalid_username">Not a valid username</string>
+    <string name="invalid_password">Password must be >5 characters</string>
+    <string name="login_failed">"Login failed"</string>
+
+
+    <string name="category_management_title">分类管理</string>
+    <string name="tab_expense">支出</string>
+    <string name="tab_income">收入</string>
+    <string name="btn_new_category">新建一级分类</string>
+
+    <!-- Category Items -->
+    <string name="category_count_format">%d</string>
+    <string name="btn_add_subcategory">新建</string>
+    <string name="expand_arrow_description">展开/收起箭头</string>
+    <string name="category_icon_description">分类图标</string>
+
+    <!-- Dialog -->
+    <string name="dialog_add_category_title">新建分类</string>
+    <string name="dialog_add_subcategory_title">新建子分类</string>
+    <string name="hint_category_name">请输入分类名称</string>
+    <string name="btn_cancel">取消</string>
+    <string name="btn_confirm">确定</string>
+
+    <!-- Error Messages -->
+    <string name="error_network">网络连接失败，请检查网络设置</string>
+    <string name="error_database">数据库操作失败</string>
+    <string name="error_sync">数据同步失败</string>
+    <string name="error_empty_name">分类名称不能为空</string>
+    <string name="action_retry">重试</string>
+
+    <!-- Empty State -->
+    <string name="empty_categories_title">暂无分类</string>
+    <string name="empty_categories_message">点击下方按钮创建您的第一个分类</string>
+    <string name="empty_subcategories_message">点击新建按钮添加子分类</string>
+
+    <!-- Loading -->
+    <string name="loading">加载中...</string>
+    <string name="syncing">同步中...</string>
+
+    <!-- Accessibility -->
+    <string name="content_description_back">返回</string>
+    <string name="content_description_more">更多选项</string>
+
+    <!-- Sub-category count -->
+    <string name="subcategory_count_format">%d个子分类</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="title_activity_bill_detail">BillDetailActivity</string>
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">First Fragment</string>
+    <string name="second_fragment_label">Second Fragment</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+
+    <string name="hello_first_fragment">Hello first fragment</string>
+    <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
+    <!-- 账单详情 -->
+    <string name="bill_detail_title">账单详情</string>
+    <string name="bill_image">账单图片</string>
+    <string name="no_image">无图片</string>
+
+    <!-- 按钮 -->
+    <string name="btn_edit">编辑</string>
+    <string name="btn_delete">删除</string>
+
+
+    <!-- 对话框 -->
+    <string name="delete_bill_title">删除账单</string>
+    <string name="delete_bill_message">确定要删除这条账单吗？</string>
+
+    <!-- 提示 -->
+    <string name="delete_success">删除成功</string>
+    <string name="delete_failed">删除失败</string>
+    <string name="feature_developing">功能开发中</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选中日期的圆形背景 - 小尺寸（42dp） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+
+    <!-- 填充颜色 -->
+    <solid android:color="@color/red" />
+
+    <!-- 缩小后的大小 -->
+    <size
+        android:width="12dp"
+        android:height="12dp" />
+
+</shape>

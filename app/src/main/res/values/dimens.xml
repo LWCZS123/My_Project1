@@ -1,0 +1,30 @@
+<resources>
+    <!-- Default screen margins, per the Android Design guidelines. -->
+    <dimen name="activity_horizontal_margin">16dp</dimen>
+    <dimen name="activity_vertical_margin">16dp</dimen>
+    <dimen name="text_margin">16dp</dimen>
+    <!-- 导航项间距 -->
+    <dimen name="bottom_nav_item_padding_horizontal">4dp</dimen>
+    <dimen name="bottom_nav_item_padding_vertical">2dp</dimen>
+
+    <!-- 图标和文字 -->
+    <dimen name="bottom_nav_icon_size">20dp</dimen>
+    <dimen name="bottom_nav_text_size">11sp</dimen>
+    <dimen name="bottom_nav_icon_text_spacing">1dp</dimen>
+
+    <!-- FAB -->
+    <dimen name="fab_size">48dp</dimen>
+    <dimen name="fab_icon_size">24dp</dimen>
+    <dimen name="fab_elevation">8dp</dimen>
+    <dimen name="fab_pressed_elevation">12dp</dimen>
+
+    <!-- 外部间距 -->
+    <dimen name="bottom_container_padding">12dp</dimen>
+    <dimen name="bottom_nav_fab_spacing">8dp</dimen>
+
+    <!-- 选中背景圆角 -->
+    <dimen name="bottom_nav_item_bg_radius">18dp</dimen>
+    <dimen name="fab_margin">16dp</dimen>
+
+
+</resources>

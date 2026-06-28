@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- bg_progress_budget_item.xml
+     分类预算条目进度条前景（蓝色渐变圆角）-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 背景轨道（透明，由 android:background 提供） -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="3dp"/>
+            <solid android:color="#EDF0F5"/>
+        </shape>
+    </item>
+    <!-- 进度前景 -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="3dp"/>
+                <gradient
+                    android:startColor="#5B8DEF"
+                    android:endColor="#4CAF50"
+                    android:angle="0"/>
+            </shape>
+        </clip>
+    </item>
+</layer-list>

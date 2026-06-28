@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    item_wish_history.xml
+    愿望存钱历史记录单项布局（风格与 item_transaction 保持一致）
+    对应 WishHistoryAdapter.ViewHolder
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="?attr/selectableItemBackground"
+    android:padding="2dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- 上方：时间图标 + 时间文字 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="8dp">
+
+        <ImageView
+            android:id="@+id/iv_time_icon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_clock1" />
+
+        <TextView
+            android:id="@+id/tv_record_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#8E8E93"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <!-- 下方：愿望图标 + 备注 + 金额 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+
+        <!-- 愿望图标（使用愿望所属图标） -->
+        <ImageView
+            android:id="@+id/iv_wish_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_face"
+            android:scaleType="centerCrop" />
+
+        <!-- 备注 / 愿望名称 -->
+        <TextView
+            android:id="@+id/tv_record_note"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="15sp"
+            android:textColor="@color/black"
+            android:textStyle="bold"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:layout_marginStart="12dp" />
+
+        <!-- 金额（绿色加粗） -->
+        <TextView
+            android:id="@+id/tv_record_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#34C759" />
+    </LinearLayout>
+
+    <!-- 分隔线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:background="#E0E0E0" />
+
+</LinearLayout>

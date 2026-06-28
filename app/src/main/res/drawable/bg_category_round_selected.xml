@@ -1,0 +1,5 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#B9D1FF"/> <!-- 选中颜色（可改） -->
+    <corners android:radius="26dp"/>
+    <stroke android:width="2dp" android:color="#304FFE"/> <!-- 白色轮廓，更显高亮 -->
+</shape>

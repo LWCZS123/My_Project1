@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- 向下箭头 -->
+    <ImageView
+        android:id="@+id/iv_arrow"
+        android:layout_width="22dp"
+        android:layout_height="12dp"
+        android:layout_gravity="start"
+        android:src="@drawable/ic_triangle_up_white"
+        android:layout_marginTop="-2dp"/>
+
+    <!-- 弹窗主体 -->
+    <LinearLayout
+        android:id="@+id/popup_card"
+        android:orientation="vertical"
+        android:background="@drawable/bg_sub_popup_round"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:alpha="0.95"
+        android:elevation="0dp">
+
+        <!-- ViewPager2 实现左右滑动翻页 -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/view_pager2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+    </LinearLayout>
+</LinearLayout>

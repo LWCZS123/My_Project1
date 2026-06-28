@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.my_project1">
+    <!-- 网络访问权限 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" /> <!-- 地图权限 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <application
+        android:name=".application.MyApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.My_Project1"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name=".ui.activity.SavingsOverviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.SavingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.CategoryBudgetDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.IconMarketActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
+            android:name=".ui.activity.BudgetActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
+            android:name=".ui.activity.CategoryBillsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.BillStatisticsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.ChangePasswordActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.EditProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.AccountDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.BillDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.SearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.LocationPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            /> <!-- 高德地图Key -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="70865c518794bbc7b0236c2ab9d4f1e7" /> <!-- 高德定位服务（10.0.600版本必须） -->
+        <service
+            android:name="com.amap.api.location.APSService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".ui.activity.AddBillActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.AccountChartActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+
+        <meta-data
+            android:name="com.google.android.actions"
+            android:resource="@xml/network_security_config" />
+
+        <provider
+            android:name="cn.bmob.v3.util.BmobContentProvider"
+            android:authorities="${applicationId}.BmobContentProvider"
+            android:exported="false" />
+
+        <receiver
+            android:name=".receiver.NetworkReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+
+                <!-- 网络连接变化 -->
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".ui.activity.AddAccountActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
+            android:name=".ui.activity.CategoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+
+            />
+        <activity
+            android:name=".ui.activity.RegisterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
+            android:name=".ui.activity.LoginActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

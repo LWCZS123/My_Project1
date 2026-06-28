@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  item_bill_date_header.xml (重构版)
+  ───────────────────────────────────────────────────────
+  ✅ 左侧留白区域宽度与 item_bill.xml 的时间轴区域对齐（均为 32dp）
+  ✅ 日期文字与账单 item 时间文字在视觉上对齐，时间线无断裂
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="16dp"
+    android:paddingBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+
+
+
+        <!-- 日期标题：4月21日（周日）-->
+        <TextView
+            android:id="@+id/tvDate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="9月11日（周四）"
+            android:textSize="12sp"
+            android:textColor="#333333"
+            android:textStyle="bold" />
+
+        <!-- 支出 / 收入 汇总 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginEnd="8dp">
+
+            <TextView
+                android:id="@+id/tvExpense"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="支出 ¥0.00"
+                android:textSize="12sp"
+                android:textColor="#FF4D4F" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="#CCCCCC" />
+
+            <TextView
+                android:id="@+id/tvIncome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="收入 ¥0.00"
+                android:textSize="12sp"
+                android:textColor="#52C41A" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

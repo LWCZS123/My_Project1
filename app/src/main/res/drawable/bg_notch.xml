@@ -1,0 +1,4 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#F5F9FC" />  <!-- 这里改成你页面背景色 -->
+</shape>

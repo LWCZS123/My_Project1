@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    日期分组头布局
+    显示：左侧日期文字（如 "2026.3.5"） + 右侧当日账单笔数（如 "3笔"）
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="6dp">
+
+    <!-- 竖向装饰条 -->
+    <View
+        android:layout_width="3dp"
+        android:layout_height="14dp"
+        android:layout_marginEnd="8dp"
+        android:background="#2F5FFF"/>
+
+    <!-- 日期 -->
+    <TextView
+        android:id="@+id/tv_date"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="2026.3.5"
+        android:textColor="#333333"
+        android:textSize="13sp"
+        android:textStyle="bold"/>
+
+    <!-- 当日笔数 -->
+    <TextView
+        android:id="@+id/tv_day_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="3笔"
+        android:textColor="#AAAAAA"
+        android:textSize="12sp"/>
+
+</LinearLayout>

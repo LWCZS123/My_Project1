@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="input_stroke_color">#BDBDBD</color>   <!-- 输入框边线灰 -->
+    <color name="icon_tint">#666666</color>           <!-- 图标灰 -->
+    <color name="accent_color">#0066FF</color>
+    <color name="red">#D50000</color>
+    <color name="green">#00C853</color>
+
+    <color name="page_bg">#F5F7FA</color>
+
+
+    <!-- FAB 背景颜色 -->
+    <color name="fab_bg_color">#1976D2</color>
+
+    <!-- FAB 水波纹颜色 -->
+    <color name="fab_ripple_color">#64B5F6</color>
+
+    <color name="primary_blue">#007AFF</color>      <!-- 主色 -->
+    <color name="bg_light_blue">#E6F7FF</color>    <!-- 背景 -->
+    <color name="card_shadow">#22007AFF</color>    <!-- 仅作参考的阴影色 -->
+    <color name="text_title">#333333</color>       <!-- 标题文字 -->
+    <color name="text_primary">#333333</color>
+    <color name="text_hint">#999999</color>        <!-- 辅助/刻度 -->
+    <color name="grid_light">#EFEFEF</color>       <!-- 网格线浅灰 -->
+    <color name="positive">#00C48C</color>         <!-- 资产颜色 -->
+    <color name="negative">#FF6B6B</color>         <!-- 负资产颜色 -->
+    <color name="track_tint">#B3DFFF</color>       <!-- Switch 轨道示例 -->
+    <color name="thumb_tint">#007AFF</color>       <!-- Switch 拇指示例 -->
+    <color name="transparent">#00000000</color>
+
+
+    <color name="snackbar_success">#4CAF50</color>
+    <color name="snackbar_error">#F44336</color>
+    <color name="snackbar_warning">#FF9800</color>
+    <color name="snackbar_info">#B7323232</color>
+
+    <!-- 如果你的项目没有定义colorPrimary，添加这个 -->
+    <color name="colorPrimary">#6200EE</color>
+
+    <!-- 主题颜色 -->
+    <color name="primary_color">#2196F3</color>
+    <color name="primary_dark">#1976D2</color>
+    <color name="text_secondary">#1A528A</color>
+
+
+
+    <!-- 文字颜色 -->
+    <color name="primary_text">#212121</color>
+    <color name="secondary_text">#757575</color>
+    <color name="hint_text">#BDBDBD</color>
+
+    <!-- 背景颜色 -->
+    <color name="background_color">#F5F5F5</color>
+ 、
+    <!-- 灰色系 -->
+    <color name="gray_50">#FAFAFA</color>
+    <color name="gray_100">#F5F5F5</color>
+    <color name="gray_200">#EEEEEE</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="gray_400">#BDBDBD</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_600">#757575</color>
+    <color name="gray_700">#616161</color>
+    <color name="gray_800">#424242</color>
+    <color name="gray_900">#212121</color>
+
+    <!-- 分割线 -->
+    <color name="divider_color">#E0E0E0</color>
+
+    <!-- 图标颜色 -->
+
+    <!-- 支出/收入颜色 -->
+    <color name="expense_color">#F44336</color>
+    <color name="income_color">#4CAF50</color>
+
+    <!-- 橙色系 -->
+    <color name="orange_500">#FF9800</color>
+
+    <!-- 错误颜色 -->
+    <color name="error_color">#F44336</color>
+
+    <!-- 主题色 -->
+    <color name="pink">#FF69B4</color>
+    <color name="pink_light">#FFB6D9</color>
+    <color name="pink_dark">#E91E63</color>
+
+    <color name="yellow">#FFD700</color>
+    <color name="gold">#FFA500</color>
+
+
+    <!-- 背景色 -->
+    <color name="bg_main">#F5F5F5</color>
+    <color name="bg_card">#FFFFFF</color>
+
+    <!-- 渐变色 -->
+    <color name="gradient_start">#667eea</color>
+    <color name="gradient_center">#764ba2</color>
+    <color name="gradient_end">#f093fb</color>
+
+    <!-- 功能色 -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FF9800</color>
+    <color name="error">#F44336</color>
+    <color name="info">#2196F3</color>
+    <color name="gray_disabled">#BDBDBD</color>
+
+
+
+
+
+
+
+
+</resources>

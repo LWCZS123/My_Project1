@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 白色底色 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/white" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+
+    <!-- 优雅的渐变装饰 - 右上角 -->
+    <item
+        android:top="0dp"
+        android:right="0dp">
+        <shape android:shape="oval">
+            <gradient
+                android:startColor="#15667EEA"
+                android:endColor="#00667EEA"
+                android:type="radial"
+                android:gradientRadius="150dp" />
+        </shape>
+    </item>
+
+    <!-- 优雅的渐变装饰 - 左下角 -->
+    <item
+        android:bottom="0dp"
+        android:left="0dp">
+        <shape android:shape="oval">
+            <gradient
+                android:startColor="#1078E6F9"
+                android:endColor="#0078E6F9"
+                android:type="radial"
+                android:gradientRadius="120dp" />
+        </shape>
+    </item>
+
+</layer-list>

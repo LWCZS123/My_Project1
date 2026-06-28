@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- bg_progress_budget_item_aurora.xml
+     分类预算条目进度条前景（蓝色极光渐变圆角） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 背景轨道 -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="24dp"/>
+            <solid android:color="#E6F0FA"/> <!-- 淡灰蓝背景 -->
+        </shape>
+    </item>
+
+    <!-- 进度前景 -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="24dp"/>
+                <gradient
+                    android:startColor="#4DA6FF"
+                android:centerColor="#64DD17"
+                android:centerX="0.4"
+                android:endColor="#00C2FF"
+                android:angle="0"/>
+            </shape>
+        </clip>
+    </item>
+
+</layer-list>

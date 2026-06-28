@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="4dp"
+    android:layout_marginVertical="4dp"
+    android:minHeight="42dp"
+    android:background="@drawable/bg_history_item"
+    android:orientation="horizontal"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical">
+
+    <!-- 账户图标 -->
+    <ImageView
+        android:id="@+id/imgAccountIcon"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginStart="4dp"
+        android:src="@drawable/ic_wallet"
+        android:contentDescription="账户图标"
+        />
+
+    <!-- 账户名称 -->
+    <TextView
+        android:id="@+id/tvAccountName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:maxEms="8"
+        android:text="微信"
+        android:textColor="#333333"
+        android:textSize="13sp"/>
+
+    <!-- 删除按钮 -->
+    <ImageView
+        android:id="@+id/btnDelete"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginEnd="4dp"
+        android:src="@drawable/ic_close"
+        android:contentDescription="删除"
+        app:tint="#999999"/>
+
+</LinearLayout>

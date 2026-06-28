@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F2F4F8">
+
+  <!-- 主内容：顶部栏 + ViewPager2 -->
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:orientation="vertical">
+
+    <!-- 区域1：顶部切换栏 -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="8dp">
+
+      <!-- 返回箭头（左） -->
+      <ImageView
+          android:id="@+id/iv_back"
+          android:layout_width="32dp"
+          android:layout_height="32dp"
+          android:layout_alignParentStart="true"
+          android:layout_centerVertical="true"
+          android:padding="4dp"
+          android:src="@drawable/ic_back3"
+          android:tint="#333333" />
+
+
+
+      <!-- 中间切换栏（始终真正居中） -->
+      <LinearLayout
+          android:id="@+id/layout_tabs"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_centerInParent="true"
+          android:background="@drawable/tab_container_bg"
+          android:gravity="center"
+          android:orientation="horizontal"
+          android:padding="4dp">
+
+        <TextView
+            android:id="@+id/tab_expense"
+            android:layout_width="100dp"
+            android:layout_height="36dp"
+            android:background="@drawable/tab_selected_bg"
+            android:gravity="center"
+            android:text="支出分类"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tab_income"
+            android:layout_width="100dp"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:text="收入分类"
+            android:textColor="#666666"
+            android:textSize="15sp" />
+
+      </LinearLayout>
+
+    </RelativeLayout>
+
+    <!-- ViewPager2 主体内容 -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+  </LinearLayout>
+
+  <!-- 悬浮按钮：真正悬浮在所有内容上方 -->
+  <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+      android:id="@+id/fabNewCategory"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_gravity="bottom|center"
+      android:layout_marginHorizontal="32dp"
+      android:layout_marginBottom="24dp"
+      android:paddingVertical="16dp"
+      android:gravity="center"
+      android:text="新建一级分类"
+      android:textColor="@android:color/white"
+      android:textStyle="bold"
+      android:textSize="16sp"
+      app:backgroundTint="#4169E1"
+      app:cornerRadius="28dp"
+      app:elevation="16dp"
+      app:icon="@drawable/ic_add"
+      app:iconTint="@android:color/white"
+      app:iconPadding="8dp"
+      app:iconGravity="textStart" />
+
+</FrameLayout>

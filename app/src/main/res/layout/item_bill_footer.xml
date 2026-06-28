@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  item_bill_footer.xml
+  ───────────────────────────────────────────────────────
+  FooterAdapter 使用的三态布局：
+    LOADING → ProgressBar
+    NO_MORE → tvMessage
+    ERROR   → btnRetry
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <!-- 加载中：旋转进度条 -->
+    <ProgressBar
+        android:id="@+id/footerProgressBar"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:indeterminateTint="@color/accent_color"
+        android:visibility="gone" />
+
+    <!-- 没有更多了 -->
+    <TextView
+        android:id="@+id/footerTvMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="— 没有更多了 —"
+        android:textColor="#AAAAAA"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <!-- 加载失败：重试按钮 -->
+    <Button
+        android:id="@+id/footerBtnRetry"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="加载失败，点击重试"
+        android:textColor="@color/accent_color"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    item_parent_category_select.xml（重构版）
+    ────────────────────────────────────────────────────
+    二级分类面板中父分类宫格的 item 布局。
+
+    改动：
+    - 从列表行样式改为宫格卡片样式（3列网格）
+    - 包含圆角图标区 + 分类名称
+    - 选中状态：高亮边框 + 蓝色文字 + 右上角勾选图标
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="6dp">
+
+    <!-- 卡片容器（选中时显示蓝色边框） -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_parent_category"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:strokeWidth="2dp"
+        app:strokeColor="@android:color/transparent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp">
+
+            <!-- 图标容器（圆角背景） -->
+            <FrameLayout
+                android:layout_width="40dp"
+                android:layout_height="40dp">
+
+                <!-- 图标背景圆 -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_icon_circle" />
+
+                <!-- 分类图标 -->
+                <ImageView
+                    android:id="@+id/iv_parent_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:scaleType="centerInside" />
+
+                <!-- 选中勾选标记（右上角） -->
+                <ImageView
+                    android:id="@+id/iv_check"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="1dp"
+                    android:src="@drawable/ic_check_circle"
+                    android:visibility="gone" />
+
+            </FrameLayout>
+
+            <!-- 分类名称 -->
+            <TextView
+                android:id="@+id/tv_category_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:gravity="center"
+                android:textSize="11sp"
+                android:textColor="#333333"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+</LinearLayout>

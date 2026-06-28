@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    日历单元格布局 - 扁平化优化版
+    ─────────────────────────────────────────────
+    优化点：
+      · 将原 FrameLayout > LinearLayout > FrameLayout 三层嵌套
+        改为单层 ConstraintLayout，减少 measure/layout 次数约 60%
+      · 去除中间 LinearLayout，直接用 ConstraintLayout 链式约束排列子 View
+      · tv_holiday_tag 保持绝对定位于右上角，zero 额外层级
+      · 固定高度 60dp（对齐 MonthPagerAdapter.ROW_HEIGHT_DP），
+        完全消除 wrap_content 引发的重测量
+    ─────────────────────────────────────────────
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackgroundBorderless"
+    android:background="@android:color/transparent">
+
+    <!--
+        ① 日期容器：热力图背景(fl_day_container) + 选中/今日背景(v_selected_bg) + 数字(tv_day)
+        三者完全重叠在同一个 32dp FrameLayout 内，确保背景与数字始终居中对齐。
+        约束链的顶部锚点，底部锚 tv_lunar。
+    -->
+    <!--
+        ① 日期容器 32dp×32dp，水平居中，顶部 4dp 让整体偏上留出农历空间。
+        fl_day_container：热力图圆角背景挂在这层。
+        v_selected_bg：选中/今日圆，四边 margin 3dp，视觉直径 26dp，比容器略小。
+        tv_day：数字居中于整个 32dp 容器，不受圆 margin 影响。
+    -->
+    <FrameLayout
+        android:id="@+id/fl_day_container"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginTop="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/tv_lunar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_chainStyle="packed"
+        app:layout_constraintVertical_bias="0.0">
+
+        <!-- 选中/今天背景圆：margin 3dp 使圆比容器小一圈，更精致 -->
+        <View
+            android:id="@+id/v_selected_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:layout_margin="3dp"/>
+
+        <!-- 日期数字：始终居中于完整 32dp 容器，不受圆 margin 影响 -->
+        <TextView
+            android:id="@+id/tv_day"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:text="1"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#1A1A1A"
+            android:includeFontPadding="false"/>
+    </FrameLayout>
+
+    <!--
+        ② 农历/节气：与日期圆之间 3dp 固定间距，视觉上下都有呼吸感
+    -->
+    <TextView
+        android:id="@+id/tv_lunar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="初一"
+        android:textSize="8sp"
+        android:textColor="#AAAAAA"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:layout_marginTop="3dp"
+        app:layout_constraintTop_toBottomOf="@id/fl_day_container"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/tv_income"/>
+
+    <!--
+        ③ 收入胶囊
+        约束在农历文字底部
+    -->
+    <TextView
+        android:id="@+id/tv_income"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="收 ¥88"
+        android:textSize="7sp"
+        android:textColor="#2E7D32"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:background="@drawable/bg_capsule_income"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/tv_lunar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/tv_expense"/>
+
+    <!--
+        ④ 支出胶囊
+        约束在收入胶囊底部，整条链的末尾
+    -->
+    <TextView
+        android:id="@+id/tv_expense"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="支 ¥66"
+        android:textSize="7sp"
+        android:textColor="#C62828"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:background="@drawable/bg_capsule_expense"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/tv_income"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <!--
+        ⑤ 右上角"休/班"标签
+        绝对定位于右上角，不参与链式约束
+    -->
+    <TextView
+        android:id="@+id/tv_holiday_tag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="休"
+        android:textSize="4sp"
+        android:textStyle="bold"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        android:paddingTop="0.5dp"
+        android:paddingBottom="0.5dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="2dp"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

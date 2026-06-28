@@ -1,0 +1,5 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#80E3F2FD"/> <!-- 80 是透明度 50%，FFFFFF 是白色 -->
+    <corners android:radius="16dp"/>
+</shape>

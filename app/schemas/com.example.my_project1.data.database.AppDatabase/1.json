@@ -1,0 +1,227 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "468a9d78b1512a849f52d9ec8a9bc096",
+    "entities": [
+      {
+        "tableName": "categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `cloud_id` TEXT, `owner_id` TEXT, `type` TEXT, `name` TEXT, `icon_uri` TEXT, `color` TEXT, `order` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `sync_state` INTEGER NOT NULL, `subCategories` TEXT, `is_system_preset` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cloudId",
+            "columnName": "cloud_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownerId",
+            "columnName": "owner_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "iconUri",
+            "columnName": "icon_uri",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "order",
+            "columnName": "order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncState",
+            "columnName": "sync_state",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subCategories",
+            "columnName": "subCategories",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isSystemPreset",
+            "columnName": "is_system_preset",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "columnNames": [
+            "id"
+          ],
+          "autoGenerate": true
+        },
+        "indices": [
+          {
+            "name": "index_categories_cloud_id",
+            "unique": false,
+            "columnNames": [
+              "cloud_id"
+            ],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_categories_cloud_id` ON `${TABLE_NAME}` (`cloud_id`)"
+          },
+          {
+            "name": "index_categories_owner_id_type",
+            "unique": false,
+            "columnNames": [
+              "owner_id",
+              "type"
+            ],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_categories_owner_id_type` ON `${TABLE_NAME}` (`owner_id`, `type`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "sub_categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `local_id` INTEGER NOT NULL, `parent_category_id` INTEGER NOT NULL, `parent_cloud_id` TEXT, `cloud_id` TEXT, `owner_id` TEXT, `name` TEXT, `icon_uri` TEXT, `color` TEXT, `order` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `sync_state` INTEGER NOT NULL, `is_system_preset` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "local_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentCategoryId",
+            "columnName": "parent_category_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentCloudId",
+            "columnName": "parent_cloud_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "cloudId",
+            "columnName": "cloud_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownerId",
+            "columnName": "owner_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "iconUri",
+            "columnName": "icon_uri",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "order",
+            "columnName": "order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncState",
+            "columnName": "sync_state",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSystemPreset",
+            "columnName": "is_system_preset",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "columnNames": [
+            "id"
+          ],
+          "autoGenerate": true
+        },
+        "indices": [
+          {
+            "name": "index_sub_categories_cloud_id",
+            "unique": false,
+            "columnNames": [
+              "cloud_id"
+            ],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sub_categories_cloud_id` ON `${TABLE_NAME}` (`cloud_id`)"
+          },
+          {
+            "name": "index_sub_categories_parent_category_id",
+            "unique": false,
+            "columnNames": [
+              "parent_category_id"
+            ],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sub_categories_parent_category_id` ON `${TABLE_NAME}` (`parent_category_id`)"
+          }
+        ],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '468a9d78b1512a849f52d9ec8a9bc096')"
+    ]
+  }
+}

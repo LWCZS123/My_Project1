@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    item_category_budget_selector.xml
+    ────────────────────────────────────────────────────────────
+    分类选择器宫格条目（4 列，GridLayoutManager(4) 使用）
+    结构：
+      圆形图标（选中时蓝色描边）
+      分类名称
+      已分配金额 or 未设置
+      选中指示器（右上角小蓝点）
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="4dp">
+
+    <!-- 整个条目容器：圆角背景，选中时高亮 -->
+    <LinearLayout
+        android:id="@+id/ll_item_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="8dp"
+        android:background="@drawable/bg_category_item_normal">
+
+        <!-- 图标容器（圆形） -->
+        <FrameLayout
+            android:id="@+id/fl_icon_bg"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_circle_icon">
+
+            <ImageView
+                android:id="@+id/iv_cat_icon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_category_default"
+                android:scaleType="centerInside"
+                android:contentDescription="分类图标"/>
+
+        </FrameLayout>
+
+        <!-- 分类名称 -->
+        <TextView
+            android:id="@+id/tv_cat_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="购物"
+            android:textSize="12sp"
+            android:textColor="#333333"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:layout_marginTop="5dp"/>
+
+        <!-- 已分配预算 / "未设置" -->
+        <TextView
+            android:id="@+id/tv_cat_budget_tag"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="未设置"
+            android:textSize="10sp"
+            android:textColor="#AAAAAA"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:layout_marginTop="2dp"/>
+
+    </LinearLayout>
+
+    <!-- 右上角选中指示器（蓝色小圆点） -->
+    <ImageView
+        android:id="@+id/iv_cat_check"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:src="@drawable/ic_check_circle"
+        android:visibility="invisible"
+        android:contentDescription="已选中"/>
+
+</FrameLayout>

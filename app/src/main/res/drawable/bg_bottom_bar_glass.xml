@@ -1,0 +1,20 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 半透明白色 -->
+    <item>
+        <shape>
+            <solid android:color="#CCFFFFFF"/>
+            <corners android:topLeftRadius="24dp"
+                android:topRightRadius="32dp"/>
+        </shape>
+    </item>
+
+    <!-- 顶部分割线 -->
+    <item android:top="0.5dp">
+        <shape>
+            <size android:height="0.5dp"/>
+            <solid android:color="#1A000000"/>
+        </shape>
+    </item>
+
+</layer-list>

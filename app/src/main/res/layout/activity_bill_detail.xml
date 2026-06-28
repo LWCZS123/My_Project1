@@ -1,0 +1,541 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F9FC"
+    tools:context=".ui.activity.BillDetailActivity">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#F5F9FC"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- 返回按钮 -->
+            <ImageView
+                android:id="@+id/iv_back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_centerVertical="true"
+                android:padding="8dp"
+                android:src="@drawable/ic_back3"
+                android:contentDescription="back"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+
+            <!-- 标题 -->
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="账单详情"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#666666" />
+
+
+            <ImageView
+                android:id="@+id/iv_menu"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:padding="8dp"
+                android:src="@drawable/ic_list"
+                app:tint="#666666" />
+
+        </RelativeLayout>
+
+    </androidx.appcompat.widget.Toolbar>
+
+
+    <!-- 内容区域 -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="100dp">
+
+            <!-- 图片轮播卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_images"
+                android:layout_width="0dp"
+                android:layout_height="200dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <!-- 图片轮播 -->
+                    <androidx.viewpager2.widget.ViewPager2
+                        android:id="@+id/vp_images"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+
+                    <!-- 图片指示器 -->
+                    <LinearLayout
+                        android:id="@+id/layout_indicator"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:layout_marginBottom="6dp"
+                        android:orientation="horizontal"
+                        android:padding="6dp" />
+
+                </FrameLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 主内容卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_content"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="52dp"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/white"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/card_images">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="20dp">
+
+                    <!-- 分类名称和类型 -->
+                    <TextView
+                        android:id="@+id/tv_category"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="餐饮美食"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="#2D3436"
+                        android:layout_marginTop="48dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        tools:ignore="HardcodedText" />
+
+                    <LinearLayout
+                        android:id="@+id/layout_type_amount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="4dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_category">
+
+                        <TextView
+                            android:id="@+id/tv_type_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_expense_label"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="4dp"
+                            android:text="支出"
+                            android:textColor="@color/accent_color"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_amount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="¥520.88"
+                            android:textColor="@color/expense_color"
+                            android:textSize="24sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="12dp" />
+                    </LinearLayout>
+
+                    <!-- 虚线分隔线 -->
+                    <View
+                        android:id="@+id/divider_1"
+                        android:layout_width="0dp"
+                        android:layout_height="2dp"
+                        android:background="@drawable/bg_coupon_dash"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginEnd="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/layout_type_amount" />
+
+                    <!-- 左缺口 -->
+                    <View
+                        android:id="@+id/notch_left"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="@drawable/bg_notch"
+                        android:translationX="-12dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/divider_1"
+                        app:layout_constraintBottom_toBottomOf="@id/divider_1" />
+
+                    <!-- 右缺口 -->
+                    <View
+                        android:id="@+id/notch_right"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="@drawable/bg_notch"
+                        android:translationX="12dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/divider_1"
+                        app:layout_constraintBottom_toBottomOf="@id/divider_1" />
+
+                    <!-- 账户行 -->
+                    <ImageView
+                        android:id="@+id/iv_account_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_liability1"
+                        app:tint="#636E72"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_1"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_account_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="账户"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_account_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_account_icon"
+                        app:layout_constraintBottom_toBottomOf="@id/iv_account_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_account"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="微信支付"
+                        android:textSize="14sp"
+                        android:textColor="#636E72"
+                        android:gravity="end"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintStart_toEndOf="@id/tv_account_label"
+                        app:layout_constraintEnd_toStartOf="@id/iv_account_arrow"
+                        app:layout_constraintTop_toTopOf="@id/tv_account_label"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_account_label"
+                        tools:ignore="HardcodedText" />
+
+                    <ImageView
+                        android:id="@+id/iv_account_arrow"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_arrow_right"
+                        app:tint="#B0B0B0"
+                        android:layout_marginEnd="20dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/tv_account"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_account"
+                        tools:ignore="ContentDescription" />
+
+                    <!-- 分隔线 -->
+                    <View
+                        android:id="@+id/divider_2"
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:background="#F0F0F0"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_account_label" />
+
+                    <!-- 时间行 -->
+                    <ImageView
+                        android:id="@+id/iv_time_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        android:src="@drawable/ic_time1"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_2"
+                        app:tint="#636E72"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_time_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="账单时间"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_time_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_time_icon"
+                        app:layout_constraintBottom_toBottomOf="@id/iv_time_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_bill_time"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="2025-12-29 14:30"
+                        android:textSize="14sp"
+                        android:textColor="#636E72"
+                        android:gravity="end"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintStart_toEndOf="@id/tv_time_label"
+                        app:layout_constraintEnd_toStartOf="@id/iv_time_arrow"
+                        app:layout_constraintTop_toTopOf="@id/tv_time_label"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_time_label"
+                        tools:ignore="HardcodedText" />
+
+                    <ImageView
+                        android:id="@+id/iv_time_arrow"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_arrow_right"
+                        app:tint="#B0B0B0"
+                        android:layout_marginEnd="20dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/tv_bill_time"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_bill_time"
+                        tools:ignore="ContentDescription" />
+
+                    <!-- 分隔线 -->
+                    <View
+                        android:id="@+id/divider_3"
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:background="#F0F0F0"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_time_label" />
+
+                    <!-- 预算行 -->
+                    <ImageView
+                        android:id="@+id/iv_budget_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_money1"
+                        app:tint="#636E72"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_3"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_budget_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="预算设置"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_budget_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_budget_icon"
+                        app:layout_constraintBottom_toBottomOf="@id/iv_budget_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_budget"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="不计入预算"
+                        android:textSize="14sp"
+                        android:textColor="#636E72"
+                        android:gravity="end"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintStart_toEndOf="@id/tv_budget_label"
+                        app:layout_constraintEnd_toStartOf="@id/iv_budget_arrow"
+                        app:layout_constraintTop_toTopOf="@id/tv_budget_label"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_budget_label"
+                        tools:ignore="HardcodedText" />
+
+                    <ImageView
+                        android:id="@+id/iv_budget_arrow"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_arrow_right"
+                        app:tint="#B0B0B0"
+                        android:layout_marginEnd="20dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/tv_budget"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_budget"
+                        tools:ignore="ContentDescription" />
+
+                    <!-- 分隔线 -->
+                    <View
+                        android:id="@+id/divider_4"
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:background="#F0F0F0"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_budget_label" />
+
+                    <!-- 备注行 -->
+                    <ImageView
+                        android:id="@+id/iv_remark_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_note"
+                        app:tint="#636E72"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_4"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_remark_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="备注"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_remark_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_remark_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_remark"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="和朋友一起吃的火锅，味道不错"
+                        android:textSize="14sp"
+                        android:background="@drawable/bg_input_gray"
+                        android:textColor="#636E72"
+                        android:lineSpacingExtra="4dp"
+                        android:layout_marginStart="50dp"
+                        android:layout_marginEnd="20dp"
+                        android:layout_marginTop="12dp"
+                        android:minHeight="48dp"
+                        android:padding="8dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_remark_label"
+                        tools:ignore="HardcodedText" />
+
+                    <!-- 分隔线 -->
+                    <View
+                        android:id="@+id/divider_5"
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:background="#F0F0F0"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_remark" />
+
+                    <!-- 位置行 -->
+                    <ImageView
+                        android:id="@+id/iv_location_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_location"
+                        app:tint="#636E72"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_5"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_location_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="位置"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_location_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_location_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_location"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="北京市朝阳区三里屯太古里"
+                        android:textSize="14sp"
+                        android:background="@drawable/bg_input_gray"
+                        android:textColor="#636E72"
+                        android:lineSpacingExtra="4dp"
+                        android:layout_marginStart="50dp"
+                        android:layout_marginEnd="20dp"
+                        android:layout_marginTop="12dp"
+                        android:minHeight="48dp"
+                        android:padding="8dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_location_label"
+                        tools:ignore="HardcodedText" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 分类图标（一半在卡片外） - 跟随card_content移动 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_icon_container"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="4dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#795078E6"
+                app:cardBackgroundColor="#EEF8FF"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@id/card_content"
+                app:layout_constraintBottom_toTopOf="@id/card_content">
+
+                <ImageView
+                    android:id="@+id/iv_category_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_expense_shopping"
+                    tools:ignore="ContentDescription" />
+            </com.google.android.material.card.MaterialCardView>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

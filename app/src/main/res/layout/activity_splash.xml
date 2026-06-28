@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/splash_gradient">
+
+    <!-- Lottie 动画，整体上移一些 -->
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/lottieView"
+        android:layout_width="320dp"
+        android:layout_height="320dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="80dp"
+        app:lottie_rawRes="@raw/finance"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="false" />
+
+    <!-- 英文欢迎文字 -->
+    <TextView
+        android:id="@+id/tvWelcome"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Welcome to Smart Finance!"
+        android:textSize="16sp"
+
+        android:textStyle="bold"
+        android:fontFamily="@font/font2"
+        android:textColor="#81CEF3"
+        android:layout_gravity="center_horizontal|bottom"
+        android:layout_marginBottom="130dp"
+        android:alpha="0"
+        android:letterSpacing="0.05"
+        android:shadowColor="#33000000"
+        android:shadowDx="2"
+        android:shadowDy="2"
+        android:shadowRadius="3" />
+
+</FrameLayout>

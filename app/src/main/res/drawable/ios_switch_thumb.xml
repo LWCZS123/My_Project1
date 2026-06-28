@@ -1,0 +1,13 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 滑块尺寸小于滑道，确保不超出 -->
+    <item>
+        <shape android:shape="oval">
+            <!-- 滑块直径比滑道高度小4dp（上下各留2dp边距） -->
+            <size android:width="28dp" android:height="28dp" />
+            <solid android:color="#FFFFFF" /> <!-- 白色滑块 -->
+            <stroke
+                android:width="0.5dp"
+                android:color="#DDDDDD" /> <!-- 轻微边框 -->
+        </shape>
+    </item>
+</selector>

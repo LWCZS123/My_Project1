@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/state_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet"
+    android:fitsSystemWindows="true">
+
+    <!-- ======================= 主内容区域（固定高度） ======================= -->
+    <LinearLayout
+        android:id="@+id/content_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp"
+        android:background="@drawable/bg_bottom_sheet">
+
+        <!-- 顶部拖拽指示器 -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_drag_handle" />
+
+        <!-- 搜索栏 -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp">
+
+            <LinearLayout
+                android:id="@+id/search_container"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_toStartOf="@id/add_icon_button"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_search_box"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
+
+                <ImageView
+                    android:id="@+id/search_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_menu_search"
+                    android:tint="#000000" />
+
+                <EditText
+                    android:id="@+id/search_edit"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@android:color/transparent"
+                    android:hint="如：餐饮、早餐等"
+                    android:textSize="15sp"
+                    android:textColor="#333333"
+                    android:textColorHint="#AAAAAA"
+                    android:maxLines="1"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text" />
+
+                <ImageView
+                    android:id="@+id/clear_button"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#CCCCCC"
+                    android:visibility="gone"
+                    android:padding="2dp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/add_icon_button"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentEnd="true"
+                android:layout_marginStart="4dp"
+                android:contentDescription="添加图标"
+                android:src="@drawable/ic_input_add" />
+        </RelativeLayout>
+
+        <!-- 内容容器（固定高度） -->
+        <FrameLayout
+            android:id="@+id/content_container"
+            android:layout_width="match_parent"
+            android:layout_height="500dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp">
+
+            <!-- 卡片容器 -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/card_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@android:color/white">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal">
+
+                    <!-- 左侧分类栏 -->
+                    <ScrollView
+                        android:layout_width="70dp"
+                        android:layout_height="match_parent"
+                        android:background="#FAFAFA"
+                        android:scrollbars="none">
+
+                        <com.example.my_project1.ui.custom.VerticalTabLayout
+                            android:id="@+id/category_tab_layout"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="8dp"
+                            android:paddingBottom="8dp" />
+                    </ScrollView>
+
+                    <!-- 右侧图标网格 -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/icon_recycler"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:clipToPadding="false"
+                        android:background="@android:color/white" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- 加载中 Lottie - 居中显示 -->
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/lottie_loading"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center"
+                android:visibility="gone"
+                app:lottie_autoPlay="true"
+                app:lottie_loop="true"
+                app:lottie_rawRes="@raw/loading" />
+
+            <!-- 加载失败 Lottie - 居中显示 -->
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/lottie_error"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:layout_gravity="center"
+                android:visibility="gone"
+                app:lottie_loop="true"
+                app:lottie_rawRes="@raw/error" />
+        </FrameLayout>
+    </LinearLayout>
+
+</FrameLayout>

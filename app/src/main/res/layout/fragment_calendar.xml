@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F2F4F8"
+    tools:context=".ui.fragment.CalendarFragment">
+
+    <!-- 顶部标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#F2F4F8"
+        android:elevation="0dp">
+
+        <TextView
+            android:id="@+id/tv_selected_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="2026年01月20日 星期二"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:gravity="center"/>
+
+        <ImageView
+            android:id="@+id/iv_back_to_today"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_calendar1"
+            android:padding="4dp"
+            android:contentDescription="回到今天"/>
+    </LinearLayout>
+
+    <!-- 可滚动区域 -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="200dp">
+
+            <!-- 日历卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@android:color/white">
+
+                    <!-- 年月 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="8dp">
+
+                        <TextView
+                            android:id="@+id/tv_year_month"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="2026年01月"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="@android:color/black"/>
+
+                        <ImageView
+                            android:id="@+id/iv_prev_month"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:padding="6dp"
+                            android:src="@drawable/ic_arrow_left"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="上一月"/>
+
+                        <ImageView
+                            android:id="@+id/iv_next_month"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:padding="6dp"
+                            android:src="@drawable/ic_arrow_right1"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="下一月"/>
+                    </LinearLayout>
+
+                    <!-- 星期 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="28dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="日" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="一" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="二" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="三" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="四" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="五" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+                        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="六" android:gravity="center" android:textSize="11sp" android:textColor="#999999"/>
+
+                    </LinearLayout>
+
+                    <!-- 日历容器 -->
+                    <FrameLayout
+                        android:id="@+id/calendar_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:paddingBottom="4dp">
+
+                        <androidx.viewpager2.widget.ViewPager2
+                            android:id="@+id/vp_calendar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:overScrollMode="never"/>
+                    </FrameLayout>
+
+                    <!-- 分割线 -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:background="#E0E0E0"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"/>
+
+                    <!-- 收支 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp">
+
+                        <ImageView
+                            android:id="@+id/iv_menu"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:src="@drawable/ic_more_vert"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="菜单"/>
+
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1"/>
+
+                        <TextView
+                            android:id="@+id/tv_total_expense"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="支出 ¥0.00"
+                            android:textSize="12sp"
+                            android:textColor="#666666"
+                            android:layout_marginEnd="12dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_total_income"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="收入 ¥0.00"
+                            android:textSize="12sp"
+                            android:textColor="#666666"
+                            android:layout_marginEnd="12dp"/>
+
+                        <ImageView
+                            android:id="@+id/iv_refresh"
+                            android:layout_width="20dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_qiehuan"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="刷新"
+                            app:tint="#666666"/>
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 账单卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:background="@android:color/white">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rv_bills"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        android:overScrollMode="never"/>
+
+                    <LinearLayout
+                        android:id="@+id/ll_empty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:visibility="gone"
+                        android:padding="24dp">
+
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

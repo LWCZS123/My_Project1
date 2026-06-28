@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- bg_capsule_small.xml  — 浅灰胶囊底，用于饼图支出/收入切换底部背景 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#F0F0F0"/>
+    <corners android:radius="999dp"/>
+</shape>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="4dp"
+    android:layout_marginVertical="4dp"
+    android:minHeight="38dp"
+    android:background="@drawable/bg_history_item"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:foreground="?attr/selectableItemBackground">
+
+    <!-- 历史图标 -->
+    <ImageView
+        android:id="@+id/imgHistory"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginStart="4dp"
+
+        android:src="@drawable/ic_history"
+        android:contentDescription="历史记录"
+        app:tint="#666666"/>
+
+    <!-- 搜索内容 -->
+    <TextView
+        android:id="@+id/tvKeyword"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:maxEms="8"
+        android:text="餐饮外卖"
+        android:textColor="#333333"
+        android:textSize="12sp"/>
+
+    <!-- 删除按钮 -->
+    <ImageView
+        android:id="@+id/btnDelete"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginEnd="4dp"
+
+        android:src="@drawable/ic_close"
+        android:contentDescription="删除"
+        app:tint="#999999"/>
+
+</LinearLayout>

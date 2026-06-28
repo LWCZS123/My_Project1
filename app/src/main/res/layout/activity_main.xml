@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    android:id="@+id/root"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Fragment容器 -->
+    <FrameLayout
+        android:id="@+id/nav_host_fragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 底部导航栏容器 -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="78dp"
+        android:layout_gravity="bottom"
+        android:paddingStart="18dp"
+        android:layout_marginBottom="18dp"
+        android:paddingEnd="18dp"
+        android:clipToPadding="false">
+
+        <FrameLayout
+            android:id="@+id/bottom_nav_container"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="72dp"
+            android:background="@drawable/bottom_nav_bg_solid_white"
+            android:elevation="4dp">
+
+            <com.google.android.material.bottomnavigation.BottomNavigationView
+                android:id="@+id/bottom_navigation"
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:background="@android:color/transparent"
+                app:itemHorizontalPadding="0dp"
+                app:itemIconSize="20dp"
+                app:itemIconTint="@color/bottom_nav_selector"
+                app:itemTextColor="@color/bottom_nav_selector"
+                app:labelVisibilityMode="labeled"
+                app:menu="@menu/bottom_nav_menu"
+                app:elevation="0dp"
+
+                app:itemBackground="@drawable/bottom_nav_item_bg"
+                app:itemRippleColor="#22000000"
+
+
+            app:itemPaddingTop="11dp"
+            app:itemPaddingBottom="11dp"
+            app:itemVerticalPadding="0dp"
+            android:clipToPadding="false"/>
+        </FrameLayout>
+
+        <!-- FAB按钮 -->
+        <FrameLayout
+            android:id="@+id/fab"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/fab_semi_transparent_bg"
+            android:elevation="4dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_setting"
+                android:tint="@color/accent_color"/>
+
+        </FrameLayout>
+
+    </RelativeLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="8dp">
+
+    <!-- 图标容器（圆形背景） -->
+    <FrameLayout
+        android:id="@+id/icon_container"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_icon_circle">
+
+        <!-- 图标图片 -->
+        <ImageView
+            android:id="@+id/iv_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:scaleType="centerInside" />
+
+
+
+        <!-- ★ 复选框：右上角，默认隐藏 -->
+        <ImageView
+            android:id="@+id/iv_checkbox"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="2dp"
+            android:src="@drawable/ic_checkbox_unchecked"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- 名称 -->
+    <TextView
+        android:id="@+id/tv_icon_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textSize="10sp"
+        android:textColor="#333333"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:maxWidth="60dp"
+        android:gravity="center" />
+
+</LinearLayout>

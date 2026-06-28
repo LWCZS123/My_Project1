@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="6dp"
+    android:paddingHorizontal="8dp">
+
+    <!-- 第一行：颜色 + 分类名称 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- 颜色指示器 -->
+        <View
+            android:id="@+id/color_indicator"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/bg_round" />
+
+        <!-- 分类名称 -->
+        <TextView
+            android:id="@+id/tv_legend_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="分类名称"
+            android:textSize="13sp"
+            android:textColor="#2D3436"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 第二行：百分比 + 金额 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical">
+
+        <!-- 百分比 -->
+        <TextView
+            android:id="@+id/tv_legend_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="25.0%"
+            android:textSize="11sp"
+            android:textColor="#636E72" />
+
+        <!-- 分隔符 -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="10dp"
+            android:layout_marginHorizontal="8dp"
+            android:background="#E0E0E0" />
+
+        <!-- 金额 -->
+        <TextView
+            android:id="@+id/tv_legend_amount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="$1,234.56"
+            android:textSize="11sp"
+            android:textColor="#2D3436"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+</LinearLayout>

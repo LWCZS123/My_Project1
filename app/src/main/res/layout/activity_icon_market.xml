@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    activity_icon_market.xml（重构版）
+    新增：search_toolbar_multi_select — 搜索结果多选工具栏
+    与 fragment_icon_detail.xml 的 toolbar_multi_select 结构完全对齐
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F2F4F8"
+    android:orientation="vertical">
+
+    <!-- ===== 搜索栏（正常模式）===== -->
+    <LinearLayout
+        android:id="@+id/toolbar_normal"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="#F2F4F8"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:elevation="0dp">
+
+        <ImageView
+            android:id="@+id/iv_back"
+
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="搜索"
+            android:src="@drawable/ic_back3"
+            app:tint="#000000" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="搜索"
+            android:src="@drawable/ic_search"
+            app:tint="#AAAAAA" />
+
+        <EditText
+            android:id="@+id/et_search"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:hint="搜索图标（支持名称、拼音、首字母）"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textColor="#1A1A2E"
+            android:textColorHint="#BBBBBB"
+            android:textSize="14sp" />
+
+        <ImageView
+            android:id="@+id/iv_clear_search"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="清除"
+            android:src="@drawable/ic_close"
+            android:visibility="gone"
+            app:tint="#AAAAAA" />
+
+    </LinearLayout>
+
+    <!-- ===== 多选工具栏（搜索结果多选模式，默认隐藏）===== -->
+    <LinearLayout
+        android:id="@+id/search_toolbar_multi_select"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/white"
+        android:elevation="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:visibility="gone">
+
+        <!-- 已选数量标题 -->
+        <TextView
+            android:id="@+id/search_tv_select_count"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="选择图标"
+            android:textColor="#1A1A2E"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- 全选 / 取消全选 -->
+        <TextView
+            android:id="@+id/search_btn_select_all"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:background="@null"
+            android:padding="6dp"
+            android:text="全选"
+            android:textColor="#304FFE"
+            android:textSize="14sp" />
+
+        <!-- 确认 -->
+        <TextView
+            android:id="@+id/search_btn_confirm_select"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:alpha="0.4"
+            android:background="@null"
+            android:padding="6dp"
+            android:text="确认"
+            android:textColor="#304FFE"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- 取消 -->
+        <TextView
+            android:id="@+id/search_btn_cancel_select"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@null"
+            android:padding="6dp"
+            android:text="取消"
+            android:textColor="#888888"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- ===== 首次加载进度条 ===== -->
+    <ProgressBar
+        android:id="@+id/progress_category"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/progress_search"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <!-- ===== 内容区域（分类列表 / 搜索结果 二选一）===== -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- 分类列表，每行 2 个 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_categories"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="8dp"
+            android:scrollbars="none" />
+
+        <!-- 搜索结果宫格，每行 6 个 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_search"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="8dp"
+            android:scrollbars="none"
+            android:visibility="gone" />
+
+        <!-- 搜索为空提示 -->
+        <TextView
+            android:id="@+id/tv_search_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:drawableTop="@drawable/ic_search"
+            android:drawablePadding="12dp"
+            android:gravity="center"
+            android:text="暂无搜索结果"
+            android:textColor="#BBBBBB"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- ===== 加载更多进度条（底部）===== -->
+    <ProgressBar
+        android:id="@+id/progress_category_more"
+        style="@style/Widget.AppCompat.ProgressBar"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/progress_search_more"
+        style="@style/Widget.AppCompat.ProgressBar"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone" />
+
+</LinearLayout>
