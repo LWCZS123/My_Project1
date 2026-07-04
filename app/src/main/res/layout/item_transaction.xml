@@ -66,14 +66,49 @@
             android:textStyle="bold"
             android:layout_marginStart="12dp"/>
 
-        <!-- 金额 -->
-        <TextView
-            android:id="@+id/tv_amount"
+        <!-- 右侧：金额 + 账户 -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="$ 96"
-            android:textSize="16sp"
-            android:textStyle="bold"/>
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <!-- 金额 -->
+            <TextView
+                android:id="@+id/tv_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="$ 96"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <!-- 账户 (放在金额下面) -->
+            <LinearLayout
+                android:id="@+id/layout_account_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/iv_account_icon"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_wallet" />
+
+                <TextView
+                    android:id="@+id/tv_account"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="账户"
+                    android:textSize="9sp"
+                    android:textColor="#999999" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
     <!-- 分隔线 -->
     <View

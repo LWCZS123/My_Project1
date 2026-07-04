@@ -2,6 +2,7 @@ package com.example.my_project1.ui.activity;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -159,15 +160,17 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         }
         binding.tvPeriodLabel.setText(periodLabel);
 
-        if (catIcon != null && !catIcon.isEmpty()) {
-            try {
-                int resId = Integer.parseInt(catIcon);
-                GlideImageLoader.load1(this, binding.ivCategoryIcon, resId);
-            } catch (NumberFormatException e) {
-                GlideImageLoader.load(this, catIcon, binding.ivCategoryIcon);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD) {
+            if (catIcon != null && !catIcon.isEmpty()) {
+                try {
+                    int resId = Integer.parseInt(catIcon);
+                    GlideImageLoader.load1(this, binding.ivCategoryIcon, resId);
+                } catch (NumberFormatException e) {
+                    GlideImageLoader.load(this, catIcon, binding.ivCategoryIcon);
+                }
+            } else {
+                binding.ivCategoryIcon.setImageResource(R.drawable.ic_category_default);
             }
-        } else {
-            binding.ivCategoryIcon.setImageResource(R.drawable.ic_category_default);
         }
     }
 
@@ -361,9 +364,6 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
             if (b.getBillTime() != null) {
                 h.tvTime.setText(SDF_TIME.format(b.getBillTime()));
 
-                // ======================
-                // 自动切换 太阳 / 月亮
-                // ======================
                 Calendar calendar = Calendar.getInstance();
                 calendar.setTime(b.getBillTime());
                 int hour = calendar.get(Calendar.HOUR_OF_DAY);

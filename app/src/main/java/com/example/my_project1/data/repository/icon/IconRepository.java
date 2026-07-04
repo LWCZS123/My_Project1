@@ -9,15 +9,15 @@ import com.example.my_project1.utils.AppExecutors;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /**
  * IconRepository - 图标数据仓库
@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   - 搜索数据懒加载，首次搜索时才拉取 search.json
  *   - computation 线程池处理 JSON 解析，不阻塞 networkIO
  *   - 分页截取：Repository 层直接切片，减少 ViewModel 数据处理量
+ *   - 【使用 OkHttp 加载】
  */
 public class IconRepository {
 
@@ -62,7 +63,7 @@ public class IconRepository {
     public static final int PAGE_SIZE_CATEGORY = 10;
 
     /** 图标详情页每页图标数 */
-    public static final int PAGE_SIZE_DETAIL = 35;
+    public static final int PAGE_SIZE_DETAIL = 50;
 
     /** 搜索结果每页图标数 */
     public static final int PAGE_SIZE_SEARCH = 200;
@@ -72,6 +73,7 @@ public class IconRepository {
     private static volatile IconRepository instance;
 
     private final AppExecutors executors;
+    private final OkHttpClient okHttpClient;
 
     /** 分类详情缓存：file → List<IconItem>，避免重复请求 */
     private final ConcurrentHashMap<String, List<IconItem>> categoryCache = new ConcurrentHashMap<>();
@@ -93,6 +95,10 @@ public class IconRepository {
 
     private IconRepository() {
         this.executors = AppExecutors.get();
+        this.okHttpClient = new OkHttpClient.Builder()
+                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
     }
 
     public static IconRepository getInstance() {
@@ -366,8 +372,20 @@ public class IconRepository {
             item.setId(obj.optString("id"));
             item.setName(obj.optString("name"));
             item.setCategory(obj.optString("category"));
-            item.setUrl(obj.optString("url"));
-            item.setThumb(obj.optString("thumb"));
+
+            // 修复：补全 URL 路径
+            String url = obj.optString("url");
+            if (!url.isEmpty() && !url.startsWith("http")) {
+                url = OSS_BASE + url;
+            }
+            item.setUrl(url);
+
+            String thumb = obj.optString("thumb");
+            if (!thumb.isEmpty() && !thumb.startsWith("http")) {
+                thumb = OSS_BASE + thumb;
+            }
+            item.setThumb(thumb);
+
             item.setPinyin(obj.optString("pinyin"));
             item.setInitial(obj.optString("initial"));
             list.add(item);
@@ -380,34 +398,21 @@ public class IconRepository {
     /**
      * 同步拉取 URL 文本内容
      * 在 networkIO 线程调用，不阻塞主线程
+     * 【已重构为使用 OkHttp】
      */
     private String fetchUrl(String urlStr) throws Exception {
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(urlStr);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(15_000);
-            conn.connect();
+        Request request = new Request.Builder()
+                .url(urlStr)
+                .build();
 
-            int code = conn.getResponseCode();
-            if (code != HttpURLConnection.HTTP_OK) {
-                throw new Exception("HTTP " + code + " - " + urlStr);
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("HTTP " + response.code() + " - " + urlStr);
             }
-
-            InputStream is = conn.getInputStream();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
+            if (response.body() == null) {
+                throw new IOException("Empty body - " + urlStr);
             }
-            reader.close();
-            return sb.toString();
-
-        } finally {
-            if (conn != null) conn.disconnect();
+            return response.body().string();
         }
     }
 

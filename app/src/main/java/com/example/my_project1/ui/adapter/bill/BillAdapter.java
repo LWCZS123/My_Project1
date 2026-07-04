@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.my_project1.R;
 import com.example.my_project1.databinding.ItemBillBinding;
 import com.example.my_project1.databinding.ItemBillDateHeaderBinding;
 import com.example.my_project1.ui.adapter.photo.PhotoAdapter;
@@ -73,6 +74,7 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                         return o.timeText.equals(n.timeText)
                                 && o.amountText.equals(n.amountText)
                                 && o.categoryName.equals(n.categoryName)
+                                && o.accountName.equals(n.accountName)
                                 && o.remarkText.equals(n.remarkText)
                                 && o.locationText.equals(n.locationText)
                                 && o.isFirstOfDay == n.isFirstOfDay
@@ -194,6 +196,19 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
             // 分类图标
             ImageLoaderUtils.loadThumbnail(context, model.categoryIconUrl, b.ivCategoryIcon);
+
+            // 账户
+            if (model.accountName != null && !model.accountName.isEmpty()) {
+                b.layoutAccountInfo.setVisibility(View.VISIBLE);
+                b.tvAccount.setText(model.accountName);
+                if (model.accountIconUrl != null && !model.accountIconUrl.isEmpty()) {
+                    ImageLoaderUtils.loadThumbnail(context, model.accountIconUrl, b.ivAccountIcon);
+                } else {
+                    b.ivAccountIcon.setImageResource(R.drawable.ic_wallet);
+                }
+            } else {
+                b.layoutAccountInfo.setVisibility(View.GONE);
+            }
 
             // 备注
             if (!model.remarkText.isEmpty()) {

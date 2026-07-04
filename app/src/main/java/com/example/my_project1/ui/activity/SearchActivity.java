@@ -233,7 +233,7 @@ public class SearchActivity extends AppCompatActivity {
         viewModel.searchResults.observe(this, bills -> {
             if (bills != null && !bills.isEmpty()) {
                 // 🔥 修复点：调用新写的转换方法，将 List<Bill> 转为带日期的 List<Object>
-                List<Object> uiModels = convertBillsToUiItems(bills);
+                List<Object> uiModels = convertBillsToUiItems(bills, viewModel.accountMap.getValue());
                 billAdapter.submitList(uiModels);
                 showSearchResults();
             }
@@ -268,9 +268,9 @@ public class SearchActivity extends AppCompatActivity {
 
     /**
      * 将原始 Bill 列表转化为 BillAdapter 需要的 [DateHeader, BillUiModel] 混合列表
-     * （与首页逻辑一致，确保搜索结果也能漂亮地显示日期和时间轴）
+     * （与首页逻辑一致，确保搜索结果也能漂亮地显示日期前和时间轴）
      */
-    private List<Object> convertBillsToUiItems(List<Bill> bills) {
+    private List<Object> convertBillsToUiItems(List<Bill> bills, java.util.Map<String, com.example.my_project1.data.model.account.Account> accountMap) {
         List<Object> items = new ArrayList<>();
         if (bills == null || bills.isEmpty()) return items;
 
@@ -341,6 +341,11 @@ public class SearchActivity extends AppCompatActivity {
 
             boolean isFirstOfDay = (items.size() == firstBillIndex);
 
+            com.example.my_project1.data.model.account.Account account =
+                    accountMap != null ? accountMap.get(bill.getAccountId()) : null;
+            String accountName = account != null ? account.getName() : "";
+            String accountIcon = account != null ? account.getIconUrl() : "";
+
             // 生成 BillUiModel
             BillUiModel uiModel = BillUiModel.builder()
                     .localId(bill.getId())
@@ -350,6 +355,8 @@ public class SearchActivity extends AppCompatActivity {
                     .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
                     .amountText(amountText)
                     .amountColor(amountColor)
+                    .accountName(accountName)
+                    .accountIconUrl(accountIcon)
                     .remarkText(bill.getRemark())
                     .locationText(bill.getLocation())
                     .imageUrls(bill.getImageUrls())

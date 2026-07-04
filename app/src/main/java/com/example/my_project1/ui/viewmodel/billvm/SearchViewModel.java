@@ -8,14 +8,20 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.my_project1.data.dao.AccountDao;
+import com.example.my_project1.data.database.AppDatabase;
+import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.bill.SearchFilter;
 import com.example.my_project1.data.model.bill.SearchHistory;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.SearchRepository;
+import com.example.my_project1.utils.AppExecutors;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
@@ -40,6 +46,7 @@ public class SearchViewModel extends AndroidViewModel {
 
     // Repository
     private final SearchRepository repository;
+    private final AccountDao accountDao;
 
     // 当前用户ID
     private String currentUserId;
@@ -48,6 +55,10 @@ public class SearchViewModel extends AndroidViewModel {
     private SearchFilter currentFilter;
 
     // ==================== LiveData ====================
+
+    // 账户映射 (accountId -> Account)
+    private final MutableLiveData<Map<String, Account>> _accountMap = new MutableLiveData<>(new HashMap<>());
+    public final LiveData<Map<String, Account>> accountMap = _accountMap;
 
     // 搜索结果
     private final MutableLiveData<List<Bill>> _searchResults = new MutableLiveData<>();
@@ -70,6 +81,10 @@ public class SearchViewModel extends AndroidViewModel {
         super(application);
 
         repository = new SearchRepository(application);
+        accountDao = AppDatabase.getInstance(application).accountDao();
+
+        // 加载账户信息
+        loadAccounts();
 
         // 获取当前用户ID
         BmobUser currentUser = BmobUser.getCurrentUser();
@@ -263,6 +278,22 @@ public class SearchViewModel extends AndroidViewModel {
                 _toastMessage.setValue("清空失败");
                 Log.e(TAG, "❌ 清空搜索历史失败: " + response.message);
             }
+        });
+    }
+
+    /**
+     * 加载账户信息以构建映射
+     */
+    private void loadAccounts() {
+        AppExecutors.get().diskIO().execute(() -> {
+            List<Account> accounts = accountDao.getAllAccountsSync();
+            Map<String, Account> map = new HashMap<>();
+            if (accounts != null) {
+                for (Account acc : accounts) {
+                    map.put(acc.getObjectId(), acc);
+                }
+            }
+            _accountMap.postValue(map);
         });
     }
 

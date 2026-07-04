@@ -109,7 +109,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
-                    android:layout_toStartOf="@+id/amountLayout"
+                    android:layout_toStartOf="@+id/rightContainer"
                     android:padding="8dp"
                     android:clipChildren="false"
                     android:clipToPadding="false"
@@ -156,16 +156,17 @@
                         android:src="@drawable/ic_wechat" />
                 </RelativeLayout>
 
-                <!-- 金额 -->
+                <!-- 右侧容器：金额 + 账户信息 -->
                 <LinearLayout
-                    android:id="@+id/amountLayout"
+                    android:id="@+id/rightContainer"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
-                    android:gravity="center"
-                    android:orientation="horizontal"
+                    android:gravity="end"
+                    android:orientation="vertical"
                     android:padding="6dp">
 
+                    <!-- 金额 -->
                     <LinearLayout
                         android:id="@+id/amountWrapper"
                         android:layout_width="wrap_content"
@@ -190,20 +191,35 @@
                             android:src="@drawable/ic_amount_line"
                             app:tint="#304FFE" />
                     </LinearLayout>
+
+                    <!-- 账户信息 (放在金额下面) -->
+                    <LinearLayout
+                        android:id="@+id/layoutAccountInfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/ivAccountIcon"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/ic_wallet" />
+
+                        <TextView
+                            android:id="@+id/tvAccount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="微信支付"
+                            android:textColor="#999999"
+                            android:textSize="10sp" />
+                    </LinearLayout>
                 </LinearLayout>
             </RelativeLayout>
-
-            <!-- 账户（默认隐藏）-->
-            <TextView
-                android:id="@+id/tvAccount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginTop="6dp"
-                android:text="账户：微信支付"
-                android:textSize="12sp"
-                android:textColor="#666666"
-                android:visibility="gone" />
 
             <!-- 备注（默认隐藏）-->
             <TextView

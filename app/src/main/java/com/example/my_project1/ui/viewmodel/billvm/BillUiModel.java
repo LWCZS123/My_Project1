@@ -23,6 +23,8 @@ public class BillUiModel {
     public final String categoryIconUrl;   // Glide 加载 URL
     public final String amountText;        // "-¥21.00" / "+¥500.00"
     public final int    amountColor;       // 红/绿颜色 int（已 resolve）
+    public final String accountName;       // 账户名称，如 "微信支付"
+    public final String accountIconUrl;    // 账户图标 URL
     public final String remarkText;        // 备注，空串则隐藏
     public final String locationText;      // 位置，空串则隐藏
     public final java.util.List<String> imageUrls; // 图片 URL 列表
@@ -45,6 +47,8 @@ public class BillUiModel {
         this.categoryIconUrl= b.categoryIconUrl;
         this.amountText     = b.amountText;
         this.amountColor    = b.amountColor;
+        this.accountName    = b.accountName;
+        this.accountIconUrl = b.accountIconUrl;
         this.remarkText     = b.remarkText;
         this.locationText   = b.locationText;
         this.imageUrls      = b.imageUrls;
@@ -64,6 +68,8 @@ public class BillUiModel {
         String categoryIconUrl= "";
         String amountText     = "";
         int    amountColor;
+        String accountName    = "";
+        String accountIconUrl = "";
         String remarkText     = "";
         String locationText   = "";
         java.util.List<String> imageUrls = new java.util.ArrayList<>();
@@ -77,6 +83,8 @@ public class BillUiModel {
         public Builder categoryIconUrl(String v){ categoryIconUrl = v; return this; }
         public Builder amountText(String v)   { amountText = v; return this; }
         public Builder amountColor(int v)     { amountColor = v; return this; }
+        public Builder accountName(String v)  { accountName = v != null ? v : ""; return this; }
+        public Builder accountIconUrl(String v){ accountIconUrl = v != null ? v : ""; return this; }
         public Builder remarkText(String v)   { remarkText = v != null ? v : ""; return this; }
         public Builder locationText(String v) { locationText = v != null ? v : ""; return this; }
         public Builder imageUrls(java.util.List<String> v){ imageUrls = v != null ? v : new java.util.ArrayList<>(); return this; }

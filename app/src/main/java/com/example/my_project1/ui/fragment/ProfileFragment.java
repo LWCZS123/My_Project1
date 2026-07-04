@@ -13,9 +13,6 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -27,6 +24,7 @@ import com.example.my_project1.ui.activity.BudgetActivity;
 import com.example.my_project1.ui.activity.ChangePasswordActivity;
 import com.example.my_project1.ui.activity.EditProfileActivity;
 import com.example.my_project1.ui.activity.IconMarketActivity;
+import com.example.my_project1.ui.activity.IconSelectionActivity;
 import com.example.my_project1.ui.activity.SavingsOverviewActivity;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
@@ -163,6 +161,13 @@ public class ProfileFragment extends Fragment {
         binding.llBudget.setOnClickListener(v -> budgetActivity());
         binding.llCategoryManage.setOnClickListener(v -> iconMarketActivity());
         binding.llMyWish.setOnClickListener(v -> savingsOverviewActivity());
+        binding.llFinancialTips.setOnClickListener(v-> iconCheckAcitvity());
+
+    }
+
+    private void iconCheckAcitvity() {
+        startActivity(new Intent(getActivity(), IconSelectionActivity.class));
+        getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
 
     }
 

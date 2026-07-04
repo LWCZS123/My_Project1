@@ -132,21 +132,27 @@ public class CalendarFragment extends Fragment {
         binding      = FragmentCalendarBinding.inflate(inflater, container, false);
         billViewModel = new ViewModelProvider(requireActivity()).get(BillViewModel.class);
 
-
-
-        // ── 1. 先只做轻量初始化，不绑定 Adapter ──────────────────────────────
+        // ── 1. 轻量 UI 初始化 ──────────────────────────────
         setupBillList();
         setupListeners();
         updateTitle();
-        observeData();
 
-        // ── 2. 日历 Adapter 延迟到下一帧（跳过转场动画帧）绑定 ──────────────
-        //    postDelayed 100ms：等待 Fragment 转场动画结束再开始 inflate 120 个
-        //    月份 holder，避免同帧内出现 jank。
-        //    如果转场动画时长 < 100ms，可适当减小到 50ms。
-        binding.getRoot().postDelayed(this::setupCalendarPager, 100);
+        // ── 2. 延迟加载日历与数据（避开 Fragment 转场动画） ──────────────
+        //    增加延迟到 300ms，确保在大多数设备上转场动画已结束
+        binding.getRoot().postDelayed(() -> {
+            if (isAdded() && binding != null) {
+                setupCalendarPager();
+                observeData();
+            }
+        }, 300);
 
         return binding.getRoot();
+    }
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        // 如果需要在此处处理可见性变化逻辑（例如：可见时刷新），请在此编写
     }
 
     @Override

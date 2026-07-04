@@ -94,8 +94,6 @@ public class MainActivity extends AppCompatActivity {
 
 
         fragmentManager = getSupportFragmentManager();
-        // ========== 修复1：启用预加载 ==========
-        preloadFragments();
 
         // 处理配置变更（如屏幕旋转）
         if (savedInstanceState != null) {
@@ -116,6 +114,9 @@ public class MainActivity extends AppCompatActivity {
             // 首次创建，显示首页
             Log.d(TAG, "首次创建，显示首页");
             showFragment(TAG_HOME);
+
+            // ========== 优化：分步预加载，避免启动卡顿 ==========
+            binding.getRoot().postDelayed(this::preloadFragments, 500);
         }
 
         // 设置底部导航监听

@@ -53,7 +53,11 @@ public class IconItem {
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
 
-    public String getUrl() { return url; }
+    public String getUrl() {
+        if (url != null && !url.isEmpty()) return url;
+        // 兼容性修复：如果 url 为空（如在 search.json 中），则返回 thumb 作为预览图
+        return thumb;
+    }
     public void setUrl(String url) { this.url = url; }
 
     public String getThumb() { return thumb; }

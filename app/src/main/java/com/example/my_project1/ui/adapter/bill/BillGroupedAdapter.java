@@ -9,9 +9,13 @@ import android.view.ViewGroup;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.dao.AccountDao;
+import com.example.my_project1.data.database.AppDatabase;
+import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ItemTransactionBinding;
 import com.example.my_project1.databinding.ItemTransationDateHeaderBinding;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.text.DecimalFormat;
@@ -19,6 +23,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -38,6 +43,7 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private final Context mContext;
     private final List<Object> mItems = new ArrayList<>();
     private OnBillClickListener mListener;
+    private Map<String, Account> mAccountMap = new HashMap<>();
 
     public interface OnBillClickListener {
         void onBillClick(Bill bill);
@@ -50,6 +56,23 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     public BillGroupedAdapter(Context context) {
         this.mContext = context;
+        loadAccounts();
+    }
+
+    private void loadAccounts() {
+        AppExecutors.get().diskIO().execute(() -> {
+            List<Account> accounts = AppDatabase.getInstance(mContext).accountDao().getAllAccountsSync();
+            Map<String, Account> map = new HashMap<>();
+            if (accounts != null) {
+                for (Account acc : accounts) {
+                    map.put(acc.getObjectId(), acc);
+                }
+            }
+            AppExecutors.get().mainThread().execute(() -> {
+                this.mAccountMap = map;
+                notifyDataSetChanged();
+            });
+        });
     }
 
     public void setBills(List<Bill> bills) {
@@ -205,6 +228,21 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             }
             // 分类名
             bind.tvCategoryName.setText(bill.getCategoryName() == null || bill.getCategoryName().isEmpty() ? "未分类" : bill.getCategoryName());
+
+            // 账户
+            Account account = mAccountMap.get(bill.getAccountId());
+            if (account != null) {
+                bind.layoutAccountInfo.setVisibility(View.VISIBLE);
+                bind.tvAccount.setText(account.getName());
+                if (account.getIconUrl() != null && !account.getIconUrl().isEmpty()) {
+                    ImageLoaderUtils.loadThumbnail(mContext, account.getIconUrl(), bind.ivAccountIcon);
+                } else {
+                    bind.ivAccountIcon.setImageResource(R.drawable.ic_wallet);
+                }
+            } else {
+                bind.layoutAccountInfo.setVisibility(View.GONE);
+            }
+
             // 时间
             bind.tvTime.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(bill.getBillTime()));
             // 金额

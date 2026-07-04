@@ -1,268 +1,154 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="8dp"
     app:cardCornerRadius="12dp"
-    app:cardElevation="0dp"
+    app:cardElevation="2dp"
     app:strokeWidth="0dp">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- 九宫格 -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <!-- 标题行 -->
+        <TextView
+            android:id="@+id/tv_category_name"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:text="图标分类"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- ================= 第一行 ================= -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <!-- 通用格子 -->
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_0"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_1"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_2"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-            </LinearLayout>
-
-            <!-- ================= 第二行 ================= -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <!-- 3,4,5 -->
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_3"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_4"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_5"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-            </LinearLayout>
-
-            <!-- ================= 第三行 ================= -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <!-- 6,7,8 -->
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_6"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_7"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginBottom="4dp"
-                    android:padding="4dp"
-                    android:background="#F0F0F0">
-
-                    <ImageView
-                        android:id="@+id/iv_thumb_8"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintDimensionRatio="1:1"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"/>
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- 分类名称 + 数量 -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tv_category_count"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:text="0 个"
+            android:textColor="#999999"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="@id/tv_category_name" />
 
-            <TextView
-                android:id="@+id/tv_category_name"
+        <!-- 正方形九宫格容器：宽度撑满，高度按 1:1 联动 -->
+        <GridLayout
+            android:id="@+id/grid_square_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:columnCount="3"
+            android:rowCount="3"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_category_name"
+            app:layout_constraintDimensionRatio="1:1"
+            android:layout_marginTop="12dp">
+
+            <ImageView
+                android:id="@+id/iv_thumb_0"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#1A1A2E"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
 
-            <TextView
-                android:id="@+id/tv_category_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#AAAAAA"
-                android:textSize="11sp" />
+            <ImageView
+                android:id="@+id/iv_thumb_1"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
 
-        </LinearLayout>
+            <ImageView
+                android:id="@+id/iv_thumb_2"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
 
-    </LinearLayout>
+            <ImageView
+                android:id="@+id/iv_thumb_3"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
+
+            <ImageView
+                android:id="@+id/iv_thumb_4"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
+
+            <ImageView
+                android:id="@+id/iv_thumb_5"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
+
+            <ImageView
+                android:id="@+id/iv_thumb_6"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
+
+            <ImageView
+                android:id="@+id/iv_thumb_7"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
+
+            <ImageView
+                android:id="@+id/iv_thumb_8"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_columnWeight="1"
+                android:layout_rowWeight="1"
+                android:layout_gravity="fill"
+                android:layout_margin="2dp"
+                android:scaleType="centerInside"
+                android:background="#F5F5F5" />
+        </GridLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

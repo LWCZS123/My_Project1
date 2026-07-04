@@ -12,6 +12,9 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.Transformations;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.dao.AccountDao;
+import com.example.my_project1.data.database.AppDatabase;
+import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.BillRepository;
@@ -24,9 +27,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,6 +60,7 @@ public class BillViewModel extends AndroidViewModel {
     private final Handler mainHandler        = new Handler(Looper.getMainLooper());
 
     // ── 依赖 ────────────────────────────────────────
+    private final AccountDao accountDao;
     private final BillRepository repository;
     private final UserProfileRepository userProfileRepository;
 
@@ -102,9 +108,12 @@ public class BillViewModel extends AndroidViewModel {
     public  final LiveData<PagingState>         pagingState  = _pagingState;
 
     /** 账单总数 */
-    public final LiveData<Integer> billCount;
+    private final MutableLiveData<Integer> _billCount = new MutableLiveData<>(0);
+    public  final LiveData<Integer>         billCount  = _billCount;
+
     /** 记账天数 */
-    public final LiveData<Integer> billDays;
+    private final MutableLiveData<Integer> _billDays = new MutableLiveData<>(0);
+    public  final LiveData<Integer>         billDays  = _billDays;
 
     /** CRUD 操作状态 */
     private final MutableLiveData<ApiResponse<String>> _operationState =
@@ -137,6 +146,7 @@ public class BillViewModel extends AndroidViewModel {
     private Observer<Integer> billCountObserver;
     private Observer<Integer> billDaysObserver;
     private Observer<List<Bill>> monthBillsObserver;
+    private Observer<List<Bill>> allBillsObserver;
 
     // ════════════════════════════════════════════════════
     //  构造
@@ -144,6 +154,8 @@ public class BillViewModel extends AndroidViewModel {
     public BillViewModel(@NonNull Application application) {
         super(application);
 
+        AppDatabase db        = AppDatabase.getInstance(application);
+        accountDao            = db.accountDao();
         repository            = new BillRepository(application);
         userProfileRepository = UserProfileRepository.getInstance(application);
 
@@ -154,12 +166,31 @@ public class BillViewModel extends AndroidViewModel {
         }
 
         initializeLiveData();
-
-        billCount = Transformations.map(allBills, this::computeBillCount);
-        billDays  = Transformations.map(allBills, this::computeBillDays);
-
+        observeAllBillsForStats();
         observeStatsForSync();
         observeMonthBillsForUiMapping();
+    }
+
+    private void observeAllBillsForStats() {
+        if (allBillsObserver != null && allBills != null) {
+            allBills.removeObserver(allBillsObserver);
+        }
+
+        allBillsObserver = bills -> {
+            if (bills == null) return;
+            bgExecutor.execute(() -> {
+                int count = computeBillCount(bills);
+                int days  = computeBillDays(bills);
+                mainHandler.post(() -> {
+                    _billCount.setValue(count);
+                    _billDays.setValue(days);
+                });
+            });
+        };
+
+        if (allBills != null) {
+            allBills.observeForever(allBillsObserver);
+        }
     }
 
     // ════════════════════════════════════════════════════
@@ -192,7 +223,17 @@ public class BillViewModel extends AndroidViewModel {
         monthBillsObserver = bills -> {
             // 提交到后台线程计算，避免主线程卡顿
             bgExecutor.execute(() -> {
-                List<Object> uiItems   = mapBillsToUiItems(bills);
+                // 1. 获取所有账户并构建 Map (用于显示账户名)
+                List<Account> accounts = accountDao.getAllAccountsSync();
+                Map<String, Account> accountMap = new HashMap<>();
+                if (accounts != null) {
+                    for (Account acc : accounts) {
+                        accountMap.put(acc.getObjectId(), acc);
+                    }
+                }
+
+                // 2. 映射 UI 模型
+                List<Object> uiItems   = mapBillsToUiItems(bills, accountMap);
                 HeaderUiModel header   = buildHeaderUiModel(bills);
 
                 mainHandler.post(() -> {
@@ -223,7 +264,7 @@ public class BillViewModel extends AndroidViewModel {
      * 将原始 Bill 列表转化为 BillAdapter 需要的 [DateHeader, BillUiModel, ...] 混合列表
      * 同时计算每条账单的时间轴连线状态（isFirstOfDay / isLastOfDay）
      */
-    private List<Object> mapBillsToUiItems(List<Bill> bills) {
+    private List<Object> mapBillsToUiItems(List<Bill> bills, Map<String, Account> accountMap) {
         List<Object> items = new ArrayList<>();
         if (bills == null || bills.isEmpty()) return items;
 
@@ -301,6 +342,10 @@ public class BillViewModel extends AndroidViewModel {
 
             boolean isFirstOfDay = (items.size() == firstBillIndex); // 第一笔
 
+            Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
+            String accountName = account != null ? account.getName() : "";
+            String accountIcon = account != null ? account.getIconUrl() : "";
+
             BillUiModel uiModel = BillUiModel.builder()
                     .localId(bill.getId())
                     .objectId(bill.getObjectId())
@@ -309,6 +354,8 @@ public class BillViewModel extends AndroidViewModel {
                     .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
                     .amountText(amountText)
                     .amountColor(amountColor)
+                    .accountName(accountName)
+                    .accountIconUrl(accountIcon)
                     .remarkText(bill.getRemark())
                     .locationText(bill.getLocation())
                     .imageUrls(bill.getImageUrls())
@@ -639,10 +686,14 @@ public class BillViewModel extends AndroidViewModel {
         if (monthBillsObserver != null && currentMonthBills != null) {
             currentMonthBills.removeObserver(monthBillsObserver);
         }
+        if (allBillsObserver != null && allBills != null) {
+            allBills.removeObserver(allBillsObserver);
+        }
         if (billCountObserver != null) billCount.removeObserver(billCountObserver);
         if (billDaysObserver  != null) billDays .removeObserver(billDaysObserver);
 
         initializeLiveData();
+        observeAllBillsForStats();
         observeStatsForSync();
         observeMonthBillsForUiMapping();
 
@@ -729,6 +780,8 @@ public class BillViewModel extends AndroidViewModel {
         bgExecutor.shutdown();
         if (billCountObserver  != null) billCount.removeObserver(billCountObserver);
         if (billDaysObserver   != null) billDays .removeObserver(billDaysObserver);
+        if (allBillsObserver   != null && allBills != null)
+            allBills.removeObserver(allBillsObserver);
         if (monthBillsObserver != null && currentMonthBills != null)
             currentMonthBills.removeObserver(monthBillsObserver);
         if (statsDebounceRunnable != null)

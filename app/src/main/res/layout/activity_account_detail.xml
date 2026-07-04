@@ -28,14 +28,15 @@
                 android:id="@+id/iv_wallet_icon"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:src="@drawable/ic_wallet"/>
+                android:src="@drawable/ic_wallet"
+                android:contentDescription="钱包图标"/>
 
             <TextView
                 android:id="@+id/tv_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="24dp"
+                android:textSize="24sp"
                 android:text="钱包"
                 android:textColor="@color/black"
                 android:layout_marginStart="12dp"/>
@@ -423,18 +424,10 @@
                         android:layout_height="wrap_content"
                         android:clipToPadding="false"
                         android:nestedScrollingEnabled="false"
-                        tools:listitem="@layout/item_transaction"/>
+                        tools:listitem="@layout/item_transaction" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-        android:id="@+id/fab_add_transaction"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:text="添加交易"
-        app:icon="@drawable/ic_add"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

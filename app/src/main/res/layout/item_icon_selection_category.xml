@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootView"
+    android:layout_width="match_parent"
+    android:layout_height="54dp"
+    android:paddingHorizontal="12dp">
+
+    <TextView
+        android:id="@+id/tvCategoryName"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:text="餐饮"
+        android:textColor="#999999"
+        android:textSize="10sp"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+</FrameLayout>

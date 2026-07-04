@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -93,9 +94,8 @@ public class AccountDetailActivity extends AppCompatActivity {
     private Long startTimestamp = null;
     private Long endTimestamp = null;
 
-    // 🔴 删除对话框和选中的目标账户
+    // 🔴 删除对话框
     private DeleteAccountDialogFragment deleteDialog;
-    private Account selectedTargetAccount = null;
 
     // 🔴 标记删除流程状态
     private boolean isWaitingForMigration = false;
@@ -212,11 +212,6 @@ public class AccountDetailActivity extends AppCompatActivity {
         binding.ivToggleChart.setOnClickListener(v -> {
             showingExpense = !showingExpense;
             updateChart();
-        });
-
-        // 添加交易按钮
-        binding.fabAddTransaction.setOnClickListener(v -> {
-            SnackbarUtils.showInfo(binding.getRoot(), "添加交易");
         });
 
         // 日期筛选按钮
@@ -493,7 +488,7 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             ChartLegendAdapter.LegendItem item = new ChartLegendAdapter.LegendItem(
                     entry.getLabel(),
-                    String.format("%.1f%%", percentage),
+                    String.format(Locale.getDefault(), "%.1f%%", percentage),
                     "$" + formatMoney(entry.getValue()),
                     colors[i % colors.length]
             );
@@ -612,8 +607,6 @@ public class AccountDetailActivity extends AppCompatActivity {
 
         chooseFragment.setOnAccountChooseListener((account, iconUrl, accountName) -> {
             if (account != null) {
-                selectedTargetAccount = account;
-
                 if (deleteDialog != null) {
                     deleteDialog.setSelectedTargetAccount(account);
                 }

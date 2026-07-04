@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:fitsSystemWindows="true"
     android:layout_width="match_parent"
@@ -30,13 +29,18 @@
             android:layout_height="54dp"
             android:background="@android:color/transparent"
             app:menu="@menu/bottom_nav_menu"
-            app:itemIconSize="20dp"
+            app:itemIconSize="18dp"
             android:layout_gravity="center"
             app:labelVisibilityMode="labeled"
             app:itemIconTint="@color/bottom_nav_selector"
             app:itemTextColor="@color/bottom_nav_selector"
             app:itemRippleColor="#22000000"
             app:itemBackground="@drawable/bottom_nav_item_bg"
+            app:itemPaddingTop="10dp"
+            app:itemPaddingBottom="10dp"
+            app:itemIconPadding="4dp"
+            app:itemTextAppearanceActive="@style/BottomNavTextAppearance"
+            app:itemTextAppearanceInactive="@style/BottomNavTextAppearance"
             app:elevation="0dp"/>
     </FrameLayout>
 
@@ -57,7 +61,8 @@
             android:layout_height="36dp"
             android:layout_gravity="center"
             android:src="@drawable/ic_add"
-            android:tint="@color/accent_color" />
+            app:tint="@color/accent_color"
+            android:contentDescription="@string/add_transaction" />
     </FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
