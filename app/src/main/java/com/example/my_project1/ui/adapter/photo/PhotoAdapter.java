@@ -7,7 +7,7 @@ import android.view.ViewGroup;
 
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.my_project1.databinding.ItemPhotoBinding;
+import com.example.my_project1.databinding.ItemPhotoSmallBinding;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.PhotoViewHol
     @Override
     public PhotoViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         // 🔑 使用parent.getContext()保留主题
-        ItemPhotoBinding binding = ItemPhotoBinding.inflate(
+        ItemPhotoSmallBinding binding = ItemPhotoSmallBinding.inflate(
                 LayoutInflater.from(parent.getContext()), parent, false);
         return new PhotoViewHolder(binding);
     }
@@ -104,9 +104,9 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.PhotoViewHol
     }
 
     class PhotoViewHolder extends RecyclerView.ViewHolder {
-        private final ItemPhotoBinding binding;
+        private final ItemPhotoSmallBinding binding;
 
-        PhotoViewHolder(ItemPhotoBinding binding) {
+        PhotoViewHolder(ItemPhotoSmallBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
         }

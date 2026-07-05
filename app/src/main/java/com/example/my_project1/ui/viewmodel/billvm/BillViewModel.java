@@ -92,10 +92,8 @@ public class BillViewModel extends AndroidViewModel {
     private final MutableLiveData<HeaderUiModel> _headerData =
             new MutableLiveData<>(
                     new HeaderUiModel(
-                            "本月支出",
-                            "¥0.00",
-                            "¥0.00",
-                            "¥0.00"
+                            "¥0.00", "¥0.00", "¥0.00", "¥0.00",
+                            "¥0.00", "¥0.00", "¥0.00", "¥0.00"
                     )
             );
     public  final LiveData<HeaderUiModel>         headerData  = _headerData;
@@ -394,21 +392,61 @@ public class BillViewModel extends AndroidViewModel {
     /**
      * ✅ 构建 HeaderAdapter 需要的统计卡片数据
      */
-    private HeaderUiModel buildHeaderUiModel(List<Bill> bills) {
-        double expense = 0, income = 0;
-        if (bills != null) {
-            for (Bill b : bills) {
-                if (b.getType() == 0) expense += b.getAmount();
-                else                   income  += b.getAmount();
+    private HeaderUiModel buildHeaderUiModel(List<Bill> monthBills) {
+        double monthlyExpense = 0, monthlyIncome = 0;
+        double todayChange = 0;
+        
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String todayKey = fmt.format(new Date());
+
+        if (monthBills != null) {
+            for (Bill b : monthBills) {
+                if (b.getType() == 0) monthlyExpense += b.getAmount();
+                else monthlyIncome += b.getAmount();
+                
+                // 计算今日变化
+                if (b.getBillTime() != null && todayKey.equals(fmt.format(b.getBillTime()))) {
+                    if (b.getType() == 0) todayChange -= b.getAmount();
+                    else todayChange += b.getAmount();
+                }
             }
         }
-        int month = Calendar.getInstance().get(Calendar.MONTH) + 1;
+
+        // 计算总资产和负债 (从账户获取)
+        double assets = 0, liabilities = 0;
+        List<Account> accounts = accountDao.getAllAccountsSync();
+        if (accounts != null) {
+            for (Account acc : accounts) {
+                if (acc.isCredit()) {
+                    liabilities += acc.getBalance();
+                } else {
+                    assets += acc.getBalance();
+                }
+            }
+        }
+
+        // 计算总收入和总支出 (从所有账单获取)
+        double totalExpense = 0, totalIncome = 0;
+        List<Bill> allBillsList = repository.getAllBillsByUserSync(currentUserId);
+        if (allBillsList != null) {
+            for (Bill b : allBillsList) {
+                if (b.getType() == 0) totalExpense += b.getAmount();
+                else totalIncome += b.getAmount();
+            }
+        }
+
         DecimalFormat df = new DecimalFormat("#,##0.00");
+        String changePrefix = todayChange >= 0 ? "+ ¥" : "- ¥";
+        
         return new HeaderUiModel(
-                month + "月 - 支出",
-                "¥" + df.format(expense),
-                "¥" + df.format(income),
-                "¥" + df.format(income - expense)
+                "¥" + df.format(assets - liabilities),
+                changePrefix + df.format(Math.abs(todayChange)),
+                "¥" + df.format(assets),
+                "¥" + df.format(liabilities),
+                "¥" + df.format(monthlyIncome),
+                "¥" + df.format(totalIncome),
+                "¥" + df.format(monthlyExpense),
+                "¥" + df.format(totalExpense)
         );
     }
 

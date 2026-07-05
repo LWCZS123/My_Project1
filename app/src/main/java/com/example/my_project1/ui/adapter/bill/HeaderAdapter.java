@@ -3,8 +3,10 @@ package com.example.my_project1.ui.adapter.bill;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.my_project1.R;
 import com.example.my_project1.databinding.ItemHomeHeaderBinding;
 import com.example.my_project1.ui.viewmodel.billvm.HeaderUiModel;
 
@@ -21,7 +23,11 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
     private OnRefreshClickListener refreshClickListener;
 
     private HeaderUiModel data = new HeaderUiModel(
-            "本月支出",
+            "¥0.00",
+            "¥0.00",
+            "¥0.00",
+            "¥0.00",
+            "¥0.00",
             "¥0.00",
             "¥0.00",
             "¥0.00"
@@ -67,16 +73,65 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             super(binding.getRoot());
             this.b = binding;
             // 刷新按钮点击
-            b.ivRefresh.setOnClickListener(v -> {
-                if (refreshClickListener != null) refreshClickListener.onRefreshClick();
-            });
+//            b.ivRefresh.setOnClickListener(v -> {
+//                if (refreshClickListener != null) refreshClickListener.onRefreshClick();
+//            });
         }
 
         void bind(HeaderUiModel model) {
-            b.tvAssetType.setText(model.assetTypeText);
-            b.tvTotalAmount.setText(model.totalExpenseText);
-            b.tvTotalCount.setText(model.totalIncomeText);
-            b.tvDailyAverage.setText(model.balanceText);
+            b.tvTotalAmount.setText(model.mainBalance);
+            
+            // 设置今日变化颜色：收入>支出为绿色，支出>收入为红色
+            String changeText = model.todayChange;
+            b.tvTodayChange.setText(changeText);
+            
+            // 解析数值判断正负（根据前缀 + 或 -）
+            if (changeText != null && !changeText.isEmpty()) {
+                try {
+                    // 检查是否包含负号前缀
+                    boolean isNegative = changeText.trim().startsWith("-");
+                    
+                    // 移除货币符号、空格和逗号，提取纯数值
+                    String numericValue = changeText.replace("¥", "")
+                            .replace("$", "")
+                            .replace("+", "")
+                            .replace("-", "")
+                            .replace(",", "")
+                            .trim();
+                    
+                    double value = Double.parseDouble(numericValue);
+                    
+                    // 如果是负数前缀，将值设为负
+                    if (isNegative) {
+                        value = -value;
+                    }
+                    
+                    if (value > 0) {
+                        // 正数（收入>支出）显示绿色
+                        b.tvTodayChange.setTextColor(ContextCompat.getColor(
+                                b.getRoot().getContext(), R.color.green));
+                    } else if (value < 0) {
+                        // 负数（支出>收入）显示红色
+                        b.tvTodayChange.setTextColor(ContextCompat.getColor(
+                                b.getRoot().getContext(), R.color.red));
+                    } else {
+                        // 零值使用默认灰色
+                        b.tvTodayChange.setTextColor(ContextCompat.getColor(
+                                b.getRoot().getContext(), R.color.icon_tint));
+                    }
+                } catch (NumberFormatException e) {
+                    // 解析失败时使用默认颜色（灰色）
+                    b.tvTodayChange.setTextColor(ContextCompat.getColor(
+                            b.getRoot().getContext(), R.color.icon_tint));
+                }
+            }
+            
+            b.tvAssetsValue.setText(model.assets);
+            b.tvLiabilitiesValue.setText(model.liabilities);
+            b.tvMonthlyIncome.setText("月收入: " + model.monthlyIncome);
+            b.tvTotalIncome.setText("总收入: " + model.totalIncome);
+            b.tvMonthlyExpense.setText("月支出: " + model.monthlyExpense);
+            b.tvTotalExpense.setText("总支出: " + model.totalExpense);
         }
     }
 }

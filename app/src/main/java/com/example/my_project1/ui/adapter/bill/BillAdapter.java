@@ -29,7 +29,7 @@ import io.reactivex.annotations.NonNull;
  * ✅ 使用 AsyncListDiffer + DiffUtil 实现丝滑局部刷新
  * ✅ 数据类型为 Object (DateHeader | BillUiModel)，支持日期分组
  * ✅ onBindViewHolder 只做简单 setText/setVisibility，零计算
- * ✅ 时间轴连线根据 BillUiModel.isFirstOfDay / isLastOfDay 动态控制
+ * ✅ 已移除时间轴连线逻辑（布局中已删除时间轴区域）
  */
 public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -189,10 +189,10 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
         void bind(BillUiModel model) {
             // ── 基础字段（纯赋值）────────────────────
-            b.tvTime.setText(model.timeText);
             b.tvCategory.setText(model.categoryName);
             b.tvAmount.setText(model.amountText);
             b.tvAmount.setTextColor(model.amountColor);
+            b.tvTime.setText(model.timeText);
 
             // 分类图标
             ImageLoaderUtils.loadThumbnail(context, model.categoryIconUrl, b.ivCategoryIcon);
@@ -211,7 +211,7 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             }
 
             // 备注
-            if (!model.remarkText.isEmpty()) {
+            if (model.remarkText != null && !model.remarkText.isEmpty()) {
                 b.tvRemark.setVisibility(View.VISIBLE);
                 b.tvRemark.setText("备注：" + model.remarkText);
             } else {
@@ -219,12 +219,63 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             }
 
             // 位置
-            if (!model.locationText.isEmpty()) {
+            if (model.locationText != null && !model.locationText.isEmpty()) {
                 b.layoutLocation.setVisibility(View.VISIBLE);
                 b.tvLocation.setText(model.locationText);
             } else {
                 b.layoutLocation.setVisibility(View.GONE);
             }
+
+            // ── 组合卡片逻辑 ──────────────────────────
+            float radius = context.getResources().getDimension(R.dimen.card_corner_radius_large);
+            // 处理圆角
+            if (model.isFirstOfDay && model.isLastOfDay) {
+                // 只有一笔：全圆角
+                b.cardView.setShapeAppearanceModel(
+                        b.cardView.getShapeAppearanceModel().toBuilder()
+                                .setAllCornerSizes(radius)
+                                .build()
+                );
+//                b.billDivider.setVisibility(View.GONE);
+            } else if (model.isFirstOfDay) {
+                // 第一笔：顶部圆角
+                b.cardView.setShapeAppearanceModel(
+                        b.cardView.getShapeAppearanceModel().toBuilder()
+                                .setTopLeftCornerSize(radius)
+                                .setTopRightCornerSize(radius)
+                                .setBottomLeftCornerSize(0)
+                                .setBottomRightCornerSize(0)
+                                .build()
+                );
+//                b.billDivider.setVisibility(View.VISIBLE);
+            } else if (model.isLastOfDay) {
+                // 最后一笔：底部圆角
+                b.cardView.setShapeAppearanceModel(
+                        b.cardView.getShapeAppearanceModel().toBuilder()
+                                .setTopLeftCornerSize(0)
+                                .setTopRightCornerSize(0)
+                                .setBottomLeftCornerSize(radius)
+                                .setBottomRightCornerSize(radius)
+                                .build()
+                );
+//                b.billDivider.setVisibility(View.GONE);
+            } else {
+                // 中间笔：无圆角
+                b.cardView.setShapeAppearanceModel(
+                        b.cardView.getShapeAppearanceModel().toBuilder()
+                                .setAllCornerSizes(0)
+                                .build()
+                );
+//                b.billDivider.setVisibility(View.VISIBLE);
+            }
+
+            // 调整 Margin 消除卡片间的间隙（MaterialCardView 使用 compat padding 会有阴影空间）
+            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) b.cardView.getLayoutParams();
+            int marginSide = (int) (16 * context.getResources().getDisplayMetrics().density); // 与顶部卡片对齐
+            int marginTopBottom = 0;
+            
+            lp.setMargins(marginSide, marginTopBottom, marginSide, marginTopBottom);
+            b.cardView.setLayoutParams(lp);
 
             // ── 图片列表 ──────────────────────────────
             if (!model.imageUrls.isEmpty()) {
@@ -244,12 +295,6 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             } else {
                 b.ivBillImage.setVisibility(View.GONE);
             }
-
-            // ── 时间轴连线控制 ────────────────────────
-            // 上连线：该条账单不是当天第一笔时才显示
-            b.timelineLineTop.setVisibility(model.isFirstOfDay ? View.INVISIBLE : View.VISIBLE);
-            // 下连线：该条账单不是当天最后一笔时才显示
-            b.timelineLine.setVisibility(model.isLastOfDay ? View.INVISIBLE : View.VISIBLE);
 
             // ── 点击事件 ─────────────────────────────
             b.cardView.setTransitionName("bill_card_" + model.diffKey);

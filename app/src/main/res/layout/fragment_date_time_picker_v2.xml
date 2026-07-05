@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_dialog_rounded1"
+    android:layout_gravity="center"
+    android:paddingBottom="8dp">
+
+    <!-- Header: Month and Year -->
+    <LinearLayout
+        android:id="@+id/llHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="8dp"
+        android:gravity="bottom"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground">
+
+        <TextView
+            android:id="@+id/tvMonthBig"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="7月"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+
+        <TextView
+            android:id="@+id/tvYearSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2026"
+            android:textSize="12sp"
+            android:textColor="#999999"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="4dp"/>
+    </LinearLayout>
+
+    <!-- Weekday Headers -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
+
+        <TextView style="@style/WeekDayTextStyle" android:text="日" android:textColor="#F44336"/>
+        <TextView style="@style/WeekDayTextStyle" android:text="一" android:textColor="#000000"/>
+        <TextView style="@style/WeekDayTextStyle" android:text="二" android:textColor="#000000"/>
+        <TextView style="@style/WeekDayTextStyle" android:text="三" android:textColor="#000000"/>
+        <TextView style="@style/WeekDayTextStyle" android:text="四" android:textColor="#000000"/>
+        <TextView style="@style/WeekDayTextStyle" android:text="五" android:textColor="#000000"/>
+        <TextView style="@style/WeekDayTextStyle" android:text="六" android:textColor="#000000"/>
+    </LinearLayout>
+
+    <!-- ViewPager2 for Calendar -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vpCalendar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:overScrollMode="never"/>
+
+    <!-- Set Time Section -->
+    <LinearLayout
+        android:id="@+id/llSetTimeHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_clock"
+        />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="设置时间"
+            android:textSize="15sp"
+            android:textColor="#000000"
+            android:layout_marginStart="10dp"/>
+
+        <ImageView
+            android:id="@+id/ivTimeArrow"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_arrow_right1"/>
+    </LinearLayout>
+
+    <!-- Time Picker Container -->
+    <LinearLayout
+        android:id="@+id/llTimePickerContainer"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:visibility="gone"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp">
+
+        <com.contrarywind.view.WheelView
+            android:id="@+id/wheelHour"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=":"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginHorizontal="16dp"/>
+
+        <com.contrarywind.view.WheelView
+            android:id="@+id/wheelMinute"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"/>
+    </LinearLayout>
+
+    <!-- Bottom Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/tvCancel"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="取消"
+            android:gravity="center"
+            android:textSize="16sp"
+            android:textColor="#999999"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"/>
+
+        <TextView
+            android:id="@+id/tvConfirm"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="确定"
+            android:gravity="center"
+            android:textSize="16sp"
+            android:textColor="@color/calendar_selection"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"/>
+    </LinearLayout>
+
+</LinearLayout>

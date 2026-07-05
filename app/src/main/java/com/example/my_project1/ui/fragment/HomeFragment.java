@@ -354,8 +354,20 @@ public class HomeFragment extends Fragment {
     }
 
     private void showSnackbar(String message) {
-        if (binding != null && isAdded())
-            Snackbar.make(binding.getRoot(), message, Snackbar.LENGTH_SHORT).show();
+        if (binding != null && isAdded() && getActivity() != null) {
+            // 获取MainActivity的根视图和FAB按钮
+            View rootView = getActivity().findViewById(R.id.root);
+            View fabButton = getActivity().findViewById(R.id.fab);
+            
+            Snackbar snackbar = Snackbar.make(rootView, message, Snackbar.LENGTH_SHORT);
+            
+            // 设置anchor view为FAB按钮，让Snackbar显示在FAB上方
+            if (fabButton != null) {
+                snackbar.setAnchorView(fabButton);
+            }
+            
+            snackbar.show();
+        }
     }
 
     public static HomeFragment newInstance() { return new HomeFragment(); }

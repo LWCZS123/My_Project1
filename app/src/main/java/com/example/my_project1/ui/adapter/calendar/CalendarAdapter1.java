@@ -72,6 +72,7 @@ public class CalendarAdapter1
     private static final int COLOR_TEXT_DEFAULT      = Color.parseColor("#1A1A1A");
     private static final int COLOR_TEXT_LUNAR_GREY   = Color.parseColor("#AAAAAA");
     private static final int COLOR_GREEN_SELECTED    = Color.parseColor("#4CAF50");
+    private static final int COLOR_TEAL_SELECTED     = Color.parseColor("#56A596");
     private static final int COLOR_BLUE              = Color.parseColor("#2196F3");
     private static final int COLOR_WHITE             = Color.WHITE;
 
@@ -318,7 +319,8 @@ public class CalendarAdapter1
 
         private void applySelectedBg(CalendarDay day) {
             int bgColor;
-            if (displayType == 2)      bgColor = COLOR_GREEN_SELECTED;
+            if (displayType == -1)     bgColor = COLOR_TEAL_SELECTED;
+            else if (displayType == 2) bgColor = COLOR_GREEN_SELECTED;
             else if (displayType == 1) bgColor = colorRed;
             else {
                 if (day.hasExpense() && day.hasIncome()) bgColor = COLOR_BLUE;

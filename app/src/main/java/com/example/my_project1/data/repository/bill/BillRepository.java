@@ -724,6 +724,13 @@ public class BillRepository {
     }
 
     /**
+     * 同步查询指定用户的所有账单
+     */
+    public List<Bill> getAllBillsByUserSync(String userId) {
+        return billDao.getAllBillsByUserSync(userId);
+    }
+
+    /**
      * 按时间范围查询账单
      */
     public LiveData<List<Bill>> getBillsInTimeRange(String userId, Date start, Date end) {

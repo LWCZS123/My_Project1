@@ -7,22 +7,30 @@ package com.example.my_project1.ui.viewmodel.billvm;
  */
 public class HeaderUiModel {
 
-    /** e.g. "4月 - 支出" */
-    public final String assetTypeText;
-    /** e.g. "¥608.0" */
-    public final String totalExpenseText;
-    /** e.g. "¥500.00" */
-    public final String totalIncomeText;
-    /** e.g. "¥-108.00" 结余 */
-    public final String balanceText;
+    public final String mainBalance;      // 大字余额
+    public final String todayChange;      // 今日变化
+    public final String assets;           // 资产
+    public final String liabilities;      // 负债
+    public final String monthlyIncome;    // 月收入
+    public final String totalIncome;      // 总收入
+    public final String monthlyExpense;   // 月支出
+    public final String totalExpense;     // 总支出
 
-    public HeaderUiModel(String assetTypeText,
-                         String totalExpenseText,
-                         String totalIncomeText,
-                         String balanceText) {
-        this.assetTypeText   = assetTypeText;
-        this.totalExpenseText = totalExpenseText;
-        this.totalIncomeText  = totalIncomeText;
-        this.balanceText      = balanceText;
+    public HeaderUiModel(String mainBalance,
+                         String todayChange,
+                         String assets,
+                         String liabilities,
+                         String monthlyIncome,
+                         String totalIncome,
+                         String monthlyExpense,
+                         String totalExpense) {
+        this.mainBalance    = mainBalance;
+        this.todayChange    = todayChange;
+        this.assets         = assets;
+        this.liabilities    = liabilities;
+        this.monthlyIncome  = monthlyIncome;
+        this.totalIncome    = totalIncome;
+        this.monthlyExpense = monthlyExpense;
+        this.totalExpense   = totalExpense;
     }
 }

@@ -26,5 +26,5 @@
     <dimen name="bottom_nav_item_bg_radius">18dp</dimen>
     <dimen name="fab_margin">16dp</dimen>
 
-
+    <dimen name="card_corner_radius_large">24dp</dimen>
 </resources>

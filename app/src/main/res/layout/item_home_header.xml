@@ -1,93 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  item_home_header.xml
-  ───────────────────────────────────────────────────────
-  从原 fragment_home.xml 的 NestedScrollView 中抽离的顶部统计卡片
-  由 HeaderAdapter 作为 RecyclerView 的第一个 item 渲染
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingTop="8dp"
+    android:paddingBottom="16dp"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
 
-    <!-- ══ 月度财务概览卡片 ══ -->
+    <!-- ══ 财务概览卡片 ══ -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardMonthlyOverview"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="0dp"
-        app:cardBackgroundColor="#0091EA">
+        app:cardCornerRadius="24dp"
+        app:cardElevation="8dp"
+        app:cardUseCompatPadding="true"
+        app:cardBackgroundColor="#FFFFFF"
+        app:strokeWidth="0dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="16dp">
 
-            <!-- 资产类型标题 -->
+            <!-- 标题 -->
             <TextView
-                android:id="@+id/tvAssetType"
+                android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="12月 - 支出"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:alpha="0.9"
+                android:text="我的账本"
+                android:fontFamily="@font/font3"
+
+                android:textColor="#666666"
+                android:textSize="15sp"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- 刷新图标 -->
-            <ImageView
-                android:id="@+id/ivRefresh"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_popup_sync"
-                app:tint="#FFFFFF"
-                android:layout_marginStart="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:layout_constraintStart_toEndOf="@id/tvAssetType"
-                app:layout_constraintTop_toTopOf="@id/tvAssetType"
-                app:layout_constraintBottom_toBottomOf="@id/tvAssetType" />
+<!--            &lt;!&ndash; 刷新图标 &ndash;&gt;-->
+<!--            <ImageView-->
+<!--                android:id="@+id/ivRefresh"-->
+<!--                android:layout_width="20dp"-->
+<!--                android:layout_height="20dp"-->
+<!--                android:src="@drawable/ic_refresh"-->
+<!--                app:tint="#999999"-->
+<!--                android:layout_marginStart="6dp"-->
+<!--                android:background="?attr/selectableItemBackgroundBorderless"-->
+<!--                app:layout_constraintStart_toEndOf="@id/tvTitle"-->
+<!--                app:layout_constraintTop_toTopOf="@id/tvTitle"-->
+<!--                app:layout_constraintBottom_toBottomOf="@id/tvTitle" />-->
 
-            <!-- Lottie 动画 -->
+            <!-- Lottie 动画 (保留) -->
             <com.airbnb.lottie.LottieAnimationView
                 android:id="@+id/lottieAnimation"
-                android:layout_width="100dp"
-                android:layout_height="100dp"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
                 app:lottie_autoPlay="true"
                 app:lottie_loop="true"
                 app:lottie_rawRes="@raw/money_animation"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- 总支出金额 -->
-            <TextView
-                android:id="@+id/tvTotalAmount"
+            <!-- 总余额 -->
+            <LinearLayout
+                android:id="@+id/llBalanceContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="¥608.0"
-                android:textColor="#FFFFFF"
-                android:textSize="36sp"
-                android:textStyle="bold"
-                android:layout_marginTop="16dp"
+                android:orientation="horizontal"
+                android:gravity="bottom"
+                android:layout_marginTop="8dp"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvAssetType" />
+                app:layout_constraintTop_toBottomOf="@id/tvTitle">
+
+                <TextView
+                    android:id="@+id/tvTotalAmount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="$5,538"
+                    android:textColor="#000000"
+                    android:textSize="28sp"
+                    android:fontFamily="@font/font2"
+                    android:textStyle="bold" />
+
+                <!-- 今日变化 -->
+                <TextView
+                    android:id="@+id/tvTodayChange"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="- ¥55"
+                    android:fontFamily="@font/font2"
+                    android:textColor="#E53935"
+                    android:textSize="10sp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginBottom="6dp" />
+            </LinearLayout>
 
             <!-- 分隔线 -->
             <View
                 android:id="@+id/divider"
                 android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:background="#FFFFFF"
-                android:alpha="0.3"
+                android:layout_height="0.5dp"
+                android:background="#EEEEEE"
                 android:layout_marginTop="12dp"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvTotalAmount" />
+                app:layout_constraintTop_toBottomOf="@id/llBalanceContainer" />
 
-            <!-- 底部：本月收入 + 本月结余 -->
+            <!-- 底部统计网格 -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -97,83 +117,111 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/divider">
 
+                <!-- 资产列 -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="本月收入: "
-                        android:textColor="#FFFFFF"
+                        android:text="资产"
+                        android:textColor="#999999"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvAssetsValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="¥8,621"
+                        android:fontFamily="@font/font2"
+
+                        android:textColor="#000000"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvMonthlyIncome"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="月收入: ¥0"
+                        android:textColor="#999999"
                         android:textSize="12sp"
-                        android:alpha="0.8" />
+                        android:layout_marginTop="8dp" />
 
                     <TextView
-                        android:id="@+id/tvTotalCount"
+                        android:id="@+id/tvTotalIncome"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="¥0.00"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
+                        android:text="总收入: ¥12,811"
+                        android:textColor="#999999"
+                        android:textSize="12sp"
+                        android:layout_marginTop="2dp" />
                 </LinearLayout>
 
+                <!-- 垂直分隔线 -->
+                <View
+                    android:layout_width="0.5dp"
+                    android:layout_height="match_parent"
+                    android:background="#F5F5F5"
+                    android:layout_marginHorizontal="8dp" />
+
+                <!-- 负债列 -->
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="本月结余: "
-                        android:textColor="#FFFFFF"
+                        android:text="负债"
+                        android:textColor="#999999"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvLiabilitiesValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="¥3,083"
+                        android:fontFamily="@font/font2"
+                        android:textColor="#000000"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvMonthlyExpense"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="月支出: ¥55"
+                        android:textColor="#999999"
                         android:textSize="12sp"
-                        android:alpha="0.8" />
+                        android:layout_marginTop="8dp" />
 
                     <TextView
-                        android:id="@+id/tvDailyAverage"
+                        android:id="@+id/tvTotalExpense"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="¥0.00"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
+                        android:text="总支出: ¥7,273"
+                        android:textColor="#999999"
+                        android:textSize="12sp"
+                        android:layout_marginTop="2dp" />
                 </LinearLayout>
             </LinearLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ══ 账单列表标题行 ══ -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="24dp"
-        android:layout_marginBottom="4dp">
 
-        <TextView
-            android:id="@+id/tvBillsTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="账单记录"
-            android:textColor="#333333"
-            android:textSize="16sp"
-            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvViewAll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="查看全部 >"
-            android:textColor="#2196F3"
-            android:textSize="14sp" />
-    </LinearLayout>
+
+
+
+
 
 </LinearLayout>

@@ -30,6 +30,10 @@ import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Locale;
+
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.annotations.Nullable;
@@ -162,6 +166,17 @@ public class ProfileFragment extends Fragment {
         binding.llCategoryManage.setOnClickListener(v -> iconMarketActivity());
         binding.llMyWish.setOnClickListener(v -> savingsOverviewActivity());
         binding.llFinancialTips.setOnClickListener(v-> iconCheckAcitvity());
+        binding.llScheduledRecord.setOnClickListener(v -> {
+            CustomDateTimePickerFragment.show(
+                    getChildFragmentManager(),
+                    Calendar.getInstance(),
+                    selectedCalendar -> {
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                        String result = sdf.format(selectedCalendar.getTime());
+                        Toast.makeText(getContext(), "定时记账已设为: " + result, Toast.LENGTH_SHORT).show();
+                    }
+            );
+        });
 
     }
 
