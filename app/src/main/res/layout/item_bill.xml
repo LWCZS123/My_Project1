@@ -1,248 +1,117 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  item_bill.xml (重构版)
-  ───────────────────────────────────────────────────────
-  ✅ 已移除左侧时间轴区域，卡片左右边距与财务概览卡片对齐（各 4dp）
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:clipChildren="false"
-    android:clipToPadding="false"
     android:orientation="vertical">
 
-    <!-- ══ 账单项卡片 ══ -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardView"
+    <RelativeLayout
+        android:id="@+id/layoutMain"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="?attr/selectableItemBackground"
         android:clickable="true"
-        android:focusable="true"
-        android:foreground="?attr/selectableItemBackground"
-        android:transitionName="bill_card_transition"
-        app:cardCornerRadius="0dp"
-        app:cardElevation="6dp"
-        app:cardMaxElevation="8dp"
-        app:cardUseCompatPadding="false"
-        app:cardBackgroundColor="#FFFFFF"
-        app:cardPreventCornerOverlap="false"
-        app:strokeWidth="0dp">
+        android:focusable="true">
 
+        <!-- 左侧：图标及圆形背景容器 (缩小) -->
+        <FrameLayout
+            android:id="@+id/iconContainer"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_category_bubble_light">
+
+            <ImageView
+                android:id="@+id/ivCategoryIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_wechat" />
+        </FrameLayout>
+
+        <!-- 中间：主信息区域 -->
         <LinearLayout
+            android:id="@+id/infoContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipChildren="false"
-            android:clipToPadding="false"
+            android:layout_toEndOf="@id/iconContainer"
+            android:layout_toStartOf="@+id/tvAmount"
+            android:layout_marginStart="12dp"
+            android:layout_centerVertical="true"
             android:orientation="vertical">
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/tvCategory"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
+                android:text="餐饮"
+                android:textColor="#333333"
+                android:textSize="15sp"
+                android:fontFamily="@font/font3"
+                android:textStyle="bold" />
 
-                <!-- 上半部分：分类 + 金额 -->
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+            <!-- 包含：时间 | 备注 -->
+            <TextView
+                android:id="@+id/tvSubInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="18:08"
+                android:textColor="#999999"
+                android:fontFamily="@font/font2"
+                android:textSize="11sp"
+                android:ellipsize="end"
+                android:maxLines="1" />
 
-                    <!-- 分类标签容器 -->
-                    <RelativeLayout
-                        android:id="@+id/categoryContainer"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:layout_toStartOf="@+id/rightContainer"
-                        android:padding="8dp"
-                        android:clipChildren="false"
-                        android:clipToPadding="false">
-
-                        <LinearLayout
-                            android:id="@+id/categoryLayout"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/bg_category_bubble"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:padding="4dp">
-
-                            <TextView
-                                android:id="@+id/tvCategory"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:text="零食-干果"
-                                android:fontFamily="@font/font3"
-                                android:textColor="#1976D2"
-                                android:textSize="16sp" />
-
-                            <ImageView
-                                android:id="@+id/ivCategoryArrow"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
-                                android:layout_marginStart="32dp"
-                                android:scaleType="centerInside"
-                                android:src="@drawable/ic_arrow_right" />
-                        </LinearLayout>
-
-                        <!-- 分类小图标（悬浮在气泡右上角）-->
-                        <ImageView
-                            android:id="@+id/ivCategoryIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_alignTop="@id/categoryLayout"
-                            android:layout_alignEnd="@id/categoryLayout"
-                            android:layout_marginTop="-6dp"
-                            android:layout_marginEnd="28dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/ic_wechat" />
-                    </RelativeLayout>
-
-                    <!-- 右侧容器：金额 -->
-                    <LinearLayout
-                        android:id="@+id/rightContainer"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:gravity="end"
-                        android:orientation="vertical"
-                        android:padding="6dp">
-
-                        <LinearLayout
-                            android:id="@+id/amountWrapper"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_horizontal"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvAmount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="-¥21.00"
-                                android:fontFamily="@font/font3"
-                                android:textColor="#1976D2"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <ImageView
-                                android:id="@+id/ivAmountUnderline"
-                                android:layout_width="match_parent"
-                                android:layout_height="12dp"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/ic_amount_line"
-                                app:tint="#304FFE" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </RelativeLayout>
-
-                <!-- 底部：备注 + 账户/时间 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:gravity="center_vertical|end"
-                    android:orientation="horizontal">
-
-                    <!-- 备注 -->
-                    <TextView
-                        android:id="@+id/tvRemark"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="4dp"
-                        android:fontFamily="@font/font2"
-                        android:layout_marginEnd="12dp"
-                        android:ellipsize="end"
-                        android:maxLines="2"
-                        android:textSize="12sp"
-                        android:textColor="#666666"
-                        android:visibility="gone" />
-
-                    <!-- 账户与时间 (右侧) -->
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:id="@+id/layoutAccountInfo"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:visibility="gone">
-
-                            <ImageView
-                                android:id="@+id/ivAccountIcon"
-                                android:layout_width="12dp"
-                                android:layout_height="12dp"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/ic_wallet" />
-
-                            <TextView
-                                android:id="@+id/tvAccount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
-                                android:text="微信支付"
-                                android:textColor="#999999"
-                                android:textSize="10sp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvTime"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="14:30"
-                            android:textColor="#999999"
-                            android:textSize="10sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- 位置信息 -->
-                <LinearLayout
-                    android:id="@+id/layoutLocation"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:src="@drawable/ic_location"
-                        app:tint="#999999" />
-
-                    <TextView
-                        android:id="@+id/tvLocation"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:textSize="12sp"
-                        android:textColor="#999999" />
-                </LinearLayout>
-
-                <!-- 图片预览 -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/ivBillImage"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:overScrollMode="never"
-                    android:visibility="gone" />
-
-            </LinearLayout>
+            <!-- 账户名称 -->
+            <TextView
+                android:id="@+id/tvAccount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="大好河山(4542)"
+                android:textColor="#B0B0B0"
+                android:fontFamily="@font/font2"
+                android:textSize="10sp" />
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
 
+        <!-- 右侧：金额显示 -->
+        <TextView
+            android:id="@+id/tvAmount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:text="- ¥55.00"
+            android:textColor="#1976D2"
+            android:fontFamily="@font/font3"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <!-- 图片预览 RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/ivBillImage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="64dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:overScrollMode="never"
+        android:visibility="gone" />
+
+    <!-- 分割线 -->
+    <View
+        android:id="@+id/billDivider"
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="#F5F5F5"
+        android:layout_marginStart="64dp"
+        android:layout_marginEnd="16dp" />
 
 </LinearLayout>

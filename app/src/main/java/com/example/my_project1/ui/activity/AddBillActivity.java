@@ -75,6 +75,7 @@ public class AddBillActivity extends AppCompatActivity {
     // ⭐ 编辑模式标识
     private boolean isEditMode = false;
     private String  editBillId = null;
+    private long    editBillLocalId = -1;
     private Bill originalBill = null; // ⭐ 保存原始账单对象
 
     // 账单类型：0-支出，1-收入
@@ -232,13 +233,14 @@ public class AddBillActivity extends AppCompatActivity {
         if ("edit".equals(mode)) {
             isEditMode = true;
             editBillId = intent.getStringExtra("bill_id");
+            editBillLocalId = intent.getLongExtra("bill_local_id", -1);
 
             // 修改标题
             if (getSupportActionBar() != null) {
                 getSupportActionBar().setTitle("编辑账单");
             }
 
-            Log.d(TAG, "⭐ 进入编辑模式: billId=" + editBillId);
+            Log.d(TAG, "⭐ 进入编辑模式: billId=" + editBillId + ", localId=" + editBillLocalId);
         }
     }
 
@@ -805,13 +807,18 @@ public class AddBillActivity extends AppCompatActivity {
      * 保存账单到数据库（使用同步查询）
      */
     private void saveBillToDatabase(List<String> imageObjectKeys) {
-        if (isEditMode && editBillId != null) {
-            //编辑模式：在后台线程同步查询
+        if (isEditMode && (editBillId != null || editBillLocalId != -1)) {
+            // 编辑模式：在后台线程同步查询
             AppExecutors.get().diskIO().execute(() -> {
                 try {
-                    bill = billViewModel.saveBill(editBillId);
+                    if (editBillId != null) {
+                        bill = billViewModel.saveBill(editBillId);
+                    } else {
+                        bill = billViewModel.saveBillLocal(editBillLocalId);
+                    }
+
                     if (bill == null) {
-                        Log.e(TAG, "❌ 数据库中找不到该账单: " + editBillId);
+                        Log.e(TAG, "❌ 数据库中找不到该账单: id=" + editBillId + ", localId=" + editBillLocalId);
                         AppExecutors.get().mainThread().execute(() -> {
                             isSaving = false;
                             showSnackbar("找不到要编辑的账单", SnackbarUtils.Type.ERROR);

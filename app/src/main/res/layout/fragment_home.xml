@@ -17,23 +17,26 @@
     android:background="#F2F4F8"
     tools:context=".ui.fragment.HomeFragment">
 
-    <!-- ══ 顶部固定标题栏（不随列表滚动）══ -->
+    <!-- ══ 顶部固定标题栏（缩小高度）══ -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#F2F4F8"
-        android:padding="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 左侧头像 -->
+        <!-- 左侧头像 (缩小) -->
         <de.hdodenhof.circleimageview.CircleImageView
             android:id="@+id/ivAvatar"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="4dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="2dp"
             android:src="@drawable/ic_wechat"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:scaleType="centerCrop"
@@ -42,7 +45,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
 
-        <!-- 右侧按钮组 -->
+        <!-- 右侧按钮组 (缩小) -->
         <LinearLayout
             android:id="@+id/rightButtons"
             android:layout_width="wrap_content"
@@ -55,25 +58,25 @@
 
             <ImageView
                 android:id="@+id/ivSearch"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="8dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:padding="6dp"
                 android:src="@drawable/ic_search1"
                 android:background="?attr/selectableItemBackgroundBorderless"/>
 
             <ImageView
                 android:id="@+id/ivChart"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="8dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:padding="6dp"
                 android:src="@drawable/ic_chart"
                 android:background="?attr/selectableItemBackgroundBorderless"/>
 
             <ImageView
                 android:id="@+id/ivAdd"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="8dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:padding="6dp"
                 android:src="@drawable/ic_menu"
                 android:background="?attr/selectableItemBackgroundBorderless"/>
         </LinearLayout>
@@ -87,6 +90,8 @@
         android:id="@+id/swipeRefreshLayout"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         app:layout_constraintTop_toBottomOf="@id/topBar"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

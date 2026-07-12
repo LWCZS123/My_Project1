@@ -19,269 +19,147 @@ import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
 /**
- * BillAdapter (重构版) - ConcatAdapter 架构中的账单列表部分
+ * BillAdapter (聚合卡片版)
  * -------------------------------------------------------
- * ✅ 使用 AsyncListDiffer + DiffUtil 实现丝滑局部刷新
- * ✅ 数据类型为 Object (DateHeader | BillUiModel)，支持日期分组
- * ✅ onBindViewHolder 只做简单 setText/setVisibility，零计算
- * ✅ 已移除时间轴连线逻辑（布局中已删除时间轴区域）
+ * ✅ 每个 Item 代表一天的账单组，由一个大卡片包裹
+ * ✅ 内部动态添加账单项，实现完美的阴影和分割线效果
+ * ✅ 修复：点击事件无效、账单图片不显示的问题
  */
-public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-
-    private static final int TYPE_DATE_HEADER = 0;
-    private static final int TYPE_BILL        = 1;
+public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
 
     private final Context context;
     private OnBillClickListener listener;
 
-    // 共享 RecycledViewPool（图片列表内嵌 RecyclerView 复用）
     private static final RecyclerView.RecycledViewPool sharedPhotoPool =
             new RecyclerView.RecycledViewPool();
     static { sharedPhotoPool.setMaxRecycledViews(0, 20); }
 
-    // ──────────── DiffUtil 回调 ────────────────────────
-    private static final DiffUtil.ItemCallback<Object> DIFF_CALLBACK =
-            new DiffUtil.ItemCallback<Object>() {
-
+    private static final DiffUtil.ItemCallback<BillGroup> DIFF_CALLBACK =
+            new DiffUtil.ItemCallback<BillGroup>() {
                 @Override
-                public boolean areItemsTheSame(@NonNull Object oldItem, @NonNull Object newItem) {
-                    if (oldItem instanceof DateHeader && newItem instanceof DateHeader) {
-                        return ((DateHeader) oldItem).dateKey.equals(((DateHeader) newItem).dateKey);
-                    }
-                    if (oldItem instanceof BillUiModel && newItem instanceof BillUiModel) {
-                        return ((BillUiModel) oldItem).diffKey.equals(((BillUiModel) newItem).diffKey);
-                    }
-                    return false;
+                public boolean areItemsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
+                    return oldItem.header.dateKey.equals(newItem.header.dateKey);
                 }
 
                 @Override
-                public boolean areContentsTheSame(@NonNull Object oldItem, @NonNull Object newItem) {
-                    if (oldItem instanceof DateHeader && newItem instanceof DateHeader) {
-                        DateHeader o = (DateHeader) oldItem;
-                        DateHeader n = (DateHeader) newItem;
-                        return o.dateText.equals(n.dateText)
-                                && o.expenseText.equals(n.expenseText)
-                                && o.incomeText.equals(n.incomeText);
+                public boolean areContentsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
+                    if (!oldItem.header.dateText.equals(newItem.header.dateText)
+                            || !oldItem.header.expenseText.equals(newItem.header.expenseText)
+                            || !oldItem.header.incomeText.equals(newItem.header.incomeText)) {
+                        return false;
                     }
-                    if (oldItem instanceof BillUiModel && newItem instanceof BillUiModel) {
-                        BillUiModel o = (BillUiModel) oldItem;
-                        BillUiModel n = (BillUiModel) newItem;
-                        return o.timeText.equals(n.timeText)
-                                && o.amountText.equals(n.amountText)
-                                && o.categoryName.equals(n.categoryName)
-                                && o.accountName.equals(n.accountName)
-                                && o.remarkText.equals(n.remarkText)
-                                && o.locationText.equals(n.locationText)
-                                && o.isFirstOfDay == n.isFirstOfDay
-                                && o.isLastOfDay  == n.isLastOfDay
-                                && Objects.equals(o.imageUrls, n.imageUrls);
+                    if (oldItem.bills.size() != newItem.bills.size()) return false;
+                    for (int i = 0; i < oldItem.bills.size(); i++) {
+                        if (!oldItem.bills.get(i).diffKey.equals(newItem.bills.get(i).diffKey)) return false;
+                        if (!oldItem.bills.get(i).amountText.equals(newItem.bills.get(i).amountText)) return false;
                     }
-                    return false;
+                    return true;
                 }
             };
 
-    private final AsyncListDiffer<Object> differ =
-            new AsyncListDiffer<>(this, DIFF_CALLBACK);
+    private final AsyncListDiffer<BillGroup> differ = new AsyncListDiffer<>(this, DIFF_CALLBACK);
 
-    // ──────────── 日期分组 Header 数据类 ──────────────
+    // ──────────── 数据结构 ──────────────
     public static class DateHeader {
-        /** "2024-04-21" 用于 DiffUtil 判同 */
         public final String dateKey;
-        /** "4月21日（周日）" 显示文字 */
         public final String dateText;
-        public final String expenseText; // "支出 ¥21.00"
-        public final String incomeText;  // "收入 ¥500.00"
+        public final String expenseText;
+        public final String incomeText;
 
-        public DateHeader(String dateKey, String dateText,
-                          String expenseText, String incomeText) {
-            this.dateKey     = dateKey;
-            this.dateText    = dateText;
+        public DateHeader(String dateKey, String dateText, String expenseText, String incomeText) {
+            this.dateKey = dateKey;
+            this.dateText = dateText;
             this.expenseText = expenseText;
-            this.incomeText  = incomeText;
+            this.incomeText = incomeText;
         }
     }
 
-    // ──────────── 接口 ─────────────────────────────────
+    public static class BillGroup {
+        public final DateHeader header;
+        public final List<BillUiModel> bills;
+
+        public BillGroup(DateHeader header, List<BillUiModel> bills) {
+            this.header = header;
+            this.bills = bills;
+        }
+    }
+
     public interface OnBillClickListener {
         void onBillClick(long localId, String objectId, View itemView);
         void onPhotoClick(String imageUrl, int position);
     }
 
     public BillAdapter(Context context, OnBillClickListener listener) {
-        this.context  = context;
+        this.context = context;
         this.listener = listener;
     }
 
-    // ──────────── 数据更新（外部调用）─────────────────
-    /**
-     * 提交新数据列表，AsyncListDiffer 在后台线程计算 diff 后主线程局部刷新
-     * @param items DateHeader | BillUiModel 混合列表（已由 ViewModel 构建好）
-     */
-    public void submitList(List<Object> items) {
+    public void submitList(List<BillGroup> items) {
         differ.submitList(items);
     }
 
-    // ──────────── RecyclerView 基础方法 ───────────────
-    @Override public int getItemCount()            { return differ.getCurrentList().size(); }
-    @Override public int getItemViewType(int pos)  {
-        return differ.getCurrentList().get(pos) instanceof DateHeader
-                ? TYPE_DATE_HEADER : TYPE_BILL;
+    @Override
+    public int getItemCount() {
+        return differ.getCurrentList().size();
     }
 
     @NonNull
     @Override
-    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (viewType == TYPE_DATE_HEADER) {
-            return new DateHeaderVH(ItemBillDateHeaderBinding.inflate(
-                    LayoutInflater.from(context), parent, false));
-        } else {
-            return new BillVH(ItemBillBinding.inflate(
-                    LayoutInflater.from(context), parent, false));
-        }
+    public DayGroupVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        return new DayGroupVH(ItemBillDateHeaderBinding.inflate(
+                LayoutInflater.from(context), parent, false));
     }
 
     @Override
-    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        Object item = differ.getCurrentList().get(position);
-        if (holder instanceof DateHeaderVH) {
-            ((DateHeaderVH) holder).bind((DateHeader) item);
-        } else {
-            ((BillVH) holder).bind((BillUiModel) item);
-        }
+    public void onBindViewHolder(@NonNull DayGroupVH holder, int position) {
+        holder.bind(differ.getCurrentList().get(position));
     }
 
-    // ──────────── DateHeader ViewHolder ───────────────
-    static class DateHeaderVH extends RecyclerView.ViewHolder {
+    class DayGroupVH extends RecyclerView.ViewHolder {
         private final ItemBillDateHeaderBinding b;
 
-        DateHeaderVH(ItemBillDateHeaderBinding b) {
+        DayGroupVH(ItemBillDateHeaderBinding b) {
             super(b.getRoot());
             this.b = b;
         }
 
-        void bind(DateHeader h) {
-            b.tvDate.setText(h.dateText);
-            b.tvExpense.setText(h.expenseText);
-            b.tvIncome.setText(h.incomeText);
-        }
-    }
+        void bind(BillGroup group) {
+            // 1. 设置头部数据
+            b.tvDate.setText(group.header.dateText);
+            b.tvDaySummary.setText(group.header.expenseText + " | " + group.header.incomeText);
 
-    // ──────────── Bill ViewHolder ──────────────────────
-    class BillVH extends RecyclerView.ViewHolder {
-        private final ItemBillBinding b;
-        private PhotoAdapter photoAdapter;
+            // 2. 清空并填充账单项
+            b.llBillContainer.removeAllViews();
+            for (int i = 0; i < group.bills.size(); i++) {
+                BillUiModel bill = group.bills.get(i);
+                ItemBillBinding ib = ItemBillBinding.inflate(
+                        LayoutInflater.from(context), b.llBillContainer, false);
 
-        BillVH(ItemBillBinding b) {
-            super(b.getRoot());
-            this.b = b;
-
-            // 图片内嵌 RecyclerView 一次性配置
-            b.ivBillImage.setLayoutManager(
-                    new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
-            b.ivBillImage.setHasFixedSize(true);
-            b.ivBillImage.setRecycledViewPool(sharedPhotoPool);
-        }
-
-        void bind(BillUiModel model) {
-            // ── 基础字段（纯赋值）────────────────────
-            b.tvCategory.setText(model.categoryName);
-            b.tvAmount.setText(model.amountText);
-            b.tvAmount.setTextColor(model.amountColor);
-            b.tvTime.setText(model.timeText);
-
-            // 分类图标
-            ImageLoaderUtils.loadThumbnail(context, model.categoryIconUrl, b.ivCategoryIcon);
-
-            // 账户
-            if (model.accountName != null && !model.accountName.isEmpty()) {
-                b.layoutAccountInfo.setVisibility(View.VISIBLE);
-                b.tvAccount.setText(model.accountName);
-                if (model.accountIconUrl != null && !model.accountIconUrl.isEmpty()) {
-                    ImageLoaderUtils.loadThumbnail(context, model.accountIconUrl, b.ivAccountIcon);
-                } else {
-                    b.ivAccountIcon.setImageResource(R.drawable.ic_wallet);
+                // 数据绑定
+                ib.tvCategory.setText(bill.categoryName);
+                ib.tvAmount.setText(bill.amountText);
+                ib.tvAmount.setTextColor(bill.amountColor);
+                
+                String subInfo = bill.timeText;
+                if (bill.remarkText != null && !bill.remarkText.isEmpty()) {
+                    subInfo += " | " + bill.remarkText;
                 }
-            } else {
-                b.layoutAccountInfo.setVisibility(View.GONE);
-            }
+                ib.tvSubInfo.setText(subInfo);
+                ib.tvAccount.setText(bill.accountName);
 
-            // 备注
-            if (model.remarkText != null && !model.remarkText.isEmpty()) {
-                b.tvRemark.setVisibility(View.VISIBLE);
-                b.tvRemark.setText("备注：" + model.remarkText);
-            } else {
-                b.tvRemark.setVisibility(View.GONE);
-            }
+                ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, ib.ivCategoryIcon);
 
-            // 位置
-            if (model.locationText != null && !model.locationText.isEmpty()) {
-                b.layoutLocation.setVisibility(View.VISIBLE);
-                b.tvLocation.setText(model.locationText);
-            } else {
-                b.layoutLocation.setVisibility(View.GONE);
-            }
-
-            // ── 组合卡片逻辑 ──────────────────────────
-            float radius = context.getResources().getDimension(R.dimen.card_corner_radius_large);
-            // 处理圆角
-            if (model.isFirstOfDay && model.isLastOfDay) {
-                // 只有一笔：全圆角
-                b.cardView.setShapeAppearanceModel(
-                        b.cardView.getShapeAppearanceModel().toBuilder()
-                                .setAllCornerSizes(radius)
-                                .build()
-                );
-//                b.billDivider.setVisibility(View.GONE);
-            } else if (model.isFirstOfDay) {
-                // 第一笔：顶部圆角
-                b.cardView.setShapeAppearanceModel(
-                        b.cardView.getShapeAppearanceModel().toBuilder()
-                                .setTopLeftCornerSize(radius)
-                                .setTopRightCornerSize(radius)
-                                .setBottomLeftCornerSize(0)
-                                .setBottomRightCornerSize(0)
-                                .build()
-                );
-//                b.billDivider.setVisibility(View.VISIBLE);
-            } else if (model.isLastOfDay) {
-                // 最后一笔：底部圆角
-                b.cardView.setShapeAppearanceModel(
-                        b.cardView.getShapeAppearanceModel().toBuilder()
-                                .setTopLeftCornerSize(0)
-                                .setTopRightCornerSize(0)
-                                .setBottomLeftCornerSize(radius)
-                                .setBottomRightCornerSize(radius)
-                                .build()
-                );
-//                b.billDivider.setVisibility(View.GONE);
-            } else {
-                // 中间笔：无圆角
-                b.cardView.setShapeAppearanceModel(
-                        b.cardView.getShapeAppearanceModel().toBuilder()
-                                .setAllCornerSizes(0)
-                                .build()
-                );
-//                b.billDivider.setVisibility(View.VISIBLE);
-            }
-
-            // 调整 Margin 消除卡片间的间隙（MaterialCardView 使用 compat padding 会有阴影空间）
-            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) b.cardView.getLayoutParams();
-            int marginSide = (int) (16 * context.getResources().getDisplayMetrics().density); // 与顶部卡片对齐
-            int marginTopBottom = 0;
-            
-            lp.setMargins(marginSide, marginTopBottom, marginSide, marginTopBottom);
-            b.cardView.setLayoutParams(lp);
-
-            // ── 图片列表 ──────────────────────────────
-            if (!model.imageUrls.isEmpty()) {
-                b.ivBillImage.setVisibility(View.VISIBLE);
-                if (photoAdapter == null) {
-                    photoAdapter = new PhotoAdapter(context, new ArrayList<>(), false,
+                // 图片列表处理
+                if (bill.imageUrls != null && !bill.imageUrls.isEmpty()) {
+                    ib.ivBillImage.setVisibility(View.VISIBLE);
+                    ib.ivBillImage.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
+                    ib.ivBillImage.setRecycledViewPool(sharedPhotoPool);
+                    
+                    PhotoAdapter photoAdapter = new PhotoAdapter(context, new ArrayList<>(), false,
                             new PhotoAdapter.OnPhotoClickListener() {
                                 @Override
                                 public void onPhotoClick(String url, int pos) {
@@ -289,19 +167,23 @@ public class BillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                                 }
                                 @Override public void onDeleteClick(int pos) { }
                             });
-                    b.ivBillImage.setAdapter(photoAdapter);
+                    ib.ivBillImage.setAdapter(photoAdapter);
+                    photoAdapter.setPhotos(bill.imageUrls);
+                } else {
+                    ib.ivBillImage.setVisibility(View.GONE);
                 }
-                photoAdapter.setPhotos(model.imageUrls);
-            } else {
-                b.ivBillImage.setVisibility(View.GONE);
-            }
 
-            // ── 点击事件 ─────────────────────────────
-            b.cardView.setTransitionName("bill_card_" + model.diffKey);
-            b.cardView.setOnClickListener(v -> {
-                if (listener != null)
-                    listener.onBillClick(model.localId, model.objectId, b.cardView);
-            });
+                // 分割线处理
+                ib.billDivider.setVisibility(i == group.bills.size() - 1 ? View.GONE : View.VISIBLE);
+
+                // 点击事件 (设置在 layoutMain 上)
+                ib.layoutMain.setOnClickListener(v -> {
+                    if (listener != null)
+                        listener.onBillClick(bill.localId, bill.objectId, ib.getRoot());
+                });
+
+                b.llBillContainer.addView(ib.getRoot());
+            }
         }
     }
 }

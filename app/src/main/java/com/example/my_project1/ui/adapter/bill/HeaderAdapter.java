@@ -129,9 +129,9 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             b.tvAssetsValue.setText(model.assets);
             b.tvLiabilitiesValue.setText(model.liabilities);
             b.tvMonthlyIncome.setText("月收入: " + model.monthlyIncome);
-            b.tvTotalIncome.setText("总收入: " + model.totalIncome);
+//            b.tvTotalIncome.setText("总收入: " + model.totalIncome);
             b.tvMonthlyExpense.setText("月支出: " + model.monthlyExpense);
-            b.tvTotalExpense.setText("总支出: " + model.totalExpense);
+//            b.tvTotalExpense.setText("总支出: " + model.totalExpense);
         }
     }
 }

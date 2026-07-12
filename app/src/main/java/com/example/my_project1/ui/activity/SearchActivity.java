@@ -232,9 +232,9 @@ public class SearchActivity extends AppCompatActivity {
         // 观察搜索结果
         viewModel.searchResults.observe(this, bills -> {
             if (bills != null && !bills.isEmpty()) {
-                // 🔥 修复点：调用新写的转换方法，将 List<Bill> 转为带日期的 List<Object>
-                List<Object> uiModels = convertBillsToUiItems(bills, viewModel.accountMap.getValue());
-                billAdapter.submitList(uiModels);
+                // 🔥 修复点：调用新写的转换方法，将 List<Bill> 转为聚合卡片组
+                List<BillAdapter.BillGroup> uiGroups = convertBillsToUiGroups(bills, viewModel.accountMap.getValue());
+                billAdapter.submitList(uiGroups);
                 showSearchResults();
             }
         });
@@ -264,15 +264,11 @@ public class SearchActivity extends AppCompatActivity {
         });
     }
 
-    // ==================== 核心转换逻辑 (修复报错点) ====================
+    // ==================== 核心转换逻辑 (聚合版) ====================
 
-    /**
-     * 将原始 Bill 列表转化为 BillAdapter 需要的 [DateHeader, BillUiModel] 混合列表
-     * （与首页逻辑一致，确保搜索结果也能漂亮地显示日期前和时间轴）
-     */
-    private List<Object> convertBillsToUiItems(List<Bill> bills, java.util.Map<String, com.example.my_project1.data.model.account.Account> accountMap) {
-        List<Object> items = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return items;
+    private List<BillAdapter.BillGroup> convertBillsToUiGroups(List<Bill> bills, java.util.Map<String, com.example.my_project1.data.model.account.Account> accountMap) {
+        List<BillAdapter.BillGroup> groups = new ArrayList<>();
+        if (bills == null || bills.isEmpty()) return groups;
 
         SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         SimpleDateFormat dateDispFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
@@ -280,74 +276,48 @@ public class SearchActivity extends AppCompatActivity {
         DecimalFormat    amtFmt      = new DecimalFormat("#,##0.00");
         String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 
-        String  prevDateKey    = null;
-        double  dayExpense     = 0;
-        double  dayIncome      = 0;
-        int     headerIndex    = -1;
-        int     firstBillIndex = -1;
+        String  prevDateKey = null;
+        double  dayExpense  = 0;
+        double  dayIncome   = 0;
+        List<BillUiModel> currentDayBills = new ArrayList<>();
+        BillAdapter.DateHeader currentHeader = null;
 
         for (int i = 0; i < bills.size(); i++) {
             Bill bill = bills.get(i);
-            if (bill.getBillTime() == null) continue; // 防空保护
+            if (bill.getBillTime() == null) continue;
 
             String dateKey = dateKeyFmt.format(bill.getBillTime());
-            boolean isDayChange = !dateKey.equals(prevDateKey);
 
-            // 日期切换：插入 Header
-            if (isDayChange) {
-                // 补写上一组 Header 的汇总金额
-                if (headerIndex >= 0) {
-                    BillAdapter.DateHeader oldHeader = (BillAdapter.DateHeader) items.get(headerIndex);
-                    items.set(headerIndex, new BillAdapter.DateHeader(
-                            oldHeader.dateKey, oldHeader.dateText,
-                            String.format(Locale.getDefault(), "支出 ¥%.2f", dayExpense),
-                            String.format(Locale.getDefault(), "收入 ¥%.2f", dayIncome)
-                    ));
-                    markLastBillOfDay(items, firstBillIndex);
-                }
-
+            if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
+                groups.add(new BillAdapter.BillGroup(
+                        new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                                String.format(Locale.getDefault(), "支 %.2f", dayExpense),
+                                String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
+                        new ArrayList<>(currentDayBills)
+                ));
                 dayExpense = 0;
                 dayIncome  = 0;
+                currentDayBills.clear();
+            }
 
+            if (bill.getType() == 0) dayExpense += bill.getAmount();
+            else                     dayIncome  += bill.getAmount();
+
+            if (currentDayBills.isEmpty()) {
                 Calendar cal = Calendar.getInstance();
                 cal.setTime(bill.getBillTime());
                 String weekDay  = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1];
                 String dateDisp = dateDispFmt.format(bill.getBillTime()) + "（" + weekDay + "）";
-
-                headerIndex = items.size();
-                items.add(new BillAdapter.DateHeader(dateKey, dateDisp, "支出 ¥0.00", "收入 ¥0.00"));
-
-                firstBillIndex = items.size();
-                prevDateKey    = dateKey;
+                currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
             }
 
-            // 统计当天收支
-            if (bill.getType() == 0) dayExpense += bill.getAmount();
-            else                     dayIncome  += bill.getAmount();
-
-            // 构建 UI 字段
-            String amountText;
-            int    amountColor;
-            if (bill.getType() == 0) {
-                amountText  = "-¥" + amtFmt.format(bill.getAmount());
-                amountColor = ContextCompat.getColor(this, R.color.red);
-            } else if (bill.getType() == 1) {
-                amountText  = "+¥" + amtFmt.format(bill.getAmount());
-                amountColor = ContextCompat.getColor(this, R.color.green);
-            } else {
-                amountText  = "¥" + amtFmt.format(bill.getAmount());
-                amountColor = ContextCompat.getColor(this, android.R.color.black);
-            }
-
-            boolean isFirstOfDay = (items.size() == firstBillIndex);
+            String amountText = (bill.getType() == 0 ? "- ¥" : "+ ¥") + amtFmt.format(bill.getAmount());
+            int amountColor = ContextCompat.getColor(this, bill.getType() == 0 ? R.color.red : R.color.green);
 
             com.example.my_project1.data.model.account.Account account =
                     accountMap != null ? accountMap.get(bill.getAccountId()) : null;
-            String accountName = account != null ? account.getName() : "";
-            String accountIcon = account != null ? account.getIconUrl() : "";
 
-            // 生成 BillUiModel
-            BillUiModel uiModel = BillUiModel.builder()
+            currentDayBills.add(BillUiModel.builder()
                     .localId(bill.getId())
                     .objectId(bill.getObjectId())
                     .timeText(timeFmt.format(bill.getBillTime()))
@@ -355,41 +325,24 @@ public class SearchActivity extends AppCompatActivity {
                     .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
                     .amountText(amountText)
                     .amountColor(amountColor)
-                    .accountName(accountName)
-                    .accountIconUrl(accountIcon)
+                    .accountName(account != null ? account.getName() : "")
                     .remarkText(bill.getRemark())
-                    .locationText(bill.getLocation())
                     .imageUrls(bill.getImageUrls())
-                    .isFirstOfDay(isFirstOfDay)
-                    .isLastOfDay(false)
-                    .build();
+                    .build());
 
-            items.add(uiModel);
+            prevDateKey = dateKey;
         }
 
-        // 补写最后一组 Header 汇总及最后一笔时间轴
-        if (headerIndex >= 0) {
-            BillAdapter.DateHeader lastHeader = (BillAdapter.DateHeader) items.get(headerIndex);
-            items.set(headerIndex, new BillAdapter.DateHeader(
-                    lastHeader.dateKey, lastHeader.dateText,
-                    String.format(Locale.getDefault(), "支出 ¥%.2f", dayExpense),
-                    String.format(Locale.getDefault(), "收入 ¥%.2f", dayIncome)
+        if (!currentDayBills.isEmpty() && currentHeader != null) {
+            groups.add(new BillAdapter.BillGroup(
+                    new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                            String.format(Locale.getDefault(), "支 %.2f", dayExpense),
+                            String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
+                    currentDayBills
             ));
-            markLastBillOfDay(items, firstBillIndex);
         }
 
-        return items;
-    }
-
-    /** 从 startIndex 往后找到最后一条 BillUiModel，设置 isLastOfDay=true，修复时间轴断线 */
-    private void markLastBillOfDay(List<Object> items, int startIndex) {
-        for (int j = items.size() - 1; j >= startIndex; j--) {
-            if (items.get(j) instanceof BillUiModel) {
-                BillUiModel last = (BillUiModel) items.get(j);
-                last.isLastOfDay = true;
-                break;
-            }
-        }
+        return groups;
     }
 
     // ==================== 筛选功能 ====================

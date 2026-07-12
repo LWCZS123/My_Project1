@@ -84,9 +84,9 @@ public class BillViewModel extends AndroidViewModel {
     /** 所有账单（用于统计 billCount / billDays） */
     private LiveData<List<Bill>> allBills;
 
-    /** ✅ 新增：供 HomeFragment 的 BillAdapter 使用，DateHeader + BillUiModel 混合列表 */
-    private final MutableLiveData<List<Object>> _billItems = new MutableLiveData<>(new ArrayList<>());
-    public  final LiveData<List<Object>>         billItems  = _billItems;
+    /** ✅ 新增：供 HomeFragment 的 BillAdapter 使用，按日分组的账单数据 */
+    private final MutableLiveData<List<BillAdapter.BillGroup>> _billItems = new MutableLiveData<>(new ArrayList<>());
+    public  final LiveData<List<BillAdapter.BillGroup>>         billItems  = _billItems;
 
     /** ✅ 新增：供 HeaderAdapter 使用的统计概览数据 */
     private final MutableLiveData<HeaderUiModel> _headerData =
@@ -230,9 +230,9 @@ public class BillViewModel extends AndroidViewModel {
                     }
                 }
 
-                // 2. 映射 UI 模型
-                List<Object> uiItems   = mapBillsToUiItems(bills, accountMap);
-                HeaderUiModel header   = buildHeaderUiModel(bills);
+                // 2. 映射 UI 模型 (聚合版)
+                List<BillAdapter.BillGroup> uiItems = mapBillsToUiGroups(bills, accountMap);
+                HeaderUiModel header = buildHeaderUiModel(bills);
 
                 mainHandler.post(() -> {
                     _billItems.setValue(uiItems);
@@ -256,15 +256,11 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     // ════════════════════════════════════════════════════
-    //  ✅ UiModel 映射（后台线程执行）
+    //  ✅ UiModel 映射 (聚合版)
     // ════════════════════════════════════════════════════
-    /**
-     * 将原始 Bill 列表转化为 BillAdapter 需要的 [DateHeader, BillUiModel, ...] 混合列表
-     * 同时计算每条账单的时间轴连线状态（isFirstOfDay / isLastOfDay）
-     */
-    private List<Object> mapBillsToUiItems(List<Bill> bills, Map<String, Account> accountMap) {
-        List<Object> items = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return items;
+    private List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills, Map<String, Account> accountMap) {
+        List<BillAdapter.BillGroup> groups = new ArrayList<>();
+        if (bills == null || bills.isEmpty()) return groups;
 
         SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         SimpleDateFormat dateDispFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
@@ -272,79 +268,49 @@ public class BillViewModel extends AndroidViewModel {
         DecimalFormat    amtFmt      = new DecimalFormat("#,##0.00");
         String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 
-        String  prevDateKey    = null;
-        double  dayExpense     = 0;
-        double  dayIncome      = 0;
-        int     headerIndex    = -1;    // 当前日期 Header 在 items 中的索引
-        int     firstBillIndex = -1;    // 当天第一笔账单在 items 中的索引
+        String  prevDateKey = null;
+        double  dayExpense  = 0;
+        double  dayIncome   = 0;
+        List<BillUiModel> currentDayBills = new ArrayList<>();
+        BillAdapter.DateHeader currentHeader = null;
 
         for (int i = 0; i < bills.size(); i++) {
             Bill   bill    = bills.get(i);
             String dateKey = dateKeyFmt.format(bill.getBillTime());
 
-            boolean isDayChange = !dateKey.equals(prevDateKey);
-
-            // ── 日期切换：补写上一组 Header 汇总，再插入新 Header ──
-            if (isDayChange) {
-                // 补写上一组 Header 的汇总金额
-                if (headerIndex >= 0) {
-                    BillAdapter.DateHeader oldHeader = (BillAdapter.DateHeader) items.get(headerIndex);
-                    items.set(headerIndex, new BillAdapter.DateHeader(
-                            oldHeader.dateKey,
-                            oldHeader.dateText,
-                            String.format(Locale.getDefault(), "支出 ¥%.2f", dayExpense),
-                            String.format(Locale.getDefault(), "收入 ¥%.2f", dayIncome)
-                    ));
-                    // 标记上一天最后一笔账单 isLastOfDay=true
-                    markLastBillOfDay(items, firstBillIndex);
-                }
-
-                // 重置日统计
+            if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
+                // 保存上一组
+                groups.add(new BillAdapter.BillGroup(
+                        new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                                String.format(Locale.getDefault(), "支 %.2f", dayExpense),
+                                String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
+                        new ArrayList<>(currentDayBills)
+                ));
                 dayExpense = 0;
                 dayIncome  = 0;
+                currentDayBills.clear();
+            }
 
-                // 构建日期显示文字
+            // 统计
+            if (bill.getType() == 0) dayExpense += bill.getAmount();
+            else                     dayIncome  += bill.getAmount();
+
+            // 构建 Header (首次或日期改变时)
+            if (currentDayBills.isEmpty()) {
                 Calendar cal = Calendar.getInstance();
                 cal.setTime(bill.getBillTime());
                 String weekDay  = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1];
                 String dateDisp = dateDispFmt.format(bill.getBillTime()) + "（" + weekDay + "）";
-
-                // 插入 DateHeader 占位（汇总金额在循环结束后补写）
-                headerIndex = items.size();
-                items.add(new BillAdapter.DateHeader(dateKey, dateDisp, "支出 ¥0.00", "收入 ¥0.00"));
-
-                firstBillIndex = items.size(); // 当天第一笔账单的索引
-                prevDateKey    = dateKey;
+                currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
             }
 
-            // ── 统计 ──────────────────────────────────
-            if (bill.getType() == 0) dayExpense += bill.getAmount();
-            else                     dayIncome  += bill.getAmount();
-
-            // ── 构建 BillUiModel ──────────────────────
-            String amountText;
-            int    amountColor;
-            switch (bill.getType()) {
-                case 0:
-                    amountText  = "-¥" + amtFmt.format(bill.getAmount());
-                    amountColor = getApplication().getColor(R.color.red);
-                    break;
-                case 1:
-                    amountText  = "+¥" + amtFmt.format(bill.getAmount());
-                    amountColor = getApplication().getColor(R.color.green);
-                    break;
-                default:
-                    amountText  = "¥" + amtFmt.format(bill.getAmount());
-                    amountColor = getApplication().getColor(android.R.color.black);
-            }
-
-            boolean isFirstOfDay = (items.size() == firstBillIndex); // 第一笔
+            // 构建 BillUiModel
+            String amountText = (bill.getType() == 0 ? "- ¥" : "+ ¥") + amtFmt.format(bill.getAmount());
+            int amountColor = getApplication().getColor(bill.getType() == 0 ? R.color.red : R.color.green);
 
             Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
-            String accountName = account != null ? account.getName() : "";
-            String accountIcon = account != null ? account.getIconUrl() : "";
 
-            BillUiModel uiModel = BillUiModel.builder()
+            currentDayBills.add(BillUiModel.builder()
                     .localId(bill.getId())
                     .objectId(bill.getObjectId())
                     .timeText(timeFmt.format(bill.getBillTime()))
@@ -352,41 +318,25 @@ public class BillViewModel extends AndroidViewModel {
                     .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
                     .amountText(amountText)
                     .amountColor(amountColor)
-                    .accountName(accountName)
-                    .accountIconUrl(accountIcon)
+                    .accountName(account != null ? account.getName() : "")
                     .remarkText(bill.getRemark())
-                    .locationText(bill.getLocation())
                     .imageUrls(bill.getImageUrls())
-                    .isFirstOfDay(isFirstOfDay)
-                    .isLastOfDay(false)    // 先默认 false，最后一笔在下次切换或循环结束时更新
-                    .build();
+                    .build());
 
-            items.add(uiModel);
+            prevDateKey = dateKey;
         }
 
-        // ── 补写最后一组 Header 汇总 + 最后一笔 isLastOfDay ──
-        if (headerIndex >= 0) {
-            BillAdapter.DateHeader lastHeader = (BillAdapter.DateHeader) items.get(headerIndex);
-            items.set(headerIndex, new BillAdapter.DateHeader(
-                    lastHeader.dateKey, lastHeader.dateText,
-                    String.format(Locale.getDefault(), "支出 ¥%.2f", dayExpense),
-                    String.format(Locale.getDefault(), "收入 ¥%.2f", dayIncome)
+        // 最后一组
+        if (!currentDayBills.isEmpty() && currentHeader != null) {
+            groups.add(new BillAdapter.BillGroup(
+                    new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                            String.format(Locale.getDefault(), "支 %.2f", dayExpense),
+                            String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
+                    currentDayBills
             ));
-            markLastBillOfDay(items, firstBillIndex);
         }
 
-        return items;
-    }
-
-    /** 从 startIndex 往后找到最后一条 BillUiModel，设置 isLastOfDay=true */
-    private void markLastBillOfDay(List<Object> items, int startIndex) {
-        for (int j = items.size() - 1; j >= startIndex; j--) {
-            if (items.get(j) instanceof BillUiModel) {
-                BillUiModel last = (BillUiModel) items.get(j);
-                last.isLastOfDay = true;
-                break;
-            }
-        }
+        return groups;
     }
 
     /**
@@ -527,6 +477,10 @@ public class BillViewModel extends AndroidViewModel {
 
     public Bill saveBill(String objectId) {
         return repository.getBillByObjectIdSync(objectId);
+    }
+
+    public Bill saveBillLocal(long id) {
+        return repository.getBillByIdSync(id);
     }
 
     public void insertBill(Bill bill) {

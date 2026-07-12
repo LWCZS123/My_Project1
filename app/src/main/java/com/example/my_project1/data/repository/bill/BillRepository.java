@@ -168,11 +168,15 @@ public class BillRepository {
     }
 
     /**
-     * ⭐ 同步获取账单（用于编辑模式）
+     * ⭐ 同步获取账单（按 ObjectId 或 本地 ID）
      * 注意：必须在后台线程调用
      */
     public Bill getBillByObjectIdSync(String objectId) {
         return billDao.getBillByObjectIdSync(objectId);
+    }
+
+    public Bill getBillByIdSync(long id) {
+        return billDao.getBillByIdSync(id);
     }
 
     /**
