@@ -16,7 +16,6 @@ import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ActivityCategoryBillsBinding;
 import com.example.my_project1.ui.adapter.bill.BillListAdapter;
-import com.example.my_project1.ui.adapter.bill.BillListAdapter.ListItem;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.GlideImageLoader;
 
@@ -96,7 +95,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
         setupHeader(categoryName, categoryIcon, billCount);
         binding.ivBack.setOnClickListener(v -> onBackPressed());
 
-        adapter = new BillListAdapter();
+        adapter = new BillListAdapter(this);
         binding.rvBills.setLayoutManager(new LinearLayoutManager(this));
         binding.rvBills.setAdapter(adapter);
         binding.rvBills.setNestedScrollingEnabled(false);
@@ -164,7 +163,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
                 return b.getBillTime().compareTo(a.getBillTime());
             });
 
-            List<ListItem> listItems = buildGroupedList(result);
+            List<BillListAdapter.ListItem> listItems = buildGroupedList(result);
 
             AppExecutors.get().mainThread().execute(() -> {
                 boolean empty = listItems.isEmpty();
@@ -183,7 +182,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
      * 将账单列表转换为带日期头的混合列表。
      * 日期头格式：yyyy.M.d（如 2026.3.5），同一天的账单归为一组。
      */
-    private List<ListItem> buildGroupedList(List<Bill> bills) {
+    private List<BillListAdapter.ListItem> buildGroupedList(List<Bill> bills) {
         SimpleDateFormat keyFmt     = new SimpleDateFormat("yyyyMMdd", Locale.CHINESE);
         SimpleDateFormat displayFmt = new SimpleDateFormat("yyyy.M.d", Locale.CHINESE);
 
@@ -194,15 +193,21 @@ public class CategoryBillsActivity extends AppCompatActivity {
             String key     = keyFmt.format(b.getBillTime());
             String display = displayFmt.format(b.getBillTime());
             keyDisplay.put(key, display);
-            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(b);
+            
+            List<Bill> group = grouped.get(key);
+            if (group == null) {
+                group = new ArrayList<>();
+                grouped.put(key, group);
+            }
+            group.add(b);
         }
 
-        List<ListItem> items = new ArrayList<>();
+        List<BillListAdapter.ListItem> items = new ArrayList<>();
         for (Map.Entry<String, List<Bill>> entry : grouped.entrySet()) {
             List<Bill> dayBills = entry.getValue();
-            items.add(new ListItem(keyDisplay.get(entry.getKey()), dayBills.size()));
+            items.add(new BillListAdapter.ListItem(keyDisplay.get(entry.getKey()), dayBills.size()));
             for (Bill b : dayBills) {
-                items.add(new ListItem(b));
+                items.add(new BillListAdapter.ListItem(b));
             }
         }
         return items;

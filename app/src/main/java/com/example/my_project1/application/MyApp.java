@@ -9,6 +9,7 @@ import com.amap.api.location.AMapLocationClient;
 import com.example.my_project1.receiver.NetworkReceiver;
 import com.example.my_project1.scheduler.SyncScheduler;
 import com.example.my_project1.utils.AppInitializer;
+import com.example.my_project1.utils.HolidayUtil;
 
 import cn.bmob.v3.Bmob;
 import cn.bmob.v3.BmobUser;
@@ -29,6 +30,10 @@ public class MyApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        
+        // 初始化节假日数据 (从 Assets 加载 JSON)
+        HolidayUtil.init(this);
+
         AMapLocationClient.updatePrivacyShow(this, true, true); // 告知SDK已经展示隐私政策弹窗
         AMapLocationClient.updatePrivacyAgree(this, true);
 

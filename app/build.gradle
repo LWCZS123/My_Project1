@@ -116,6 +116,9 @@ dependencies {
     //进度条
     implementation 'com.github.lzyzsd:circleprogress:1.2.4'
 
+    // 农历与节假日库
+    implementation 'cn.6tail:lunar:1.3.11'
+
 
     //implementation 'com.github.zcweng:switch-button:0.0.3@aar'
     //implementation 'com.kyleduo.switchbutton:library:2.1.1'

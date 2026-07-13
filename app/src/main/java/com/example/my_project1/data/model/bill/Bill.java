@@ -164,6 +164,68 @@ public class Bill {
 
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Bill bill = (Bill) o;
+
+        if (id != bill.id) return false;
+        if (Double.compare(bill.amount, amount) != 0) return false;
+        if (type != bill.type) return false;
+        if (excludeBudget != bill.excludeBudget) return false;
+        if (sourceWishId != bill.sourceWishId) return false;
+        if (objectId != null ? !objectId.equals(bill.objectId) : bill.objectId != null)
+            return false;
+        if (userId != null ? !userId.equals(bill.userId) : bill.userId != null) return false;
+        if (bookId != null ? !bookId.equals(bill.bookId) : bill.bookId != null) return false;
+        if (accountId != null ? !accountId.equals(bill.accountId) : bill.accountId != null)
+            return false;
+        if (categoryId != null ? !categoryId.equals(bill.categoryId) : bill.categoryId != null)
+            return false;
+        if (categoryName != null ? !categoryName.equals(bill.categoryName) : bill.categoryName != null)
+            return false;
+        if (categoryIconUrl != null ? !categoryIconUrl.equals(bill.categoryIconUrl) : bill.categoryIconUrl != null)
+            return false;
+        if (remark != null ? !remark.equals(bill.remark) : bill.remark != null) return false;
+        if (billTime != null ? !billTime.equals(bill.billTime) : bill.billTime != null) return false;
+        if (imageUrls != null ? !imageUrls.equals(bill.imageUrls) : bill.imageUrls != null)
+            return false;
+        if (location != null ? !location.equals(bill.location) : bill.location != null) return false;
+        if (syncState != bill.syncState) return false;
+        if (createdAt != null ? !createdAt.equals(bill.createdAt) : bill.createdAt != null)
+            return false;
+        return updatedAt != null ? updatedAt.equals(bill.updatedAt) : bill.updatedAt == null;
+    }
+
+    @Override
+    public int hashCode() {
+        int result;
+        long temp;
+        result = (int) (id ^ (id >>> 32));
+        result = 31 * result + (objectId != null ? objectId.hashCode() : 0);
+        result = 31 * result + (userId != null ? userId.hashCode() : 0);
+        result = 31 * result + (bookId != null ? bookId.hashCode() : 0);
+        result = 31 * result + (accountId != null ? accountId.hashCode() : 0);
+        result = 31 * result + (categoryId != null ? categoryId.hashCode() : 0);
+        result = 31 * result + (categoryName != null ? categoryName.hashCode() : 0);
+        result = 31 * result + (categoryIconUrl != null ? categoryIconUrl.hashCode() : 0);
+        temp = Double.doubleToLongBits(amount);
+        result = 31 * result + (int) (temp ^ (temp >>> 32));
+        result = 31 * result + type;
+        result = 31 * result + (excludeBudget ? 1 : 0);
+        result = 31 * result + (remark != null ? remark.hashCode() : 0);
+        result = 31 * result + (billTime != null ? billTime.hashCode() : 0);
+        result = 31 * result + (imageUrls != null ? imageUrls.hashCode() : 0);
+        result = 31 * result + (location != null ? location.hashCode() : 0);
+        result = 31 * result + (int) (sourceWishId ^ (sourceWishId >>> 32));
+        result = 31 * result + (syncState != null ? syncState.hashCode() : 0);
+        result = 31 * result + (createdAt != null ? createdAt.hashCode() : 0);
+        result = 31 * result + (updatedAt != null ? updatedAt.hashCode() : 0);
+        return result;
+    }
+
+    @Override
     public String toString() {
         return "Bill{" +
                 "id=" + id +

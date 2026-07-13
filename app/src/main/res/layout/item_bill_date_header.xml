@@ -44,7 +44,7 @@
                     android:text="7月5日 (周日)"
                     android:textColor="#333333"
                     android:textSize="14sp"
-                    android:fontFamily="@font/font3"
+                    android:fontFamily="@font/font3_regular"
                     android:textStyle="bold" />
 
                 <TextView
@@ -54,7 +54,7 @@
                     android:layout_alignParentEnd="true"
                     android:text="支 20.00 | 收 0.00"
                     android:textColor="#999999"
-                    android:fontFamily="@font/font3"
+                    android:fontFamily="@font/font3_regular"
                     android:textSize="12sp" />
             </RelativeLayout>
 

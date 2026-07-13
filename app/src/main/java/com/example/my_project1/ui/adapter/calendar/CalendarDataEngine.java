@@ -8,6 +8,7 @@ import android.util.LruCache;
 import android.util.SparseArray;
 
 import com.example.my_project1.data.model.calendar.CalendarDay;
+import com.example.my_project1.utils.HolidayUtil;
 import com.example.my_project1.utils.LunarCalendar;
 
 import java.text.SimpleDateFormat;
@@ -259,7 +260,15 @@ public final class CalendarDataEngine {
                     LunarCalendar.getSolarTerm(year, month, d);
             cd.setSolarTerm(solarTerm != null && !solarTerm.isEmpty());
 
-            // ⚠️ 已删除节假日逻辑
+            // 节假日逻辑
+            String dayTag = HolidayUtil.getDayTag(year, month, d);
+            if ("休".equals(dayTag)) {
+                cd.setHolidayType(1); // HOLIDAY_REST
+            } else if ("班".equals(dayTag)) {
+                cd.setHolidayType(2); // HOLIDAY_WORKDAY
+            } else {
+                cd.setHolidayType(0); // HOLIDAY_NONE
+            }
 
             BillDataProvider provider = this.billDataProvider;
             if (provider != null) {

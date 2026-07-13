@@ -76,6 +76,9 @@ public class CalendarAdapter1
     private static final int COLOR_BLUE              = Color.parseColor("#2196F3");
     private static final int COLOR_WHITE             = Color.WHITE;
 
+    // 节假日项目背景 - 极浅蓝 (修改点)
+    private static final int COLOR_ITEM_REST_BG  = Color.parseColor("#F1F8FF"); 
+
     // 节假日标签 - 蓝色调（修改点）
     private static final int COLOR_TAG_REST_BG   = Color.parseColor("#E3F2FD"); // 浅蓝背景 - 休
     private static final int COLOR_TAG_REST_TEXT = Color.parseColor("#1565C0"); // 深蓝文字 - 休
@@ -199,6 +202,7 @@ public class CalendarAdapter1
         private final GradientDrawable selectedDrawable;
         private final GradientDrawable todayDrawable;
         private final GradientDrawable holidayTagDrawable;
+        private final GradientDrawable itemRestBgDrawable;
 
         private final int   colorRed;
         private final int   colorAccent;
@@ -226,6 +230,11 @@ public class CalendarAdapter1
             holidayTagDrawable.setShape(GradientDrawable.RECTANGLE);
             holidayTagDrawable.setCornerRadius(4f * density);
 
+            itemRestBgDrawable = new GradientDrawable();
+            itemRestBgDrawable.setShape(GradientDrawable.RECTANGLE);
+            itemRestBgDrawable.setCornerRadius(8f * density);
+            itemRestBgDrawable.setColor(COLOR_ITEM_REST_BG);
+
             colorRed    = ContextCompat.getColor(binding.getRoot().getContext(), R.color.accent_color);
             colorAccent = ContextCompat.getColor(binding.getRoot().getContext(), R.color.accent_color);
 
@@ -245,10 +254,12 @@ public class CalendarAdapter1
             binding.flDayContainer.setBackground(null);
             binding.vSelectedBg.setBackground(null);
             binding.tvDay.setTextColor(COLOR_TEXT_DEFAULT);
+            binding.getRoot().setBackground(null);
 
             if (!day.isCurrentMonth()) {
                 binding.tvDay.setTextColor(COLOR_NON_CURRENT_MONTH);
-                binding.tvLunar.setVisibility(View.INVISIBLE);
+                applyLunarText(day); // 优化：非本月日期显示农历，但保持灰色
+                binding.tvLunar.setTextColor(COLOR_TEXT_LUNAR_GREY);
                 binding.tvIncome.setVisibility(View.GONE);
                 binding.tvExpense.setVisibility(View.GONE);
                 binding.tvHolidayTag.setVisibility(View.GONE);
@@ -258,6 +269,11 @@ public class CalendarAdapter1
 
             binding.getRoot().setClickable(true);
             applyHolidayTag(day);
+
+            // 节假日特殊背景 (修改点)
+            if (day.getHolidayType() == HOLIDAY_REST && !day.isSelected()) {
+                binding.getRoot().setBackground(itemRestBgDrawable);
+            }
 
             boolean hasBill   = shouldShowBill(day);
             double displayAmt = amountForDay(day);
