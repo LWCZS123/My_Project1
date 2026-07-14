@@ -2,6 +2,7 @@ package com.example.my_project1.ui.fragment;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import android.transition.TransitionManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,60 +11,49 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
-import androidx.viewpager2.widget.ViewPager2;
 
 import com.contrarywind.adapter.WheelAdapter;
 import com.contrarywind.view.WheelView;
 import com.example.my_project1.R;
 import com.example.my_project1.databinding.DialogYearMonthPickerBinding;
 import com.example.my_project1.databinding.FragmentDateTimePickerV2Binding;
-import com.example.my_project1.ui.adapter.calendar.CalendarDataEngine;
-import com.example.my_project1.ui.adapter.calendar.MonthPagerAdapter;
+import com.example.my_project1.utils.HolidayUtil;
+import com.haibin.calendarview.Calendar;
+import com.haibin.calendarview.CalendarView;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * CustomDateTimePickerFragment - 高级日期时间选择器
- * 风格参考支付宝/记账类App
- * 支持农历显示、月份快捷切换、集成时间选择
+ * CustomDateTimePickerFragment - 日期时间选择器 (动态高度最终修复版)
+ * 核心优化：
+ * 1. 深度整合 CalendarLayout：利用库原生的高度计算机制实现 5行/6行 自动切换。
+ * 2. 彻底禁用折叠：设置 showMode="only_month_view" 并代码加锁，杜绝向上滑动折叠。
+ * 3. 解决遮挡问题：代码明确设置子项高度为 56dp，给最后一周预留充足纵向空间。
  */
-public class CustomDateTimePickerFragment extends DialogFragment {
-
-    private static final int MONTHS_COUNT = 2400; // 200年范围
-    private static final int CENTER_POSITION = 1200;
+public class CustomDateTimePickerFragment extends DialogFragment implements 
+        CalendarView.OnCalendarSelectListener, 
+        CalendarView.OnMonthChangeListener {
 
     private FragmentDateTimePickerV2Binding binding;
-    private MonthPagerAdapter monthPagerAdapter;
-    private CalendarDataEngine dataEngine;
-
-    private Calendar selectedCalendar;
-    private Calendar todayDate;
-    private int currentMonthIndex = CENTER_POSITION;
-
+    private java.util.Calendar selectedCalendar;
     private OnDateTimeSelectedListener listener;
-    private boolean isTimePickerVisible = true;
+    private boolean isTimePickerVisible = false;
 
     public interface OnDateTimeSelectedListener {
-        void onDateTimeSelected(Calendar calendar);
+        void onDateTimeSelected(java.util.Calendar calendar);
     }
 
-    /**
-     * 显示日期时间选择弹窗，支持预设初始日期和选择结果回调
-     *
-     * @param fragmentManager Fragment 管理器，用于弹出 DialogFragment
-     * @param initialDate     初始选中的日期，为 null 时默认为当前日期
-     * @param listener        日期时间选择完成后的回调，用户点击确认时触发
-     */
     public static void show(androidx.fragment.app.FragmentManager fragmentManager,
-                            Calendar initialDate,
+                            java.util.Calendar initialDate,
                             OnDateTimeSelectedListener listener) {
         CustomDateTimePickerFragment fragment = new CustomDateTimePickerFragment();
-        fragment.selectedCalendar = (Calendar) (initialDate != null ? initialDate.clone() : Calendar.getInstance());
+        fragment.selectedCalendar = (java.util.Calendar) (initialDate != null ? initialDate.clone() : java.util.Calendar.getInstance());
         fragment.listener = listener;
         fragment.show(fragmentManager, "CustomDateTimePicker");
     }
@@ -71,29 +61,19 @@ public class CustomDateTimePickerFragment extends DialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        todayDate = Calendar.getInstance();
         if (selectedCalendar == null) {
-            selectedCalendar = (Calendar) todayDate.clone();
+            selectedCalendar = java.util.Calendar.getInstance();
         }
-        
-        // 计算初始位置
-        int yearDiff = selectedCalendar.get(Calendar.YEAR) - todayDate.get(Calendar.YEAR);
-        int monthDiff = selectedCalendar.get(Calendar.MONTH) - todayDate.get(Calendar.MONTH);
-        currentMonthIndex = CENTER_POSITION + (yearDiff * 12) + monthDiff;
-        
-        dataEngine = new CalendarDataEngine(todayDate, CENTER_POSITION);
-        String key = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(selectedCalendar.getTime());
-        dataEngine.updateSelectedKey(key, currentMonthIndex);
     }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         binding = FragmentDateTimePickerV2Binding.inflate(inflater, container, false);
-        setupViewPager();
+        setupCalendarView();
         setupTimePicker();
         setupButtons();
-        updateHeader();
+        updateHeader(selectedCalendar.get(java.util.Calendar.YEAR), selectedCalendar.get(java.util.Calendar.MONTH) + 1);
         return binding.getRoot();
     }
 
@@ -104,10 +84,8 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         if (dialog != null) {
             Window window = dialog.getWindow();
             if (window != null) {
-                // 背景透明以便显示布局的圆角
                 window.setBackgroundDrawableResource(android.R.color.transparent);
                 WindowManager.LayoutParams lp = window.getAttributes();
-                // 宽度设置为屏幕宽度的 90%
                 lp.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9);
                 lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
                 window.setAttributes(lp);
@@ -115,70 +93,65 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         }
     }
 
-    private void setupViewPager() {
-        monthPagerAdapter = new MonthPagerAdapter();
-        monthPagerAdapter.setDisplayType(-1); // 特殊标识，使用 Teal 选中色
+    private void setupCalendarView() {
+        // 关键：明确设置子项高度，确保库内部计算 6 行月份时不发生溢出或遮挡
+        binding.calendarView.setCalendarItemHeight(dipToPx(56));
+
+        // 初始选中日期
+        binding.calendarView.scrollToCalendar(
+                selectedCalendar.get(java.util.Calendar.YEAR),
+                selectedCalendar.get(java.util.Calendar.MONTH) + 1,
+                selectedCalendar.get(java.util.Calendar.DAY_OF_MONTH)
+        );
+
+        binding.calendarView.setOnCalendarSelectListener(this);
+        binding.calendarView.setOnMonthChangeListener(this);
         
-        CalendarDataEngine.MonthMeta initialMeta = dataEngine.getMetaSync(currentMonthIndex);
-        applyCalendarHeight(initialMeta);
-
-        dataEngine.setCallback((pageIndex, days, meta) -> {
-            if (binding == null) return;
-            monthPagerAdapter.deliverData(pageIndex, days, meta);
-            if (pageIndex == currentMonthIndex) {
-                applyCalendarHeight(meta);
-            }
-        });
-
-        monthPagerAdapter.init(MONTHS_COUNT, dataEngine);
-        monthPagerAdapter.setOnDayClickListener(day -> {
-            selectedCalendar.set(day.getYear(), day.getMonth() - 1, day.getDay());
-            String newKey = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(selectedCalendar.getTime());
-            dataEngine.updateSelectedKey(newKey, currentMonthIndex);
-        });
-
-        binding.vpCalendar.setAdapter(monthPagerAdapter);
-        binding.vpCalendar.setOffscreenPageLimit(1);
-
-        binding.vpCalendar.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                currentMonthIndex = position;
-                updateHeader();
-                CalendarDataEngine.MonthMeta meta = dataEngine.getMetaSync(position);
-                applyCalendarHeight(meta);
-                dataEngine.requestMonth(position);
-            }
-        });
-
-        binding.vpCalendar.setCurrentItem(currentMonthIndex, false);
+        // 根据初始月份调整高度
+        adjustCalendarHeight(
+                selectedCalendar.get(java.util.Calendar.YEAR),
+                selectedCalendar.get(java.util.Calendar.MONTH) + 1
+        );
+        
+        loadHolidays(selectedCalendar.get(java.util.Calendar.YEAR), selectedCalendar.get(java.util.Calendar.MONTH) + 1);
     }
 
-    private void applyCalendarHeight(CalendarDataEngine.MonthMeta meta) {
-        if (binding == null || meta == null) return;
-        float density = getResources().getDisplayMetrics().density;
-        int heightPx = (int) (MonthPagerAdapter.ROW_HEIGHT_DP * meta.rowCount * density);
-        ViewGroup.LayoutParams params = binding.vpCalendar.getLayoutParams();
-        if (params.height != heightPx) {
-            params.height = heightPx;
-            binding.vpCalendar.setLayoutParams(params);
+    private void loadHolidays(int year, int month) {
+        Map<String, Calendar> map = new HashMap<>();
+        java.util.Calendar temp = java.util.Calendar.getInstance();
+        temp.set(year, month - 1, 1);
+        temp.add(java.util.Calendar.MONTH, -2);
+        
+        for (int i = 0; i < 150; i++) {
+            int y = temp.get(java.util.Calendar.YEAR);
+            int m = temp.get(java.util.Calendar.MONTH) + 1;
+            int d = temp.get(java.util.Calendar.DAY_OF_MONTH);
+            String tag = HolidayUtil.getDayTag(y, m, d);
+            if (tag != null && (tag.equals("休") || tag.equals("班"))) {
+                Calendar calendar = new Calendar();
+                calendar.setYear(y);
+                calendar.setMonth(m);
+                calendar.setDay(d);
+                calendar.setScheme(tag);
+                map.put(calendar.toString(), calendar);
+            }
+            temp.add(java.util.Calendar.DAY_OF_MONTH, 1);
         }
+        binding.calendarView.setSchemeDate(map);
     }
 
     private void setupTimePicker() {
-        // 优化滚轮参数，提高流畅度和选择准确度
+        int tealColor = ContextCompat.getColor(requireContext(), R.color.calendar_selection);
         binding.wheelHour.setCyclic(true);
         binding.wheelMinute.setCyclic(true);
-        
-        binding.wheelHour.setLineSpacingMultiplier(2.2f); // 增加行间距，更容易点选
+        binding.wheelHour.setLineSpacingMultiplier(2.2f);
         binding.wheelMinute.setLineSpacingMultiplier(2.2f);
-        
-        binding.wheelHour.setTextSize(18f); // 调整文字大小
+        binding.wheelHour.setTextSize(18f);
         binding.wheelMinute.setTextSize(18f);
-        
-        // 设置分割线样式
         binding.wheelHour.setDividerType(WheelView.DividerType.FILL);
         binding.wheelMinute.setDividerType(WheelView.DividerType.FILL);
+        binding.wheelHour.setTextColorCenter(tealColor);
+        binding.wheelMinute.setTextColorCenter(tealColor);
 
         List<String> hours = new ArrayList<>();
         for (int i = 0; i < 24; i++) hours.add(String.format(Locale.getDefault(), "%02d", i));
@@ -188,29 +161,25 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         for (int i = 0; i < 60; i++) minutes.add(String.format(Locale.getDefault(), "%02d", i));
         binding.wheelMinute.setAdapter(new StringWheelAdapter(minutes));
 
-        binding.wheelHour.setCurrentItem(selectedCalendar.get(Calendar.HOUR_OF_DAY));
-        binding.wheelMinute.setCurrentItem(selectedCalendar.get(Calendar.MINUTE));
-
-        // 默认显示时间选择器
-        binding.llTimePickerContainer.setVisibility(View.VISIBLE);
-        binding.ivTimeArrow.setRotation(90);
+        binding.wheelHour.setCurrentItem(selectedCalendar.get(java.util.Calendar.HOUR_OF_DAY));
+        binding.wheelMinute.setCurrentItem(selectedCalendar.get(java.util.Calendar.MINUTE));
 
         binding.llSetTimeHeader.setOnClickListener(v -> {
             isTimePickerVisible = !isTimePickerVisible;
+            TransitionManager.beginDelayedTransition((ViewGroup) binding.getRoot());
             binding.llTimePickerContainer.setVisibility(isTimePickerVisible ? View.VISIBLE : View.GONE);
             binding.ivTimeArrow.setRotation(isTimePickerVisible ? 90 : 0);
+            binding.getRoot().requestLayout();
         });
     }
 
     private void setupButtons() {
         binding.llHeader.setOnClickListener(v -> showYearMonthPickerDialog());
-        
         binding.tvCancel.setOnClickListener(v -> dismiss());
-        
         binding.tvConfirm.setOnClickListener(v -> {
             if (isTimePickerVisible) {
-                selectedCalendar.set(Calendar.HOUR_OF_DAY, binding.wheelHour.getCurrentItem());
-                selectedCalendar.set(Calendar.MINUTE, binding.wheelMinute.getCurrentItem());
+                selectedCalendar.set(java.util.Calendar.HOUR_OF_DAY, binding.wheelHour.getCurrentItem());
+                selectedCalendar.set(java.util.Calendar.MINUTE, binding.wheelMinute.getCurrentItem());
             }
             if (listener != null) {
                 listener.onDateTimeSelected(selectedCalendar);
@@ -219,12 +188,9 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         });
     }
 
-    private void updateHeader() {
-        Calendar cal = (Calendar) todayDate.clone();
-        cal.add(Calendar.MONTH, currentMonthIndex - CENTER_POSITION);
-        
-        binding.tvMonthBig.setText((cal.get(Calendar.MONTH) + 1) + "月");
-        binding.tvYearSmall.setText(String.valueOf(cal.get(Calendar.YEAR)));
+    private void updateHeader(int year, int month) {
+        binding.tvMonthBig.setText(month + "月");
+        binding.tvYearSmall.setText(String.valueOf(year));
     }
 
     private void showYearMonthPickerDialog() {
@@ -232,24 +198,18 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         DialogYearMonthPickerBinding dialogBinding = DialogYearMonthPickerBinding.inflate(getLayoutInflater());
         dialog.setContentView(dialogBinding.getRoot());
 
-        // 优化年月选择弹窗的滚轮，使其更流畅且易于选准
         dialogBinding.wheelYear.setCyclic(false);
         dialogBinding.wheelMonth.setCyclic(true);
         dialogBinding.wheelYear.setLineSpacingMultiplier(2.2f);
         dialogBinding.wheelMonth.setLineSpacingMultiplier(2.2f);
         dialogBinding.wheelYear.setTextSize(18f);
         dialogBinding.wheelMonth.setTextSize(18f);
-        dialogBinding.wheelYear.setDividerType(WheelView.DividerType.FILL);
-        dialogBinding.wheelMonth.setDividerType(WheelView.DividerType.FILL);
 
-        Calendar displayCal = (Calendar) todayDate.clone();
-        displayCal.add(Calendar.MONTH, currentMonthIndex - CENTER_POSITION);
-        int currentYear = displayCal.get(Calendar.YEAR);
-        int currentMonth = displayCal.get(Calendar.MONTH) + 1;
+        int currentYear = binding.calendarView.getCurYear();
+        int currentMonth = binding.calendarView.getCurMonth();
 
-        // 年份范围：今天 +/- 50年
         List<String> years = new ArrayList<>();
-        int startYear = todayDate.get(Calendar.YEAR) - 100;
+        int startYear = currentYear - 100;
         for (int i = 0; i <= 200; i++) years.add(String.valueOf(startYear + i));
         dialogBinding.wheelYear.setAdapter(new StringWheelAdapter(years));
         dialogBinding.wheelYear.setCurrentItem(currentYear - startYear);
@@ -263,9 +223,7 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         dialogBinding.tvDialogConfirm.setOnClickListener(v -> {
             int selectedYear = startYear + dialogBinding.wheelYear.getCurrentItem();
             int selectedMonth = dialogBinding.wheelMonth.getCurrentItem() + 1;
-            
-            int targetMonthIndex = CENTER_POSITION + (selectedYear - todayDate.get(Calendar.YEAR)) * 12 + (selectedMonth - 1 - todayDate.get(Calendar.MONTH));
-            binding.vpCalendar.setCurrentItem(targetMonthIndex, false);
+            binding.calendarView.scrollToCalendar(selectedYear, selectedMonth, 1);
             dialog.dismiss();
         });
 
@@ -278,8 +236,60 @@ public class CustomDateTimePickerFragment extends DialogFragment {
         dialog.show();
     }
 
+    private int dipToPx(float dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    // --- CalendarView Listeners ---
+
+    @Override
+    public void onCalendarOutOfRange(Calendar calendar) {}
+
+    @Override
+    public void onCalendarSelect(Calendar calendar, boolean isClick) {
+        selectedCalendar.set(calendar.getYear(), calendar.getMonth() - 1, calendar.getDay());
+    }
+
+    @Override
+    public void onMonthChange(int year, int month) {
+        updateHeader(year, month);
+        loadHolidays(year, month);
+        
+        // 关键修复：动态调整日历高度并触发根布局重新计算，联动 Dialog 窗口高度
+        if (binding != null) {
+            adjustCalendarHeight(year, month);
+            TransitionManager.beginDelayedTransition((ViewGroup) binding.getRoot());
+            binding.getRoot().post(() -> {
+                binding.getRoot().requestLayout();
+                if (getDialog() != null && getDialog().getWindow() != null) {
+                    getDialog().getWindow().getDecorView().requestLayout();
+                }
+            });
+        }
+    }
+
+    private int getMonthRows(int year, int month) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.set(year, month - 1, 1);
+        int dayOfWeek = c.get(java.util.Calendar.DAY_OF_WEEK) - 1; // 0代表周日
+        int days = c.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
+        return (dayOfWeek + days + 6) / 7;
+    }
+
+    private void adjustCalendarHeight(int year, int month) {
+        if (binding == null) return;
+        int rows = getMonthRows(year, month);
+        // 高度 = 星期栏(32dp) + 行数 * 项高(56dp) + 内边距(上下各10dp=20dp)
+        int totalHeight = dipToPx(32 + rows * 56 + 20);
+        ViewGroup.LayoutParams lp = binding.calendarView.getLayoutParams();
+        if (lp.height != totalHeight) {
+            lp.height = totalHeight;
+            binding.calendarView.setLayoutParams(lp);
+        }
+    }
+
     private static class StringWheelAdapter implements WheelAdapter<String> {
-        private List<String> items;
+        private final List<String> items;
         StringWheelAdapter(List<String> items) { this.items = items; }
         @Override public int getItemsCount() { return items.size(); }
         @Override public String getItem(int index) { return items.get(index); }
@@ -289,7 +299,6 @@ public class CustomDateTimePickerFragment extends DialogFragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (dataEngine != null) dataEngine.release();
         binding = null;
     }
 }
