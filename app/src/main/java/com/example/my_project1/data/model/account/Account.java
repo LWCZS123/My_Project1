@@ -31,9 +31,17 @@ public class Account  implements Serializable {
     private double balance; // 余额
     private boolean isCredit; // 是否信贷账户
     private double creditLimit; // 信用额度
+    private String accountType; // 账户类型 (现金、储蓄卡、信用卡等)
+    private String category; // 账户大类 (资金账户、信用账户、充值账户)
     private String remark; // 备注
     private String cardNumber; // 卡号
     private String iconUrl; // 图标URL
+    private String currency = "CNY"; // 币种
+    private int billingDay; // 账单日
+    private int repaymentDay; // 还款日
+    private boolean includeBillInCurrentPeriod; // 出账日账单计入当期
+    private boolean includeInTotal = true; // 是否计入总资产
+    private boolean canBeSelected = true; // 记账时是否可选
     private Date createdAt;
     private Date updatedAt;
 
@@ -91,6 +99,30 @@ public class Account  implements Serializable {
 
     public double getCreditLimit() { return creditLimit; }
     public void setCreditLimit(double creditLimit) { this.creditLimit = creditLimit; }
+
+    public String getAccountType() { return accountType; }
+    public void setAccountType(String accountType) { this.accountType = accountType; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+
+    public int getBillingDay() { return billingDay; }
+    public void setBillingDay(int billingDay) { this.billingDay = billingDay; }
+
+    public int getRepaymentDay() { return repaymentDay; }
+    public void setRepaymentDay(int repaymentDay) { this.repaymentDay = repaymentDay; }
+
+    public boolean isIncludeBillInCurrentPeriod() { return includeBillInCurrentPeriod; }
+    public void setIncludeBillInCurrentPeriod(boolean includeBillInCurrentPeriod) { this.includeBillInCurrentPeriod = includeBillInCurrentPeriod; }
+
+    public boolean isIncludeInTotal() { return includeInTotal; }
+    public void setIncludeInTotal(boolean includeInTotal) { this.includeInTotal = includeInTotal; }
+
+    public boolean isCanBeSelected() { return canBeSelected; }
+    public void setCanBeSelected(boolean canBeSelected) { this.canBeSelected = canBeSelected; }
 
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }

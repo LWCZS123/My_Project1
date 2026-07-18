@@ -468,7 +468,12 @@ public class BillViewModel extends AndroidViewModel {
 
     public LiveData<List<Bill>> getBillsByAccount(String accountId) {
         if (currentUserId == null || accountId == null) return new MutableLiveData<>();
-        return repository.getBillsByAccount(currentUserId, accountId);
+        return repository.getBillsByAccount(currentUserId, accountId, -1);
+    }
+
+    public LiveData<List<Bill>> getBillsByAccount(String accountId, long localAccountId) {
+        if (currentUserId == null) return new MutableLiveData<>();
+        return repository.getBillsByAccount(currentUserId, accountId, localAccountId);
     }
 
     public void refreshData() {

@@ -1,31 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="?attr/selectableItemBackground">
 
-    <!-- 横向内容区域（图标、文本、金额） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
         android:gravity="center_vertical">
 
         <!-- 左侧图标 -->
-        <ImageView
+        <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/iv_icon"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_marginEnd="12dp"
-            android:src="@drawable/ic_wechat"
+            android:src="@drawable/ic_wallet"
             android:scaleType="centerInside"
-            android:contentDescription="账户图标" />
+            app:shapeAppearanceOverlay="@style/CircleAppearance" />
 
         <!-- 中间文本 -->
         <LinearLayout
@@ -38,17 +37,17 @@
                 android:id="@+id/tv_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="微信"
+                android:text="账户名称"
                 android:textColor="#333333"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tv_subtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="[信用卡] 26天后出账"
+                android:layout_marginTop="2dp"
+                android:text="备注信息"
                 android:textColor="#999999"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -64,27 +63,27 @@
                 android:id="@+id/tv_amount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="-203.00"
-                android:textColor="#D50000"
-                android:textSize="17sp"
+                android:text="¥0.00"
+                android:textColor="#333333"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tv_available"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="可用 85.00"
-                android:textColor="#64B5F6"
-                android:textSize="12sp" />
+                android:layout_marginTop="2dp"
+                android:text="可用额度 0.00"
+                android:textColor="#999999"
+                android:textSize="11sp"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 底部分割线（和左右 padding 对齐） -->
     <View
         android:id="@+id/divider"
         android:layout_width="match_parent"
-        android:layout_height="0.6dp"
-
-        android:background="#E0E0E0" />
+        android:layout_height="0.5dp"
+        android:layout_marginStart="68dp"
+        android:background="#EEEEEE" />
 </LinearLayout>

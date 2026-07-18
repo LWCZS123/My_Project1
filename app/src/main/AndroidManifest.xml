@@ -163,9 +163,11 @@
         <activity
             android:name=".ui.activity.AddAccountActivity"
             android:exported="false"
-            android:theme="@style/Theme.TransparentStatusBar"
-
-            />
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
+            android:name=".ui.activity.ChooseAccountTypeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
         <activity
             android:name=".ui.activity.CategoryActivity"
             android:exported="false"

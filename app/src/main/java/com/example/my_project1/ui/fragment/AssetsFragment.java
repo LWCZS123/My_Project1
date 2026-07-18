@@ -22,11 +22,11 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.FragmentAssetsBinding;
-import com.example.my_project1.ui.activity.AccountChartActivity;
 import com.example.my_project1.ui.activity.AccountDetailActivity;
-import com.example.my_project1.ui.activity.AddAccountActivity;
 import com.example.my_project1.ui.adapter.account.AssetsGroupAdapter;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
+import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
+import com.example.my_project1.utils.ImageLoaderUtils;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -48,6 +48,7 @@ public class AssetsFragment extends Fragment {
 
     private FragmentAssetsBinding binding;
     private AccountViewModel viewModel;
+    private UserProfileViewModel userViewModel;
     private AssetsGroupAdapter adapter;
     private double totalPositiveAssets;
     private double totalNegativeAssets;
@@ -78,14 +79,12 @@ public class AssetsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         Log.d(TIME_TAG, "AssetsFragment → onViewCreated 开始");
         viewModel = new ViewModelProvider(requireActivity()).get(AccountViewModel.class);
+        userViewModel = new ViewModelProvider(requireActivity()).get(UserProfileViewModel.class);
 
 
         ViewCompat.setOnApplyWindowInsetsListener(requireView(), (v, insets) -> {
-
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-
             v.setPadding(0, bars.top, 0, 0);
-
             return insets;
         });
 
@@ -97,18 +96,29 @@ public class AssetsFragment extends Fragment {
         // 设置观察者，然后加载数据
         observeData();
         loadAccountGroups();
+        loadUserAvatar();
 
-        binding.btnChart.setOnClickListener(v->{
-            Intent intent = new Intent(requireContext(), AccountChartActivity.class);
+        binding.btnAddAccountTop.setOnClickListener(v -> {
+            Intent intent = new Intent(requireContext(), com.example.my_project1.ui.activity.ChooseAccountTypeActivity.class);
             startActivity(intent);
-            getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+            if (getActivity() != null) {
+                getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+            }
         });
-
-        binding.btnAddAccount.setOnClickListener(v -> {
-            Intent intent = new Intent(requireContext(), AddAccountActivity.class);
-            startActivity(intent);
-            getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
-        });
+        
+        // 如果有 fabAdd 按钮也统一逻辑
+        try {
+            View fabAdd = binding.getRoot().findViewById(R.id.fab_add);
+            if (fabAdd != null) {
+                fabAdd.setOnClickListener(v -> {
+                    Intent intent = new Intent(requireContext(), com.example.my_project1.ui.activity.ChooseAccountTypeActivity.class);
+                    startActivity(intent);
+                    if (getActivity() != null) {
+                        getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+                    }
+                });
+            }
+        } catch (Exception e) {}
 
         binding.ivEves.setOnClickListener(v -> {
             isAmountHidden = !isAmountHidden;
@@ -121,9 +131,13 @@ public class AssetsFragment extends Fragment {
                 binding.tvNetAsset.setText("****");
                 binding.tvTotalAsset.setText("****");
                 binding.tvTotalDebt.setText("****");
+                binding.tvTotalBorrowed.setText("****");
+                binding.tvTotalLent.setText("****");
             } else {
-                binding.tvTotalAsset.setText(String.format("%.2f", totalPositiveAssets));
-                binding.tvTotalDebt.setText(String.format("%.2f", totalNegativeAssets));
+                binding.tvTotalAsset.setText(String.format("¥%,.2f", totalPositiveAssets));
+                binding.tvTotalDebt.setText(String.format("¥%,.2f", totalNegativeAssets));
+                binding.tvTotalBorrowed.setText(String.format("¥%,.2f", totalNegativeAssets));
+                binding.tvTotalLent.setText("¥0.00");
                 animateNumber(binding.tvNetAsset, netAsset);
             }
 
@@ -157,6 +171,7 @@ public class AssetsFragment extends Fragment {
                 Log.d(TAG, "查看账户: " + account.getName());
                 Intent intent = new Intent(requireContext(), AccountDetailActivity.class);
                 intent.putExtra(AccountDetailActivity.EXTRA_ACCOUNT_ID, account.getObjectId());
+                intent.putExtra(AccountDetailActivity.EXTRA_ACCOUNT_LOCAL_ID, account.getId());
                 startActivity(intent);
                 getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
             }
@@ -170,112 +185,102 @@ public class AssetsFragment extends Fragment {
     }
 
     /**
-     * 🔴 关键改进：清理旧的观察者并重新订阅
-     */
-    private void observeAllGroupAccounts(List<AccountGroup> groups) {
-        if (groups == null || groups.isEmpty()) {
-            Log.d(TAG, "⚠️ 账户组列表为空");
-            return;
-        }
-
-        Log.d(TAG, "🔄 开始为所有账户组设置观察者");
-
-        for (AccountGroup group : groups) {
-            if (group.getAccountCount() > 0) {
-                String groupId = group.getObjectId();
-
-                // 🔴 如果已经有观察者，先移除
-                if (accountObservers.containsKey(groupId)) {
-                    Observer<List<Account>> oldObserver = accountObservers.get(groupId);
-                    viewModel.getAccountsByGroupId(groupId).removeObserver(oldObserver);
-                    Log.d(TAG, "🗑️ 移除组 " + groupId + " 的旧观察者");
-                }
-
-                // 🔴 创建新的观察者
-                Observer<List<Account>> observer = accounts -> {
-                    int accountSize = (accounts != null ? accounts.size() : 0);
-                    Log.d(TAG, "📢 组 " + group.getName() + " 的账户更新: " + accountSize + " 个账户");
-
-                    // 立即更新适配器
-                    if (accounts != null && !accounts.isEmpty()) {
-                        adapter.updateAccountsForExpandedGroup(groupId, accounts);
-                    } else {
-                        adapter.updateAccountsForExpandedGroup(groupId, new java.util.ArrayList<>());
-                    }
-
-                    // 更新总金额
-                    updateTotalAssets();
-                };
-
-                // 🔴 添加观察者并保存引用
-                viewModel.getAccountsByGroupId(groupId).observe(getViewLifecycleOwner(), observer);
-                accountObservers.put(groupId, observer);
-
-                Log.d(TAG, "✅ 为组 " + group.getName() + " (" + groupId + ") 添加观察者");
-            }
-        }
-
-        Log.d(TAG, "✅ 共为 " + accountObservers.size() + " 个账户组设置了观察者");
-    }
-
-    /**
      * 🔴 新增：清理所有账户观察者
      */
     private void clearAllObservers() {
         if (!accountObservers.isEmpty()) {
-            Log.d(TAG, "🧹 清理 " + accountObservers.size() + " 个旧观察者");
-            for (Map.Entry<String, Observer<List<Account>>> entry : accountObservers.entrySet()) {
-                viewModel.getAccountsByGroupId(entry.getKey()).removeObserver(entry.getValue());
-            }
+            // 注意：现在由于使用了 MediatorLiveData 和 getAllAccounts，
+            // 这里的 accountObservers 逻辑可能需要调整，或者直接移除。
+            // 目前先保持空，因为新的 observeData 不再填充这个 Map。
             accountObservers.clear();
         }
     }
 
     private void observeData() {
-        // 🔥 观察账户组列表
-        viewModel.getAccountGroups().observe(getViewLifecycleOwner(), groups -> {
-            if (groups != null) {
-                int validGroupCount = 0;
-                for (AccountGroup group : groups) {
-                    if (group.getAccountCount() > 0) {
-                        validGroupCount++;
-                    }
-                }
+        // 使用 MediatorLiveData 合并账户组和所有账户的观察
+        androidx.lifecycle.MediatorLiveData<CombinedData> combinedLiveData = new androidx.lifecycle.MediatorLiveData<>();
+        
+        combinedLiveData.addSource(viewModel.getAccountGroups(), groups -> {
+            CombinedData current = combinedLiveData.getValue();
+            if (current == null) current = new CombinedData();
+            current.groups = groups;
+            combinedLiveData.setValue(current);
+        });
+        
+        combinedLiveData.addSource(viewModel.getAllAccounts(), accounts -> {
+            CombinedData current = combinedLiveData.getValue();
+            if (current == null) current = new CombinedData();
+            current.accounts = accounts;
+            combinedLiveData.setValue(current);
+        });
 
-                Log.d(TAG, "✅ 账户组更新: 总共 " + groups.size() + " 个, 有效 " + validGroupCount + " 个");
-
-                // 更新适配器
-                adapter.setGroups(groups);
-                clearAllObservers();
-                observeAllGroupAccounts(groups);
-
-                long totalCost = System.currentTimeMillis() - fragmentStartTime;
-                Log.d(TIME_TAG, "==================================================");
-                Log.d(TIME_TAG, "【AssetsFragment】数据完全加载完成 → 总耗时：" + totalCost + "ms");
-                Log.d(TIME_TAG, "==================================================");
-            } else {
-                Log.d(TAG, "⚠️ 账户组数据为 null");
+        combinedLiveData.observe(getViewLifecycleOwner(), data -> {
+            if (data.groups != null && data.accounts != null) {
+                processCombinedData(data.groups, data.accounts);
             }
         });
 
-        // 🔥 观察账户组更新通知(用于实时刷新)
+        // 🔥 观察账户组更新通知 (保持兼容)
         viewModel.groupAccountsUpdate.observe(getViewLifecycleOwner(), updateMap -> {
             if (updateMap != null && !updateMap.isEmpty()) {
                 for (Map.Entry<String, List<Account>> entry : updateMap.entrySet()) {
-                    String groupId = entry.getKey();
-                    List<Account> accounts = entry.getValue();
-
-                    Log.d(TAG, "📢 收到组 " + groupId + " 的更新通知");
-                    Log.d(TAG, "   - 账户数量: " + (accounts != null ? accounts.size() : 0));
-
-                    if (accounts != null) {
-                        adapter.updateAccountsForExpandedGroup(groupId, accounts);
-                    }
-
+                    adapter.updateAccountsForExpandedGroup(entry.getKey(), entry.getValue());
                     updateTotalAssets();
                 }
             }
         });
+    }
+
+    private static class CombinedData {
+        List<AccountGroup> groups;
+        List<Account> accounts;
+    }
+
+    private void processCombinedData(List<AccountGroup> groups, List<Account> allAccounts) {
+        List<AccountGroup> displayGroups = new java.util.ArrayList<>();
+        Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
+        
+        // 1. 处理真实的账户组
+        for (AccountGroup group : groups) {
+            displayGroups.add(group);
+            List<Account> accountsInGroup = new java.util.ArrayList<>();
+            for (Account acc : allAccounts) {
+                if (group.getObjectId().equals(acc.getGroupId())) {
+                    accountsInGroup.add(acc);
+                }
+            }
+            groupToAccountsMap.put(group.getObjectId(), accountsInGroup);
+        }
+
+        // 2. 处理没有分组的账户，按大类归类为“虚拟分组”
+        String[] categories = {"资金账户", "信用账户", "充值账户"};
+        for (String category : categories) {
+            List<Account> accountsInCategory = new java.util.ArrayList<>();
+            for (Account acc : allAccounts) {
+                if ((acc.getGroupId() == null || acc.getGroupId().isEmpty()) && category.equals(acc.getCategory())) {
+                    accountsInCategory.add(acc);
+                }
+            }
+
+            if (!accountsInCategory.isEmpty()) {
+                // 创建一个虚拟的 AccountGroup
+                AccountGroup virtualGroup = new AccountGroup();
+                virtualGroup.setObjectId("CATEGORY_" + category);
+                virtualGroup.setName(category);
+                virtualGroup.setAccountCount(accountsInCategory.size());
+                
+                displayGroups.add(virtualGroup);
+                groupToAccountsMap.put(virtualGroup.getObjectId(), accountsInCategory);
+            }
+        }
+
+        Log.d(TAG, "✅ 数据合并完成: 总显示分组 " + displayGroups.size());
+        
+        adapter.setGroups(displayGroups);
+        for (Map.Entry<String, List<Account>> entry : groupToAccountsMap.entrySet()) {
+            adapter.updateAccountsForExpandedGroup(entry.getKey(), entry.getValue());
+        }
+        updateTotalAssets();
     }
 
     /**
@@ -292,9 +297,24 @@ public class AssetsFragment extends Fragment {
         Log.d(TAG, "   - 净资产: ¥" + String.format("%.2f", netAsset));
 
         if (!isAmountHidden) {
-            binding.tvTotalAsset.setText(String.format("%.2f", totalPositiveAssets));
-            binding.tvTotalDebt.setText(String.format("%.2f", totalNegativeAssets));
-            binding.tvNetAsset.setText("¥" + String.format("%.2f", netAsset));
+            binding.tvTotalAsset.setText(String.format("¥%,.2f", totalPositiveAssets));
+            binding.tvTotalDebt.setText(String.format("¥%,.2f", totalNegativeAssets));
+            binding.tvNetAsset.setText(String.format("¥%,.2f", netAsset));
+            binding.tvTotalBorrowed.setText(String.format("¥%,.2f", totalNegativeAssets));
+            binding.tvTotalLent.setText("¥0.00"); // 暂无专门的借出统计，可根据业务扩展
+        }
+    }
+
+    private void loadUserAvatar() {
+        BmobUser currentUser = BmobUser.getCurrentUser();
+        if (currentUser != null) {
+            userViewModel.getUserProfile(currentUser.getObjectId()).observe(getViewLifecycleOwner(), profile -> {
+                if (profile != null && profile.getAvatarUrl() != null && !profile.getAvatarUrl().isEmpty()) {
+                    String avatarUrl = profile.getAvatarUrl();
+                    String fullUrl = avatarUrl.startsWith("http") ? avatarUrl : "https://xd-user-image.oss-cn-hangzhou.aliyuncs.com/" + avatarUrl;
+                    ImageLoaderUtils.loadThumbnail(requireContext(), fullUrl, binding.ivUserAvatar);
+                }
+            });
         }
     }
 

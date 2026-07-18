@@ -100,16 +100,52 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
     }
 
     /**
-     * 🔴 计算账户列表的总金额
+     * 计算账户列表的总金额（正资产）
+     */
+    private double calculatePositiveAmount(List<Account> accounts) {
+        if (accounts == null || accounts.isEmpty()) {
+            return 0.0;
+        }
+        double total = 0.0;
+        for (Account account : accounts) {
+            // 🔴 仅当计入总资产时才参与统计
+            if (account.isIncludeInTotal() && account.getBalance() > 0) {
+                total += account.getBalance();
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 计算账户列表的总欠款（负债）
+     */
+    private double calculateNegativeAmount(List<Account> accounts) {
+        if (accounts == null || accounts.isEmpty()) {
+            return 0.0;
+        }
+        double total = 0.0;
+        for (Account account : accounts) {
+            // 🔴 仅当计入总资产时才参与统计
+            if (account.isIncludeInTotal() && account.getBalance() < 0) {
+                total += Math.abs(account.getBalance());
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 计算账户列表的总金额（原有方法，用于兼容）
      */
     private double calculateTotalAmount(List<Account> accounts) {
         if (accounts == null || accounts.isEmpty()) {
             return 0.0;
         }
-
         double total = 0.0;
         for (Account account : accounts) {
-            total += account.getBalance();
+            // 🔴 仅当计入总资产时才参与统计
+            if (account.isIncludeInTotal()) {
+                total += account.getBalance();
+            }
         }
         return total;
     }
@@ -142,7 +178,8 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
         for (List<Account> accounts : groupAccounts.values()) {
             if (accounts != null) {
                 for (Account account : accounts) {
-                    if (account.getBalance() > 0) {
+                    // 🔴 增加计入总资产判断
+                    if (account.isIncludeInTotal() && account.getBalance() > 0) {
                         total += account.getBalance();
                     }
                 }
@@ -159,7 +196,8 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
         for (List<Account> accounts : groupAccounts.values()) {
             if (accounts != null) {
                 for (Account account : accounts) {
-                    if (account.getBalance() < 0) {
+                    // 🔴 增加计入总资产判断
+                    if (account.isIncludeInTotal() && account.getBalance() < 0) {
                         total += Math.abs(account.getBalance());
                     }
                 }
@@ -239,7 +277,12 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
             binding.layoutGroupActions.setOnClickListener(v -> {
                 int pos = getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && groupActionClickListener != null) {
-                    groupActionClickListener.onEditGroup(groupList.get(pos));
+                    AccountGroup group = groupList.get(pos);
+                    // 🔴 虚拟分组不支持编辑
+                    if (group.getObjectId() != null && group.getObjectId().startsWith("CATEGORY_")) {
+                        return;
+                    }
+                    groupActionClickListener.onEditGroup(group);
                 }
             });
 
@@ -289,38 +332,35 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
             String groupId = group.getObjectId();
 
             binding.tvGroupName.setText(group.getName());
-            binding.tvCount.setText(String.valueOf(group.getAccountCount()));
-
-            // 图标
-            if (group.getIconUrl() != null && !group.getIconUrl().isEmpty()) {
-                binding.ivGroup.setVisibility(View.VISIBLE);
-                Glide.with(binding.ivGroup.getContext())
-                        .load(group.getIconUrl())
-                        .placeholder(R.drawable.ic_cross)
-                        .into(binding.ivGroup);
-            } else {
-                binding.ivGroup.setVisibility(View.GONE);
-            }
+            binding.tvCount.setText("(" + group.getAccountCount() + ")");
 
             // 展开/折叠状态
             boolean expanded = expandedGroupIds.contains(groupId);
             binding.layoutAccountsContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
-            binding.ivArrow.setRotation(expanded ? 90f : 0f);
+            binding.ivArrow.setRotation(expanded ? 180f : 0f); // 配合新的箭头图标
 
-            // 🔴 关键改进：总金额实时更新
-            double totalBalance = getGroupTotalAmount(groupId);
+            // 计算该组的总资产和总负债
+            List<Account> accounts = groupAccounts.get(groupId);
+            double positiveBalance = calculatePositiveAmount(accounts);
+            double negativeBalance = calculateNegativeAmount(accounts);
 
             if (isAmountHidden) {
-                binding.tvTotalAmount.setText("****");
+                binding.tvGroupBalance.setText("****");
+                binding.tvGroupDebt.setText("****");
             } else {
-                binding.tvTotalAmount.setText(formatMoney(totalBalance));
+                binding.tvGroupBalance.setText(formatMoney(positiveBalance));
+                binding.tvGroupDebt.setText(formatMoney(negativeBalance));
             }
+
+            // 如果没有负债，隐藏负债标签和金额
+            int debtVisibility = negativeBalance > 0 ? View.VISIBLE : View.GONE;
+            binding.tvDebtLabel.setVisibility(debtVisibility);
+            binding.tvGroupDebt.setVisibility(debtVisibility);
 
             subAdapter.setAmountHidden(isAmountHidden);
 
             // 如果已展开，更新子账户列表
             if (expanded) {
-                List<Account> accounts = groupAccounts.get(groupId);
                 subAdapter.setAccounts(accounts != null ? accounts : new ArrayList<>());
             }
         }

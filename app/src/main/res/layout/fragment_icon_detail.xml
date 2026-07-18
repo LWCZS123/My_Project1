@@ -91,12 +91,14 @@
         android:layout_weight="1">
 
         <!-- ViewPager2 - 左右滑动分页 -->
+
+        <!-- ★ 居中转圈 ProgressBar -->
+
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/view_pager"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- ★ 居中转圈 ProgressBar -->
         <ProgressBar
             android:id="@+id/progress_detail"
             android:layout_width="48dp"

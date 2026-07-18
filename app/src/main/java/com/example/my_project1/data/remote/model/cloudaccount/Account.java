@@ -18,9 +18,17 @@ public class Account extends BmobObject {
     private Double balance;
     private Boolean isCredit;
     private Double creditLimit;
+    private String accountType; // 账户类型
+    private String category; // 账户大类
     private String remark;
     private String cardNumber;
     private String iconUrl;
+    private String currency;
+    private Integer billingDay;
+    private Integer repaymentDay;
+    private Boolean includeBillInCurrentPeriod;
+    private Boolean includeInTotal;
+    private Boolean canBeSelected;
 
     // Getter & Setter
     public BmobPointer getUser() { return user; }
@@ -41,6 +49,12 @@ public class Account extends BmobObject {
     public Double getCreditLimit() { return creditLimit; }
     public void setCreditLimit(Double creditLimit) { this.creditLimit = creditLimit; }
 
+    public String getAccountType() { return accountType; }
+    public void setAccountType(String accountType) { this.accountType = accountType; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }
 
@@ -49,6 +63,25 @@ public class Account extends BmobObject {
 
     public String getIconUrl() { return iconUrl; }
     public void setIconUrl(String iconUrl) { this.iconUrl = iconUrl; }
+
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+
+    public Integer getBillingDay() { return billingDay; }
+    public void setBillingDay(Integer billingDay) { this.billingDay = billingDay; }
+
+    public Integer getRepaymentDay() { return repaymentDay; }
+    public void setRepaymentDay(Integer repaymentDay) { this.repaymentDay = repaymentDay; }
+
+    public Boolean getIncludeBillInCurrentPeriod() { return includeBillInCurrentPeriod; }
+    public void setIncludeBillInCurrentPeriod(Boolean includeBillInCurrentPeriod) { this.includeBillInCurrentPeriod = includeBillInCurrentPeriod; }
+
+    public Boolean getIncludeInTotal() { return includeInTotal; }
+    public void setIncludeInTotal(Boolean includeInTotal) { this.includeInTotal = includeInTotal; }
+
+    public Boolean getCanBeSelected() { return canBeSelected; }
+    public void setCanBeSelected(Boolean canBeSelected) { this.canBeSelected = canBeSelected; }
+
     //获取本地账户组id
     public String getGroupId() {
         return group != null ? group.getObjectId() : null;
@@ -69,9 +102,17 @@ public class Account extends BmobObject {
         local.setBalance(balance != null ? balance : 0);
         local.setCredit(isCredit != null && isCredit);
         local.setCreditLimit(creditLimit != null ? creditLimit : 0);
+        local.setAccountType(accountType);
+        local.setCategory(category);
         local.setRemark(remark);
         local.setCardNumber(cardNumber);
         local.setIconUrl(iconUrl);
+        local.setCurrency(currency != null ? currency : "CNY");
+        local.setBillingDay(billingDay != null ? billingDay : 0);
+        local.setRepaymentDay(repaymentDay != null ? repaymentDay : 0);
+        local.setIncludeBillInCurrentPeriod(includeBillInCurrentPeriod != null ? includeBillInCurrentPeriod : false);
+        local.setIncludeInTotal(includeInTotal != null ? includeInTotal : true);
+        local.setCanBeSelected(canBeSelected != null ? canBeSelected : true);
         local.setCreatedAt(DateConvertUtil.safeConvertToDate(getCreatedAt()));
         local.setUpdatedAt(DateConvertUtil.safeConvertToDate(getUpdatedAt()));
         return local;
@@ -88,9 +129,17 @@ public class Account extends BmobObject {
         cloud.setIsCredit(local.isCredit());
         cloud.setBalance(local.getBalance() != 0 ? local.getBalance() : 0);
         cloud.setCreditLimit(local.getCreditLimit() != 0 ? local.getCreditLimit() : 0);
+        cloud.setAccountType(local.getAccountType());
+        cloud.setCategory(local.getCategory());
         cloud.setRemark(local.getRemark());
         cloud.setCardNumber(local.getCardNumber());
         cloud.setIconUrl(local.getIconUrl());
+        cloud.setCurrency(local.getCurrency());
+        cloud.setBillingDay(local.getBillingDay());
+        cloud.setRepaymentDay(local.getRepaymentDay());
+        cloud.setIncludeBillInCurrentPeriod(local.isIncludeBillInCurrentPeriod());
+        cloud.setIncludeInTotal(local.isIncludeInTotal());
+        cloud.setCanBeSelected(local.isCanBeSelected());
 
         if (local.getUserId() != null)
             cloud.setUser(BmobPointerUtil.user(local.getUserId()));

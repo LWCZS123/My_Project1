@@ -1,113 +1,460 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F9FC">
+    android:background="#F8F9FA"
+    android:orientation="vertical">
 
     <!-- 顶部 Toolbar -->
-    <com.google.android.material.appbar.AppBarLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#F5F9FC"
-        app:elevation="2dp">
+        android:layout_height="?attr/actionBarSize"
+        android:background="#FFFFFF">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="56dp">
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_back3"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="#333333" />
 
-            <ImageView
-                android:id="@+id/btn_back"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginStart="8dp"
-                android:src="@drawable/ic_back3"
-                android:contentDescription="返回"
-                app:tint="#333333"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent" />
+        <TextView
+            android:id="@+id/tv_toolbar_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="添加账户"
+            android:textColor="#333333"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="资产管理"
-                android:textColor="#333333"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent" />
+        <ImageView
+            android:id="@+id/btn_save"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_check_circle"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+           />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <!-- 主内容区域 -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="80dp">
+            android:padding="16dp">
 
-            <!-- 账户分组列表 -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_account_groups"
+            <!-- 第一部分：图标和名称 (在同一行) -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="72dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/iv_account_icon"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:padding="4dp"
+                        android:src="@drawable/ic_wallet"
+                        app:shapeAppearanceOverlay="@style/CircleAppearance" />
+
+                    <EditText
+                        android:id="@+id/et_account_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="16dp"
+                        android:background="@android:color/transparent"
+                        android:hint="请输入账户名称"
+                        android:textColor="#333333"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 第二部分：余额及主要信息 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- 余额/欠款 -->
+                    <LinearLayout
+                        android:id="@+id/layout_balance"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:id="@+id/tv_balance_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="账户余额"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <EditText
+                            android:id="@+id/et_balance"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@android:color/transparent"
+                            android:gravity="end"
+                            android:hint="请输入账户余额"
+                            android:inputType="numberDecimal"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE" />
+
+                    <!-- 信用额度 (仅信用账户) -->
+                    <LinearLayout
+                        android:id="@+id/layout_credit_limit"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="总信用额度"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <EditText
+                            android:id="@+id/et_credit_limit"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@android:color/transparent"
+                            android:gravity="end"
+                            android:hint="请输入总额度"
+                            android:inputType="numberDecimal"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:id="@+id/divider_limit"
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE"
+                        android:visibility="gone" />
+
+                    <!-- 备注 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="备注"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <EditText
+                            android:id="@+id/et_account_remark"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@android:color/transparent"
+                            android:gravity="end"
+                            android:hint="点击填写备注 (可不填)"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE" />
+
+                    <!-- 卡号 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="卡号"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <EditText
+                            android:id="@+id/et_card_number"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@android:color/transparent"
+                            android:gravity="end"
+                            android:hint="请输入卡号 (可选)"
+                            android:inputType="number"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 第三部分：日期信息 (仅信用账户) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_date_info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/layout_billing_day"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="账单日"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/tv_billing_day"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="请选择日期 >"
+                            android:textColor="#999999"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:id="@+id/divider_bill"
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE" />
+
+                    <LinearLayout
+                        android:id="@+id/layout_repayment_day"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="还款日期"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/tv_repayment_day"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="请点击设置 >"
+                            android:textColor="#999999"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:id="@+id/divider_repay"
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE" />
+
+                    <LinearLayout
+                        android:id="@+id/layout_include_bill"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="出账日账单计入当期"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/switch_include_bill"
+                            style="@style/AppSwitchStyle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 第四部分：账户配置 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- 币种 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="账户币种"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/tv_currency"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="人民币 (CNY) >"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="计入总资产"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/switch_include_total"
+                            style="@style/AppSwitchStyle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#EEEEEE" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="记账时可被选择"
+                            android:textColor="#333333"
+                            android:textSize="15sp" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/switch_can_be_selected"
+                            style="@style/AppSwitchStyle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_move_group"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="移动到指定分组"
+                android:textColor="#2196F3"
+                app:backgroundTint="#FFFFFF"
+                app:cornerRadius="16dp"
+                app:elevation="0dp"
+                app:strokeColor="#E3F2FD"
+                app:strokeWidth="1dp" />
 
         </LinearLayout>
-
     </androidx.core.widget.NestedScrollView>
 
-    <!-- 底部按钮区域 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:orientation="horizontal"
-        android:background="#FFFFFF"
-        android:padding="12dp"
-        android:elevation="8dp">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_add_group"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="添加分组"
-            android:textSize="16sp"
-            android:textColor="#666666"
-            app:cornerRadius="12dp"
-            app:strokeColor="#E0E0E0"
-            app:backgroundTint="#FFFFFF"
-
-            app:strokeWidth="1dp"
-            style="@style/Widget.Material3.Button" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_create_account"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="创建账户"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#2962FF"
-            app:cornerRadius="12dp"
-            style="@style/Widget.Material3.Button" />
-
-    </LinearLayout>
-
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

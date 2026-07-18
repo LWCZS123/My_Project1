@@ -72,8 +72,8 @@ public interface BillDao {
     LiveData<List<Bill>> getBillsByBook(String userId, String bookId);
 
     /** 🔥 按账户和用户查询账单 - 排除已删除的账单 */
-    @Query("SELECT * FROM bills WHERE user_id = :userId AND account_id = :accountId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
-    LiveData<List<Bill>> getBillsByAccount(String userId, String accountId);
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND (account_id = :accountId OR local_account_id = :localAccountId) AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
+    LiveData<List<Bill>> getBillsByAccount(String userId, String accountId, long localAccountId);
 
     /** 🔥 按分类ID和用户查询账单(支持一级/二级) - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND category_id = :categoryId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")

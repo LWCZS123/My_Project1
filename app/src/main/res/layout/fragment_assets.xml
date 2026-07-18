@@ -2,41 +2,51 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F9FC">
+    android:background="#F8F9FA">
 
     <!-- 顶部 AppBar -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#F5F9FC"
+        android:background="@android:color/transparent"
         app:elevation="0dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize">
-
-            <TextView
-                android:id="@+id/tv_toolbar_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="资产账户"
-                android:textColor="#1976D2"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent" />
+            android:layout_height="?attr/actionBarSize"
+            android:paddingHorizontal="16dp">
 
             <ImageButton
-                android:id="@+id/btn_chart"
+                android:id="@+id/btn_add_account_top"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_add"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:tint="#333333" />
+
+            <ImageButton
+                android:id="@+id/btn_more"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_more_vert"
+                android:layout_marginEnd="8dp"
+                app:layout_constraintEnd_toStartOf="@id/iv_user_avatar"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:tint="#333333" />
+
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/iv_user_avatar"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/ic_chart"
-                android:contentDescription="图表"
+                android:src="@drawable/ic_default_avatar"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent" />
@@ -45,8 +55,6 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-
-    <!-- 内容区 -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -56,179 +64,244 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="100dp"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="80dp">
 
-            <!-- 上方卡片 + 标题部分保留 padding -->
+            <!-- 标题 "资产" -->
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="资产"
+                android:textColor="#000000"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- 净资产大卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="净资产"
+                            android:textColor="#888888"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/iv_eves"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="6dp"
+                            android:src="@drawable/ic_eye_open"
+                            app:tint="#AAAAAA" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_net_asset"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="¥19,824.00"
+                        android:textColor="#000000"
+                        android:textSize="32sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="总资产"
+                            android:textColor="#AAAAAA"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_total_asset"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="¥24,662.00"
+                            android:textColor="#AAAAAA"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="总负债"
+                            android:textColor="#AAAAAA"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_total_debt"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="¥4,838.00"
+                            android:textColor="#AAAAAA"
+                            android:textSize="13sp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 借入借出小卡片 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="20dp"
+                android:orientation="horizontal">
 
-                <!-- 净资产卡片 -->
                 <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    app:cardBackgroundColor="#E3F2FD"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    app:cardBackgroundColor="#FFFFFF"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="0dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="20dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="12dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:background="@drawable/bg_circle_gray"
+                            android:padding="6dp"
+                            android:src="@drawable/ic_arrow_downward"
+                            app:tint="#333333" />
 
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:layout_marginStart="10dp"
+                            android:orientation="vertical">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="净资产"
-                                android:textColor="#1976D2"
-                                android:textSize="14sp" />
+                                android:text="总借入"
+                                android:textColor="#888888"
+                                android:textSize="12sp" />
 
-                            <ImageView
-                                android:id="@+id/iv_eves"
-                                android:layout_width="16dp"
-                                android:layout_height="16dp"
-                                android:layout_marginStart="4dp"
-                                android:src="@drawable/ic_eye_open"
-                                android:tint="#64B5F6" />
-
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tv_net_asset"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="16dp"
-                            android:text="¥64.00"
-                            android:textColor="#0D47A1"
-                            android:textSize="36sp"
-                            android:textStyle="bold" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:padding="12dp"
-                            android:background="@drawable/rounded_assets_bg"
-                            android:orientation="horizontal">
-
-                            <LinearLayout
-                                android:layout_width="0dp"
+                            <TextView
+                                android:id="@+id/tv_total_borrowed"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="总资产"
-                                    android:textColor="#1976D2"
-                                    android:textSize="12sp" />
-
-                                <TextView
-                                    android:id="@+id/tv_total_asset"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="64.00"
-                                    android:textColor="#0D47A1"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold" />
-
-                            </LinearLayout>
-
-                            <View
-                                android:layout_width="1dp"
-                                android:layout_height="match_parent"
-                                android:background="#90CAF9" />
-
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical"
-                                android:gravity="end">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="总负债"
-                                    android:textColor="#1976D2"
-                                    android:textSize="12sp" />
-
-                                <TextView
-                                    android:id="@+id/tv_total_debt"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="0.00"
-                                    android:textColor="#0D47A1"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
+                                android:text="¥0.00"
+                                android:textColor="#000000"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
                         </LinearLayout>
                     </LinearLayout>
-
                 </com.google.android.material.card.MaterialCardView>
 
-
-                <!-- 资产账户标题 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp">
 
-                    <TextView
-                        android:id="@+id/tv_asset_title"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_weight="1"
-                        android:gravity="start|center_vertical"
-                        android:text="资产账户"
-                        android:textColor="#1976D2"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="12dp">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_add_account"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="添加账户"
-                        android:textSize="12sp"
-                        app:cornerRadius="18dp"
-                        app:icon="@drawable/ic_add"
-                        app:backgroundTint="#2962FF"
-                        app:iconSize="16dp"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        app:iconPadding="4dp" />
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:background="@drawable/bg_circle_gray"
+                            android:padding="6dp"
+                            android:src="@drawable/ic_arrow_upward"
+                            app:tint="#333333" />
 
-                </LinearLayout>
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:orientation="vertical">
 
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="总借出"
+                                android:textColor="#888888"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/tv_total_lent"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="¥0.00"
+                                android:textColor="#000000"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-
-            <!-- 🚀 RecyclerView 完全占满屏幕宽度，不受 padding 影响 -->
+            <!-- 列表部分 -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_accounts"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:nestedScrollingEnabled="false" />
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                tools:listitem="@layout/item_asset_group" />
+
+            <View
+                android:id="@+id/btn_chart"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/btn_add_account"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
 
         </LinearLayout>
-
     </androidx.core.widget.NestedScrollView>
+
+
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -142,6 +142,10 @@ public interface AccountDao {
     @Query("SELECT * FROM accounts WHERE object_id = :id LIMIT 1")
     Account getAccountById(String id);
 
+    /** 根据本地 ID 查询账户 */
+    @Query("SELECT * FROM accounts WHERE id = :localId LIMIT 1")
+    Account getAccountByLocalId(long localId);
+
     // ----------------------------------------------------------------------
     // 🧩 联合操作
     // ----------------------------------------------------------------------
@@ -168,6 +172,10 @@ public interface AccountDao {
             insertAccounts(accounts);
         }
     }
+
+    /** 根据用户ID查询所有账户 */
+    @Query("SELECT * FROM accounts WHERE user_id = :userId AND sync_state != 'TO_DELETE' ORDER BY createdAt ASC")
+    LiveData<List<Account>> getAccountsByUser(String userId);
 
     @Query("SELECT * FROM account_groups WHERE object_id = :groupId LIMIT 1")
     AccountGroup getById(String groupId);

@@ -96,7 +96,13 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
             Log.d(TAG, "🎨 bind() 账户: " + account.getName());
 
             binding.tvName.setText(account.getName());
-            binding.tvSubtitle.setText(account.getRemark());
+
+            // 副标题：显示账户类型或备注
+            String subtitle = account.getAccountType();
+            if (subtitle == null || subtitle.isEmpty()) {
+                subtitle = account.getRemark();
+            }
+            binding.tvSubtitle.setText(subtitle != null ? subtitle : "");
 
             double balance = account.getBalance();
             double creditLimit = account.getCreditLimit();
@@ -104,36 +110,42 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
             if (isAmountHidden) {
                 binding.tvAmount.setText("****");
             } else {
-                binding.tvAmount.setText(String.format("%.2f", balance));
+                binding.tvAmount.setText(String.format("¥%,.2f", balance));
             }
 
-            int amountColor = balance >= 0
-                    ? binding.getRoot().getContext().getColor(R.color.green)
-                    : binding.getRoot().getContext().getColor(R.color.red);
+            // 金额颜色：正数黑色，负数红色（或者根据截图，正数黑色，负数黑色但带负号？）
+            // 截图显示借记卡是黑色，信用卡是带负号的黑色。
+            // 我们可以根据正负设置颜色
+            if (balance < 0) {
+                binding.tvAmount.setTextColor(binding.getRoot().getContext().getColor(R.color.red));
+            } else {
+                binding.tvAmount.setTextColor(0xFF333333); // 深灰色/黑色
+            }
 
-            binding.tvAmount.setTextColor(amountColor);
             if (account.isCredit()) {
-
                 // 可用额度 = 信用额度 + balance（balance 是负数）
                 double available = creditLimit + balance;
 
                 binding.tvAvailable.setVisibility(View.VISIBLE);
                 if (isAmountHidden) {
-                    binding.tvAvailable.setText("可用 ****");
+                    binding.tvAvailable.setText("可用额度 ****");
                 } else {
-                    binding.tvAvailable.setText("可用 " + String.format("%.2f", available));
+                    binding.tvAvailable.setText("可用额度 " + String.format("¥%,.2f", available));
                 }
-
             } else {
                 // 隐藏可用额度
                 binding.tvAvailable.setVisibility(View.GONE);
             }
 
             // 加载图标
-            Glide.with(binding.ivIcon.getContext())
-                    .load(account.getIconUrl())
-                    .placeholder(R.drawable.ic_cross)
-                    .into(binding.ivIcon);
+            if (account.getIconUrl() != null && !account.getIconUrl().isEmpty()) {
+                Glide.with(binding.ivIcon.getContext())
+                        .load(account.getIconUrl())
+                        .placeholder(R.drawable.ic_wallet)
+                        .into(binding.ivIcon);
+            } else {
+                binding.ivIcon.setImageResource(R.drawable.ic_wallet);
+            }
 
             // 点击事件
             binding.getRoot().setOnClickListener(v -> {

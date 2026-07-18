@@ -35,7 +35,7 @@ import com.example.my_project1.data.model.wish.WishRecord;
                 SearchHistory.class, UserProfile.class, Budget.class,
                 Wish.class, WishRecord.class
         },
-        version = 16,
+        version = 19,
         exportSchema = true
 )
 

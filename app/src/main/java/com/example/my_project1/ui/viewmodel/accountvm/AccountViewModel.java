@@ -86,6 +86,10 @@ public class AccountViewModel extends AndroidViewModel {
         return repository.getAccountByIdSync(accountId);
     }
 
+    public Account getAccountByLocalIdSync(long localId) {
+        return repository.getAccountByLocalIdSync(localId);
+    }
+
     /**
      * 🔴 新增：获取单个账户的LiveData（支持实时监听）
      * 用于AccountDetailActivity实时监听余额变化
@@ -163,6 +167,14 @@ public class AccountViewModel extends AndroidViewModel {
             }
             _groupState.removeSource(source);
         });
+    }
+
+    /**
+     * 获取用户所有账户（LiveData）
+     */
+    public LiveData<List<Account>> getAllAccounts() {
+        String userId = BmobUser.getCurrentUser().getObjectId();
+        return repository.getAccountsByUser(userId);
     }
 
     // ===================== 插入操作 =====================

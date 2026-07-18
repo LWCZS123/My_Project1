@@ -108,19 +108,26 @@ public class BillDetailActivity extends AppCompatActivity {
         // 初始化Toolbar
         setupToolbar();
 
-        // 支持两种ID传递方式
+        // 支持三种传递方式：objectId, 本地ID, 或 直接传递对象(用于虚拟账单)
         String billId = getIntent().getStringExtra(EXTRA_BILL_ID);
         long billLocalId = getIntent().getLongExtra(EXTRA_BILL_LOCAL_ID, -1);
+        Bill billObject = (Bill) getIntent().getSerializableExtra("bill_object");
 
-        if (billId == null && billLocalId == -1) {
+        if (billObject != null) {
+            // 虚拟账单直接显示
+            currentBill = billObject;
+            displayBillDetail(billObject);
+            // 虚拟账单不允许编辑删除
+            binding.ivMenu.setVisibility(View.GONE);
+        } else if (billId != null || billLocalId != -1) {
+            // 从数据库加载
+            loadBillDetail(billId, billLocalId);
+        } else {
             SnackbarUtils.showError(binding.getRoot(), "账单数据错误");
             finish();
             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
             return;
         }
-
-        // 加载账单数据
-        loadBillDetail(billId, billLocalId);
 
         // 设置按钮点击事件
         setupButtons();

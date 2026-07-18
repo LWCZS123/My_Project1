@@ -7,11 +7,12 @@ import androidx.room.PrimaryKey;
 
 import com.example.my_project1.data.model.SyncState;
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
 @Entity(tableName = "bills")
-public class Bill {
+public class Bill implements Serializable {
 
     @PrimaryKey(autoGenerate = true)
     private long id;
@@ -27,6 +28,9 @@ public class Bill {
 
     @ColumnInfo(name = "account_id")
     private String accountId;     // 使用账户
+
+    @ColumnInfo(name = "local_account_id", defaultValue = "-1")
+    private long localAccountId = -1; // 使用账户本地ID
 
     @ColumnInfo(name = "category_id")
     private String categoryId;    // 分类ID（可一级/二级）
@@ -108,6 +112,9 @@ public class Bill {
 
     public String getAccountId() { return accountId; }
     public void setAccountId(String accountId) { this.accountId = accountId; }
+
+    public long getLocalAccountId() { return localAccountId; }
+    public void setLocalAccountId(long localAccountId) { this.localAccountId = localAccountId; }
 
     public String getCategoryId() { return categoryId; }
     public void setCategoryId(String categoryId) { this.categoryId = categoryId; }

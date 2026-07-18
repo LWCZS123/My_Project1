@@ -527,6 +527,15 @@ public class AccountRepository {
         }
     }
 
+    public com.example.my_project1.data.model.account.Account getAccountByLocalIdSync(long localId) {
+        try {
+            return accountDao.getAccountByLocalId(localId);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ 获取本地账户失败: " + localId, e);
+            return null;
+        }
+    }
+
     public void getAccountNameById(String accountId, ResultCallback callback) {
         runInBackground(new Runnable() {
             @Override
@@ -637,6 +646,13 @@ public class AccountRepository {
                     existingAccount.setCardNumber(account.getCardNumber());
                     existingAccount.setCreditLimit(account.getCreditLimit());
                     existingAccount.setGroupId(account.getGroupId());
+                    existingAccount.setAccountType(account.getAccountType());
+                    existingAccount.setCategory(account.getCategory());
+                    existingAccount.setBillingDay(account.getBillingDay());
+                    existingAccount.setRepaymentDay(account.getRepaymentDay());
+                    existingAccount.setIncludeBillInCurrentPeriod(account.isIncludeBillInCurrentPeriod());
+                    existingAccount.setIncludeInTotal(account.isIncludeInTotal());
+                    existingAccount.setCanBeSelected(account.isCanBeSelected());
                     existingAccount.setUpdatedAt(new Date());
 
                     // 🔴 关键：如果已同步，标记为需要更新
@@ -740,6 +756,10 @@ public class AccountRepository {
 
     public LiveData<List<com.example.my_project1.data.model.account.Account>> getAccountsByGroup(String groupId) {
         return accountDao.getAccountsByGroup(groupId);
+    }
+
+    public LiveData<List<com.example.my_project1.data.model.account.Account>> getAccountsByUser(String userId) {
+        return accountDao.getAccountsByUser(userId);
     }
 
     // -------------------------------
@@ -1040,6 +1060,13 @@ public class AccountRepository {
                                     acc.setRemark(cloud.getRemark());
                                     acc.setCardNumber(cloud.getCardNumber());
                                     acc.setCreditLimit(cloud.getCreditLimit());
+                                    acc.setAccountType(cloud.getAccountType());
+                                    acc.setCategory(cloud.getCategory());
+                                    acc.setBillingDay(cloud.getBillingDay() != null ? cloud.getBillingDay() : 0);
+                                    acc.setRepaymentDay(cloud.getRepaymentDay() != null ? cloud.getRepaymentDay() : 0);
+                                    acc.setIncludeBillInCurrentPeriod(cloud.getIncludeBillInCurrentPeriod() != null ? cloud.getIncludeBillInCurrentPeriod() : false);
+                                    acc.setIncludeInTotal(cloud.getIncludeInTotal() != null ? cloud.getIncludeInTotal() : true);
+                                    acc.setCanBeSelected(cloud.getCanBeSelected() != null ? cloud.getCanBeSelected() : true);
                                     acc.setSyncState(SyncState.SYNCED);
                                     accountDao.insertAccount(acc);
                                     Log.d(TAG, "🆕 新增账户：" + acc.getName());
@@ -1052,6 +1079,13 @@ public class AccountRepository {
                                     local.setRemark(cloud.getRemark());
                                     local.setCardNumber(cloud.getCardNumber());
                                     local.setCreditLimit(cloud.getCreditLimit());
+                                    local.setAccountType(cloud.getAccountType());
+                                    local.setCategory(cloud.getCategory());
+                                    local.setBillingDay(cloud.getBillingDay() != null ? cloud.getBillingDay() : 0);
+                                    local.setRepaymentDay(cloud.getRepaymentDay() != null ? cloud.getRepaymentDay() : 0);
+                                    local.setIncludeBillInCurrentPeriod(cloud.getIncludeBillInCurrentPeriod() != null ? cloud.getIncludeBillInCurrentPeriod() : false);
+                                    local.setIncludeInTotal(cloud.getIncludeInTotal() != null ? cloud.getIncludeInTotal() : true);
+                                    local.setCanBeSelected(cloud.getCanBeSelected() != null ? cloud.getCanBeSelected() : true);
                                     local.setCreatedAt(DateConvertUtil.safeConvertToDate(cloud.getCreatedAt()));
                                     local.setUpdatedAt(DateConvertUtil.safeConvertToDate(cloud.getUpdatedAt()));
                                     local.setSyncState(SyncState.SYNCED);

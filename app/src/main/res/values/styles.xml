@@ -9,13 +9,16 @@
     </style>
 
     <style name="AppSwitchStyle" parent="Theme.AppCompat.Light">
-        <item name="colorControlActivated">#4CD964</item> <!-- 开关打开时的颜色 -->
+        <item name="android:thumb">@drawable/ios_switch_thumb</item>
+        <item name="track">@drawable/ios_switch_track</item>
         <item name="switchStyle">@style/AppCompat.Switch.IOS</item>
+        <item name="android:minWidth">36dp</item>
+        <item name="android:minHeight">20dp</item>
     </style>
 
     <style name="AppCompat.Switch.IOS" parent="Widget.AppCompat.CompoundButton.Switch">
-        <item name="android:minWidth">51dp</item>
-        <item name="android:minHeight">31dp</item>
+        <item name="android:minWidth">36dp</item>
+        <item name="android:minHeight">20dp</item>
     </style>
     <style name="CustomBottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
         <!-- 去掉系统默认圆角背景 -->
@@ -94,6 +97,11 @@
 
 
     <style name="CircleImageStyle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="CircleAppearance">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>

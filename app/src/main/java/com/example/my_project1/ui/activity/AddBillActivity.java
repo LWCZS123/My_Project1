@@ -57,11 +57,14 @@ public class AddBillActivity extends AppCompatActivity {
 
     private static final String TAG = "AddBillActivity";
 
+    private static final String PREF_LAST_ACCOUNT_ID = "last_account_id";
+
     // View Binding
     private ActivityAddBillBinding binding;
 
     // ViewModels
     private BillViewModel billViewModel;
+    private com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel accountViewModel;
     private ImageUploadViewModel uploadViewModel;
 
     // Adapter
@@ -335,12 +338,32 @@ public class AddBillActivity extends AppCompatActivity {
         updateAmountDisplay();
     }
 
-    /**
-     * 初始化ViewModels
-     */
     private void initViewModels() {
         billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
+        accountViewModel = new ViewModelProvider(this).get(com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel.class);
         uploadViewModel = new ViewModelProvider(this).get(ImageUploadViewModel.class);
+        
+        loadLastUsedAccount();
+    }
+
+    private void loadLastUsedAccount() {
+        android.content.SharedPreferences prefs = getSharedPreferences("bill_prefs", MODE_PRIVATE);
+        String lastAccountId = prefs.getString(PREF_LAST_ACCOUNT_ID, null);
+        
+        if (lastAccountId != null && !isEditMode) {
+            AppExecutors.get().diskIO().execute(() -> {
+                Account account = accountViewModel.getAccountByIdSync(lastAccountId);
+                if (account != null) {
+                    AppExecutors.get().mainThread().execute(() -> {
+                        selectedAccount = account;
+                        binding.tvAccount.setText(account.getName());
+                        if (account.getIconUrl() != null) {
+                            ImageLoaderUtils.load(getApplication(), account.getIconUrl(), binding.ivAccount);
+                        }
+                    });
+                }
+            });
+        }
     }
 
     // ==================== 观察ViewModel ====================
@@ -885,6 +908,7 @@ public class AddBillActivity extends AppCompatActivity {
         // 账户（可选）
         if (selectedAccount != null) {
             bill.setAccountId(selectedAccount.getObjectId());
+            bill.setLocalAccountId(selectedAccount.getId());
         }
 
         // 地点（可选）
@@ -899,6 +923,15 @@ public class AddBillActivity extends AppCompatActivity {
     private void handleBillSaveSuccess() {
         isSaving = false;
         uploadViewModel.resetBatchUploadState();
+        
+        // 保存最后使用的账户ID
+        if (selectedAccount != null) {
+            getSharedPreferences("bill_prefs", MODE_PRIVATE)
+                .edit()
+                .putString(PREF_LAST_ACCOUNT_ID, selectedAccount.getObjectId())
+                .apply();
+        }
+
         if (isEditMode) {
             // 编辑模式：返回详情页
             showSnackbar("修改成功", SnackbarUtils.Type.SUCCESS);

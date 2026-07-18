@@ -137,94 +137,85 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
 
     /** ================== 监听账户组变化 ================== **/
     private void observeGroupData() {
-        viewModel.getAccountGroups().observe(getViewLifecycleOwner(), groups -> {
-            // 打印调试信息
-            if (groups != null) {
-                Log.d(TAG, "收到账户组数量 = "+ groups.size());
-                for (AccountGroup group : groups) {
-                    Log.d(TAG, "Group: " + group.getName() + ", 账户数量 = " + group.getAccountCount());
-                }
-            } else {
-                Log.d(TAG, "没有账户组数据");
-            }
+        androidx.lifecycle.MediatorLiveData<CombinedData> combinedLiveData = new androidx.lifecycle.MediatorLiveData<>();
 
-            // 🔴 先观察所有账户组的账户数据，然后再过滤
-            observeGroupAccounts(groups);
+        combinedLiveData.addSource(viewModel.getAccountGroups(), groups -> {
+            CombinedData current = combinedLiveData.getValue();
+            if (current == null) current = new CombinedData();
+            current.groups = groups;
+            combinedLiveData.setValue(current);
+        });
+
+        combinedLiveData.addSource(viewModel.getAllAccounts(), accounts -> {
+            CombinedData current = combinedLiveData.getValue();
+            if (current == null) current = new CombinedData();
+            current.accounts = accounts;
+            combinedLiveData.setValue(current);
+        });
+
+        combinedLiveData.observe(getViewLifecycleOwner(), data -> {
+            if (data.groups != null && data.accounts != null) {
+                processAndFilterData(data.groups, data.accounts);
+            }
         });
     }
 
-    /** ================== 每个账户组监听账户变化 ================== **/
-    private void observeGroupAccounts(List<AccountGroup> groups){
-        // 🔴 用于统计每个账户组的可见账户数量
-        Map<String, Integer> visibleAccountCounts = new HashMap<>();
-
-        for(AccountGroup group : groups){
-            if(group.getAccountCount() == 0) continue;
-
-            String groupId = group.getObjectId();
-
-            // 清除旧监听
-            if(accountObservers.containsKey(groupId)){
-                viewModel.getAccountsByGroupId(groupId).removeObserver(accountObservers.get(groupId));
-            }
-
-            // 创建监听 → 展开后实时更新账户列表
-            Observer<List<Account>> observer = accounts -> {
-                // 过滤账户：排除已删除的账户 + 要删除的账户（迁移模式）
-                if (accounts != null) {
-                    List<Account> activeAccounts = new ArrayList<>();
-                    for (Account account : accounts) {
-                        // 跳过已删除的账户
-                        if (account.getSyncState() == SyncState.TO_DELETE) {
-                            continue;
-                        }
-                        // 跳过要删除的账户（迁移模式）
-                        if (excludeAccountId != null && account.getObjectId() != null
-                                && account.getObjectId().equals(excludeAccountId)) {
-                            Log.d(TAG, "过滤掉要删除的账户: " + account.getName());
-                            continue;
-                        }
-                        activeAccounts.add(account);
-                    }
-
-                    // 🔴 记录该组的可见账户数量
-                    visibleAccountCounts.put(groupId, activeAccounts.size());
-
-                    adapter.updateAccountsForExpandedGroup(groupId, activeAccounts);
-                } else {
-                    visibleAccountCounts.put(groupId, 0);
-                    adapter.updateAccountsForExpandedGroup(groupId, accounts);
-                }
-
-                // 🔴 每次账户数据更新后，重新过滤账户组
-                filterAndSetGroups(groups, visibleAccountCounts);
-            };
-
-            viewModel.getAccountsByGroupId(groupId).observe(getViewLifecycleOwner(), observer);
-            accountObservers.put(groupId, observer);
-        }
+    private static class CombinedData {
+        List<AccountGroup> groups;
+        List<Account> accounts;
     }
 
-    /**
-     * 🔴 新增：过滤并设置账户组（只显示有可见账户的组）
-     */
-    private void filterAndSetGroups(List<AccountGroup> allGroups, Map<String, Integer> visibleAccountCounts) {
-        List<AccountGroup> filteredGroups = new ArrayList<>();
+    private void processAndFilterData(List<AccountGroup> groups, List<Account> allAccounts) {
+        List<AccountGroup> displayGroups = new java.util.ArrayList<>();
+        Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
 
-        for (AccountGroup group : allGroups) {
-            String groupId = group.getObjectId();
-            Integer visibleCount = visibleAccountCounts.get(groupId);
-
-            // 如果该组有可见账户，或者还没有加载账户数据（null），则显示该组
-            if (visibleCount == null || visibleCount > 0) {
-                filteredGroups.add(group);
-                Log.d(TAG, "✅ 显示账户组: " + group.getName() + ", 可见账户: " + visibleCount);
-            } else {
-                Log.d(TAG, "❌ 隐藏账户组: " + group.getName() + ", 可见账户: 0");
+        // 1. 处理真实的账户组
+        for (AccountGroup group : groups) {
+            List<Account> activeAccounts = new java.util.ArrayList<>();
+            for (Account acc : allAccounts) {
+                if (group.getObjectId().equals(acc.getGroupId())) {
+                    // 过滤逻辑
+                    if (acc.getSyncState() == SyncState.TO_DELETE) continue;
+                    if (!acc.isCanBeSelected()) continue;
+                    if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
+                    
+                    activeAccounts.add(acc);
+                }
+            }
+            if (!activeAccounts.isEmpty()) {
+                displayGroups.add(group);
+                groupToAccountsMap.put(group.getObjectId(), activeAccounts);
             }
         }
 
-        adapter.setGroups(filteredGroups);
+        // 2. 处理虚拟账户组 (按大类)
+        String[] categories = {"资金账户", "信用账户", "充值账户"};
+        for (String category : categories) {
+            List<Account> activeAccounts = new java.util.ArrayList<>();
+            for (Account acc : allAccounts) {
+                if ((acc.getGroupId() == null || acc.getGroupId().isEmpty()) && category.equals(acc.getCategory())) {
+                    if (acc.getSyncState() == SyncState.TO_DELETE) continue;
+                    if (!acc.isCanBeSelected()) continue;
+                    if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
+
+                    activeAccounts.add(acc);
+                }
+            }
+            if (!activeAccounts.isEmpty()) {
+                AccountGroup virtualGroup = new AccountGroup();
+                virtualGroup.setObjectId("CATEGORY_" + category);
+                virtualGroup.setName(category);
+                virtualGroup.setAccountCount(activeAccounts.size());
+                
+                displayGroups.add(virtualGroup);
+                groupToAccountsMap.put(virtualGroup.getObjectId(), activeAccounts);
+            }
+        }
+
+        adapter.setGroups(displayGroups);
+        for (Map.Entry<String, List<Account>> entry : groupToAccountsMap.entrySet()) {
+            adapter.updateAccountsForExpandedGroup(entry.getKey(), entry.getValue());
+        }
     }
 
     /** ================== 默认“无账户”按钮 ================== **/

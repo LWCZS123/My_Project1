@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/white"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp">
+
+    <TextView
+        android:id="@+id/tv_month_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="2026年07月"
+
+        android:textColor="#333333"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_month_range"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/bg_month_range"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:text="07月01日 - 07月31日"
+        android:textColor="#999999"
+        android:textSize="11sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_month_title" />
+
+    <TextView
+        android:id="@+id/tv_bill_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="#F5F5F5"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:text="账单金额: 未出账"
+        android:textColor="#999999"
+        android:textSize="10sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_month_range" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toStartOf="@+id/iv_arrow"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginEnd="8dp">
+
+        <TextView
+            android:id="@+id/tv_outflow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="流出: ¥110.00"
+            android:textColor="#FF6B6B"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/tv_inflow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="流入: ¥8,656.00"
+            android:textColor="#00C48C"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/iv_arrow"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_down_arrow"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="#CCCCCC" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

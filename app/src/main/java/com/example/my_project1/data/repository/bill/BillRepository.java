@@ -180,10 +180,10 @@ public class BillRepository {
     }
 
     /**
-     * 按账户查询账单
+     * 按账户查询账单（支持 objectId 和 本地 ID）
      */
-    public LiveData<List<Bill>> getBillsByAccount(String userId, String accountId) {
-        return billDao.getBillsByAccount(userId, accountId);
+    public LiveData<List<Bill>> getBillsByAccount(String userId, String accountId, long localAccountId) {
+        return billDao.getBillsByAccount(userId, accountId, localAccountId);
     }
 
     // ==================== 删除操作 ====================

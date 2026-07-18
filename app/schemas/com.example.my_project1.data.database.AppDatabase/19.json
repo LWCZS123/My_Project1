@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 16,
-    "identityHash": "5a3bdaece1d1c1abb13bd74b6da17c71",
+    "version": 19,
+    "identityHash": "e7f37fadc7ef1c03e65a57e1b165dc61",
     "entities": [
       {
         "tableName": "categories",
@@ -320,7 +320,7 @@
       },
       {
         "tableName": "accounts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `object_id` TEXT, `user_id` TEXT, `group_id` TEXT, `name` TEXT, `balance` REAL NOT NULL, `isCredit` INTEGER NOT NULL, `creditLimit` REAL NOT NULL, `accountType` TEXT, `remark` TEXT, `cardNumber` TEXT, `iconUrl` TEXT, `includeInTotal` INTEGER NOT NULL, `canBeSelected` INTEGER NOT NULL, `createdAt` INTEGER, `updatedAt` INTEGER, `sync_state` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `object_id` TEXT, `user_id` TEXT, `group_id` TEXT, `name` TEXT, `balance` REAL NOT NULL, `isCredit` INTEGER NOT NULL, `creditLimit` REAL NOT NULL, `accountType` TEXT, `category` TEXT, `remark` TEXT, `cardNumber` TEXT, `iconUrl` TEXT, `currency` TEXT, `billingDay` INTEGER NOT NULL, `repaymentDay` INTEGER NOT NULL, `includeBillInCurrentPeriod` INTEGER NOT NULL, `includeInTotal` INTEGER NOT NULL, `canBeSelected` INTEGER NOT NULL, `createdAt` INTEGER, `updatedAt` INTEGER, `sync_state` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -377,6 +377,12 @@
             "notNull": false
           },
           {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
             "fieldPath": "remark",
             "columnName": "remark",
             "affinity": "TEXT",
@@ -393,6 +399,30 @@
             "columnName": "iconUrl",
             "affinity": "TEXT",
             "notNull": false
+          },
+          {
+            "fieldPath": "currency",
+            "columnName": "currency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "billingDay",
+            "columnName": "billingDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "repaymentDay",
+            "columnName": "repaymentDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "includeBillInCurrentPeriod",
+            "columnName": "includeBillInCurrentPeriod",
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "includeInTotal",
@@ -436,7 +466,7 @@
       },
       {
         "tableName": "bills",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `object_id` TEXT, `user_id` TEXT, `book_id` TEXT, `account_id` TEXT, `category_id` TEXT, `category_name` TEXT, `category_icon` TEXT, `amount` REAL NOT NULL, `type` INTEGER NOT NULL, `excludeBudget` INTEGER NOT NULL, `remark` TEXT, `billTime` INTEGER, `image_urls` TEXT, `location` TEXT, `source_wish_id` INTEGER NOT NULL DEFAULT -1, `sync_state` TEXT, `createdAt` INTEGER, `updatedAt` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `object_id` TEXT, `user_id` TEXT, `book_id` TEXT, `account_id` TEXT, `local_account_id` INTEGER NOT NULL DEFAULT -1, `category_id` TEXT, `category_name` TEXT, `category_icon` TEXT, `amount` REAL NOT NULL, `type` INTEGER NOT NULL, `excludeBudget` INTEGER NOT NULL, `remark` TEXT, `billTime` INTEGER, `image_urls` TEXT, `location` TEXT, `source_wish_id` INTEGER NOT NULL DEFAULT -1, `sync_state` TEXT, `createdAt` INTEGER, `updatedAt` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -467,6 +497,13 @@
             "columnName": "account_id",
             "affinity": "TEXT",
             "notNull": false
+          },
+          {
+            "fieldPath": "localAccountId",
+            "columnName": "local_account_id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "-1"
           },
           {
             "fieldPath": "categoryId",
@@ -1020,7 +1057,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5a3bdaece1d1c1abb13bd74b6da17c71')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e7f37fadc7ef1c03e65a57e1b165dc61')"
     ]
   }
 }
