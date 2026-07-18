@@ -61,6 +61,7 @@ public class BillViewModel extends AndroidViewModel {
 
     // ── 依赖 ────────────────────────────────────────
     private final AccountDao accountDao;
+    private final com.example.my_project1.data.repository.account.AccountRepository accountRepository; // 新增
     private final BillRepository repository;
     private final UserProfileRepository userProfileRepository;
 
@@ -81,6 +82,9 @@ public class BillViewModel extends AndroidViewModel {
     /** 原始当月账单（Room → ViewModel 内部使用，不直接暴露给 UI） */
     private LiveData<List<Bill>> currentMonthBills;
 
+    /** 所有账户（用于联动刷新 UI 和 Header） */
+    private LiveData<List<Account>> allAccountsLive;
+
     /** 所有账单（用于统计 billCount / billDays） */
     private LiveData<List<Bill>> allBills;
 
@@ -93,7 +97,7 @@ public class BillViewModel extends AndroidViewModel {
             new MutableLiveData<>(
                     new HeaderUiModel(
                             "¥0.00", "¥0.00", "¥0.00", "¥0.00",
-                            "¥0.00", "¥0.00", "¥0.00", "¥0.00"
+                            "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00"
                     )
             );
     public  final LiveData<HeaderUiModel>         headerData  = _headerData;
@@ -144,6 +148,7 @@ public class BillViewModel extends AndroidViewModel {
     private Observer<Integer> billCountObserver;
     private Observer<Integer> billDaysObserver;
     private Observer<List<Bill>> monthBillsObserver;
+    private Observer<List<Account>> accountsObserver;
     private Observer<List<Bill>> allBillsObserver;
 
     // ════════════════════════════════════════════════════
@@ -154,6 +159,7 @@ public class BillViewModel extends AndroidViewModel {
 
         AppDatabase db        = AppDatabase.getInstance(application);
         accountDao            = db.accountDao();
+        accountRepository     = new com.example.my_project1.data.repository.account.AccountRepository(application); // 初始化
         repository            = new BillRepository(application);
         userProfileRepository = UserProfileRepository.getInstance(application);
 
@@ -201,28 +207,34 @@ public class BillViewModel extends AndroidViewModel {
                 Log.d(TAG, "查询当月账单: " + formatDate(range[0]) + " ~ " + formatDate(range[1]));
                 return repository.getBillsInTimeRange(currentUserId, range[0], range[1]);
             });
+            allAccountsLive = accountDao.getAllAccountsLive();
             allBills = repository.getAllBillsByUser(currentUserId);
         } else {
             currentMonthBills = new MutableLiveData<>();
+            allAccountsLive = new MutableLiveData<>();
             allBills          = new MutableLiveData<>();
         }
     }
 
     /**
-     * ✅ 核心：观察原始账单列表，在后台线程完成 UiModel 映射
-     * 每当 currentMonthBills 变化时（Room 通知），重新计算整个 UiModel 列表
+     * ✅ 核心优化：联动观察账单与账户
+     * 只要账单列表或账户表发生变化，立即刷新 UI Items 和 Header 统计
      */
     private void observeMonthBillsForUiMapping() {
-        // 先移除旧 Observer（用户切换时重新注册）
         if (monthBillsObserver != null && currentMonthBills != null) {
             currentMonthBills.removeObserver(monthBillsObserver);
         }
+        if (accountsObserver != null && allAccountsLive != null) {
+            allAccountsLive.removeObserver(accountsObserver);
+        }
 
-        monthBillsObserver = bills -> {
+        // 定义统一的计算逻辑
+        Runnable updateAction = () -> {
+            List<Bill> bills = currentMonthBills.getValue();
+            List<Account> accounts = allAccountsLive.getValue();
+            
             // 提交到后台线程计算，避免主线程卡顿
             bgExecutor.execute(() -> {
-                // 1. 获取所有账户并构建 Map (用于显示账户名)
-                List<Account> accounts = accountDao.getAllAccountsSync();
                 Map<String, Account> accountMap = new HashMap<>();
                 if (accounts != null) {
                     for (Account acc : accounts) {
@@ -232,7 +244,7 @@ public class BillViewModel extends AndroidViewModel {
 
                 // 2. 映射 UI 模型 (聚合版)
                 List<BillAdapter.BillGroup> uiItems = mapBillsToUiGroups(bills, accountMap);
-                HeaderUiModel header = buildHeaderUiModel(bills);
+                HeaderUiModel header = buildHeaderUiModel(bills, accounts);
 
                 mainHandler.post(() -> {
                     _billItems.setValue(uiItems);
@@ -249,9 +261,14 @@ public class BillViewModel extends AndroidViewModel {
             });
         };
 
+        monthBillsObserver = bills -> updateAction.run();
+        accountsObserver = accounts -> updateAction.run();
+
         if (currentMonthBills != null) {
-            // observeForever，在 onCleared 中手动移除
             currentMonthBills.observeForever(monthBillsObserver);
+        }
+        if (allAccountsLive != null) {
+            allAccountsLive.observeForever(accountsObserver);
         }
     }
 
@@ -341,8 +358,9 @@ public class BillViewModel extends AndroidViewModel {
 
     /**
      * ✅ 构建 HeaderAdapter 需要的统计卡片数据
+     * 优化：传入已获取的账户列表，避免重复查询数据库
      */
-    private HeaderUiModel buildHeaderUiModel(List<Bill> monthBills) {
+    private HeaderUiModel buildHeaderUiModel(List<Bill> monthBills, List<Account> accounts) {
         double monthlyExpense = 0, monthlyIncome = 0;
         double todayChange = 0;
         
@@ -362,11 +380,13 @@ public class BillViewModel extends AndroidViewModel {
             }
         }
 
-        // 计算总资产和负债 (从账户获取)
+        // 计算总资产和负债 (从传入的账户列表获取)
         double assets = 0, liabilities = 0;
-        List<Account> accounts = accountDao.getAllAccountsSync();
         if (accounts != null) {
             for (Account acc : accounts) {
+                // 排除标记删除的账户
+                if (acc.getSyncState() == com.example.my_project1.data.model.SyncState.TO_DELETE) continue;
+                
                 if (acc.isCredit()) {
                     liabilities += acc.getBalance();
                 } else {
@@ -375,13 +395,27 @@ public class BillViewModel extends AndroidViewModel {
             }
         }
 
-        // 计算总收入和总支出 (从所有账单获取)
+        // 计算总收入和总支出 (从所有账单获取) 以及周结余
         double totalExpense = 0, totalIncome = 0;
+        double weeklyExpense = 0, weeklyIncome = 0;
+        
+        Date[] weekRange = getCurrentWeekRange();
+        
         List<Bill> allBillsList = repository.getAllBillsByUserSync(currentUserId);
         if (allBillsList != null) {
             for (Bill b : allBillsList) {
-                if (b.getType() == 0) totalExpense += b.getAmount();
-                else totalIncome += b.getAmount();
+                double amt = b.getAmount();
+                if (b.getType() == 0) {
+                    totalExpense += amt;
+                    if (b.getBillTime() != null && b.getBillTime().after(weekRange[0]) && b.getBillTime().before(weekRange[1])) {
+                        weeklyExpense += amt;
+                    }
+                } else {
+                    totalIncome += amt;
+                    if (b.getBillTime() != null && b.getBillTime().after(weekRange[0]) && b.getBillTime().before(weekRange[1])) {
+                        weeklyIncome += amt;
+                    }
+                }
             }
         }
 
@@ -396,8 +430,23 @@ public class BillViewModel extends AndroidViewModel {
                 "¥" + df.format(monthlyIncome),
                 "¥" + df.format(totalIncome),
                 "¥" + df.format(monthlyExpense),
-                "¥" + df.format(totalExpense)
+                "¥" + df.format(totalExpense),
+                "¥" + df.format(weeklyIncome - weeklyExpense)
         );
+    }
+
+    private Date[] getCurrentWeekRange() {
+        Calendar c = Calendar.getInstance();
+        c.setFirstDayOfWeek(Calendar.MONDAY);
+        c.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);      c.set(Calendar.MILLISECOND, 0);
+        Date start = c.getTime();
+        
+        c.add(Calendar.DAY_OF_WEEK, 6);
+        c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59);
+        c.set(Calendar.SECOND, 59);      c.set(Calendar.MILLISECOND, 999);
+        return new Date[]{start, c.getTime()};
     }
 
     // ════════════════════════════════════════════════════
@@ -544,15 +593,22 @@ public class BillViewModel extends AndroidViewModel {
         });
     }
 
-    public void migrateBillsToAccount(String fromAccountId, String toAccountId) {
-        if (fromAccountId == null || fromAccountId.isEmpty()) { _toastMessage.setValue("原账户ID为空"); return; }
-        if (toAccountId   == null || toAccountId.isEmpty())   { _toastMessage.setValue("目标账户ID为空"); return; }
+    public void migrateBillsToAccount(String fromAccountId, long fromLocalId, String toAccountId) {
+        if ((fromAccountId == null || fromAccountId.isEmpty()) && fromLocalId <= 0) {
+            _toastMessage.setValue("原账户ID为空");
+            return;
+        }
+        if (toAccountId == null || toAccountId.isEmpty()) {
+            _toastMessage.setValue("目标账户ID为空");
+            return;
+        }
         _operationState.setValue(ApiResponse.loading("正在迁移账单..."));
-        repository.migrateBillsToAccount(fromAccountId, toAccountId, r -> {
+        repository.migrateBillsToAccount(fromAccountId, fromLocalId, toAccountId, r -> {
             if (r.isSuccess()) {
                 _operationState.setValue(ApiResponse.success(r.message));
                 _toastMessage.setValue(r.message);
-                refreshData(); triggerBackgroundSync();
+                refreshData();
+                triggerBackgroundSync();
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("迁移失败: " + r.message);
@@ -560,17 +616,40 @@ public class BillViewModel extends AndroidViewModel {
         });
     }
 
-    public void setBillsToNoAccount(String accountId) {
-        if (accountId == null || accountId.isEmpty()) { _toastMessage.setValue("账户ID为空"); return; }
+    public void setBillsToNoAccount(String accountId, long localAccountId) {
+        if ((accountId == null || accountId.isEmpty()) && localAccountId <= 0) {
+            _toastMessage.setValue("账户ID为空");
+            return;
+        }
         _operationState.setValue(ApiResponse.loading("正在处理账单..."));
-        repository.setBillsToNoAccount(accountId, r -> {
+        repository.setBillsToNoAccount(accountId, localAccountId, r -> {
             if (r.isSuccess()) {
                 _operationState.setValue(ApiResponse.success(r.message));
                 _toastMessage.setValue(r.message);
-                refreshData(); triggerBackgroundSync();
+                refreshData();
+                triggerBackgroundSync();
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("操作失败: " + r.message);
+            }
+        });
+    }
+
+    public void deleteAllBillsByAccount(String accountId, long localAccountId) {
+        if ((accountId == null || accountId.isEmpty()) && localAccountId <= 0) {
+            _toastMessage.setValue("账户ID为空");
+            return;
+        }
+        _operationState.setValue(ApiResponse.loading("正在删除所有账单..."));
+        repository.deleteBillsByAccount(currentUserId, accountId, localAccountId, r -> {
+            if (r.isSuccess()) {
+                _operationState.setValue(ApiResponse.success(r.message));
+                _toastMessage.setValue("账户账单已全部删除");
+                refreshData();
+                triggerBackgroundSync();
+            } else {
+                _operationState.setValue(ApiResponse.error(r.message));
+                _toastMessage.setValue("删除账单失败: " + r.message);
             }
         });
     }
@@ -635,25 +714,31 @@ public class BillViewModel extends AndroidViewModel {
         lastSyncTime  = System.currentTimeMillis();
         _syncState.setValue(ApiResponse.loading("正在同步..."));
 
-        repository.syncFromCloud(currentUserId, r -> {
-            isSyncing = false;
-            if (r.isSuccess()) {
-                _syncState.setValue(ApiResponse.success(r.data, r.message));
-                _toastMessage.setValue("同步成功");
-
-                // ✅ 关键：同步成功后，触发本地数据库重新查询
-                // 这样 HomeFragment 观察的 billItems 就会收到最新数据
-                // 并且因为数据变了，HomeFragment 里的 setRefreshing(false) 会被执行
-                mainHandler.post(() -> {
-                    _refreshTrigger.setValue(System.currentTimeMillis());
-                });
-            } else {
-                _syncState.setValue(ApiResponse.error(r.message));
-                _toastMessage.setValue("同步失败: " + r.message);
-
-                // 即使失败也要触发一次，防止 UI 一直在转圈
-                _refreshTrigger.setValue(System.currentTimeMillis());
+        // 🔴 联动同步：先同步账户，再同步账单
+        accountRepository.syncFromAccountGroupCloud((success, message) -> {
+            if (!success) {
+                Log.w(TAG, "⚠️ 账户同步失败: " + message);
             }
+            
+            repository.syncFromCloud(currentUserId, r -> {
+                isSyncing = false;
+                if (r.isSuccess()) {
+                    _syncState.setValue(ApiResponse.success(r.data, r.message));
+                    _toastMessage.setValue("同步成功");
+
+                    // ✅ 关键：同步成功后，触发本地数据库重新查询
+                    mainHandler.post(() -> {
+                        // 强制触发 LiveData 通知，确保 UI 收到数据变更
+                        _refreshTrigger.setValue(System.currentTimeMillis());
+                        // 额外调用一次 computeStats 确保 Header 统计准确
+                        refreshData();
+                    });
+                } else {
+                    _syncState.setValue(ApiResponse.error(r.message));
+                    _toastMessage.setValue("同步失败: " + r.message);
+                    _refreshTrigger.setValue(System.currentTimeMillis());
+                }
+            });
         });
     }
 
@@ -682,6 +767,9 @@ public class BillViewModel extends AndroidViewModel {
     private void reinitializeLiveData() {
         if (monthBillsObserver != null && currentMonthBills != null) {
             currentMonthBills.removeObserver(monthBillsObserver);
+        }
+        if (accountsObserver != null && allAccountsLive != null) {
+            allAccountsLive.removeObserver(accountsObserver);
         }
         if (allBillsObserver != null && allBills != null) {
             allBills.removeObserver(allBillsObserver);
@@ -781,6 +869,8 @@ public class BillViewModel extends AndroidViewModel {
             allBills.removeObserver(allBillsObserver);
         if (monthBillsObserver != null && currentMonthBills != null)
             currentMonthBills.removeObserver(monthBillsObserver);
+        if (accountsObserver != null && allAccountsLive != null)
+            allAccountsLive.removeObserver(accountsObserver);
         if (statsDebounceRunnable != null)
             statsDebounceHandler.removeCallbacks(statsDebounceRunnable);
         Log.d(TAG, "ViewModel cleared");

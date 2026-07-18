@@ -130,7 +130,7 @@ public class CategoryAddBottomSheetFragment extends BottomSheetDialogFragment {
                 // 设置上圆角背景
                 bottomSheet.setBackground(
                         ContextCompat.getDrawable(requireContext(),
-                                R.drawable.bg_bottom_sheet)
+                                R.drawable.bg_bottom_sheet1)
                 );
 
                 // 默认展开 BottomSheet

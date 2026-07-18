@@ -27,9 +27,11 @@ import com.example.my_project1.ui.adapter.account.AssetsGroupAdapter;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
+import com.example.my_project1.utils.SnackbarUtils;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -177,6 +179,41 @@ public class AssetsFragment extends Fragment {
             }
 
             @Override
+            public void onAccountDelete(Account account) {
+                if (account == null) return;
+                
+                // 弹出确认对话框
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle("删除账户")
+                    .setMessage("确定要删除账户「" + account.getName() + "」吗？这将标记账户为待删除状态并同步到云端。")
+                    .setPositiveButton("删除", (dialog, which) -> {
+                        viewModel.deleteAccount(account, (success, message) -> {
+                            if (success) {
+                                SnackbarUtils.showSuccess(binding.getRoot(), "已标记删除账户");
+                            } else {
+                                SnackbarUtils.showError(binding.getRoot(), "删除失败: " + message);
+                            }
+                        });
+                    })
+                    .setNegativeButton("取消", null)
+                    .show();
+            }
+
+            @Override
+            public void onAccountHide(Account account) {
+                account.setIncludeInTotal(false);
+                viewModel.updateAccount(account);
+                SnackbarUtils.showInfo(binding.getRoot(), "已隐藏账户: " + account.getName());
+            }
+
+            @Override
+            public void onAccountEdit(Account account) {
+                Intent intent = new Intent(requireContext(), com.example.my_project1.ui.activity.AddAccountActivity.class);
+                intent.putExtra("editAccount", account);
+                startActivity(intent);
+            }
+
+            @Override
             public void onGroupExpand(String groupId) {
                 Log.d(TAG, "🔄 展开账户组: " + groupId);
             }
@@ -240,38 +277,42 @@ public class AssetsFragment extends Fragment {
         List<AccountGroup> displayGroups = new java.util.ArrayList<>();
         Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
         
-        // 1. 处理真实的账户组
-        for (AccountGroup group : groups) {
-            displayGroups.add(group);
-            List<Account> accountsInGroup = new java.util.ArrayList<>();
-            for (Account acc : allAccounts) {
-                if (group.getObjectId().equals(acc.getGroupId())) {
-                    accountsInGroup.add(acc);
-                }
+        // 1. 先将所有账户按 groupId 分组 (O(A))
+        Map<String, List<Account>> tempMap = new HashMap<>();
+        Map<String, List<Account>> categoryMap = new HashMap<>();
+        
+        for (Account acc : allAccounts) {
+            String gid = acc.getGroupId();
+            if (gid != null && !gid.isEmpty()) {
+                if (!tempMap.containsKey(gid)) tempMap.put(gid, new ArrayList<>());
+                tempMap.get(gid).add(acc);
+            } else {
+                String cat = acc.getCategory();
+                if (cat == null) cat = "其他";
+                if (!categoryMap.containsKey(cat)) categoryMap.put(cat, new ArrayList<>());
+                categoryMap.get(cat).add(acc);
             }
-            groupToAccountsMap.put(group.getObjectId(), accountsInGroup);
         }
 
-        // 2. 处理没有分组的账户，按大类归类为“虚拟分组”
-        String[] categories = {"资金账户", "信用账户", "充值账户"};
-        for (String category : categories) {
-            List<Account> accountsInCategory = new java.util.ArrayList<>();
-            for (Account acc : allAccounts) {
-                if ((acc.getGroupId() == null || acc.getGroupId().isEmpty()) && category.equals(acc.getCategory())) {
-                    accountsInCategory.add(acc);
-                }
+        // 2. 处理真实的账户组 (O(G))
+        for (AccountGroup group : groups) {
+            List<Account> accountsInGroup = tempMap.get(group.getObjectId());
+            if (accountsInGroup != null && !accountsInGroup.isEmpty()) {
+                displayGroups.add(group);
+                groupToAccountsMap.put(group.getObjectId(), accountsInGroup);
             }
+        }
 
-            if (!accountsInCategory.isEmpty()) {
-                // 创建一个虚拟的 AccountGroup
-                AccountGroup virtualGroup = new AccountGroup();
-                virtualGroup.setObjectId("CATEGORY_" + category);
-                virtualGroup.setName(category);
-                virtualGroup.setAccountCount(accountsInCategory.size());
-                
-                displayGroups.add(virtualGroup);
-                groupToAccountsMap.put(virtualGroup.getObjectId(), accountsInCategory);
-            }
+        // 3. 处理没有分组的账户，按大类归类为“虚拟分组”
+        for (Map.Entry<String, List<Account>> entry : categoryMap.entrySet()) {
+            AccountGroup virtualGroup = new AccountGroup();
+            String catKey = "CATEGORY_" + entry.getKey();
+            virtualGroup.setObjectId(catKey);
+            virtualGroup.setName(entry.getKey());
+            virtualGroup.setAccountCount(entry.getValue().size());
+            
+            displayGroups.add(virtualGroup);
+            groupToAccountsMap.put(catKey, entry.getValue());
         }
 
         Log.d(TAG, "✅ 数据合并完成: 总显示分组 " + displayGroups.size());

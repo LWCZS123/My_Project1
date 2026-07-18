@@ -168,7 +168,7 @@ public class DateRangePickerFragment extends BottomSheetDialogFragment {
             if (bottomSheet != null) {
                 // 背景圆角
                 bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.bg_bottom_sheet));
+                        R.drawable.bg_bottom_sheet1));
 
                 // 设置为自适应高度
                 BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);

@@ -136,9 +136,14 @@ public interface BillDao {
     @Query("DELETE FROM bills WHERE user_id = :userId AND book_id = :bookId")
     int deleteBillsByBook(String userId, String bookId);
 
+    /** 🔥 批量标记删除某用户某账户下全部账单 (提升性能) */
+    @Query("UPDATE bills SET sync_state = 'TO_DELETE', updatedAt = :now " +
+            "WHERE user_id = :userId AND (account_id = :accountId OR local_account_id = :localAccountId)")
+    int markBillsAsDeletedByAccountId(String userId, String accountId, long localAccountId, long now);
+
     /** 🔥 删除某用户某账户下全部账单 */
-    @Query("DELETE FROM bills WHERE user_id = :userId AND account_id = :accountId")
-    int deleteBillsByAccountId(String userId, String accountId);
+    @Query("DELETE FROM bills WHERE user_id = :userId AND (account_id = :accountId OR local_account_id = :localAccountId)")
+    int deleteBillsByAccountId(String userId, String accountId, long localAccountId);
 
     /** 🔥 删除某用户某分类下账单 */
     @Query("DELETE FROM bills WHERE user_id = :userId AND category_id = :categoryId")
@@ -151,8 +156,8 @@ public interface BillDao {
     /**
      * 同步查询某个账户下的所有账单（用于后台任务）
      */
-    @Query("SELECT * FROM bills WHERE account_id = :accountId ORDER BY billTime DESC")
-    List<Bill> getBillsByAccountSync(String accountId);
+    @Query("SELECT * FROM bills WHERE account_id = :accountId OR local_account_id = :localAccountId ORDER BY billTime DESC")
+    List<Bill> getBillsByAccountSync(String accountId, long localAccountId);
 
     /**
      * 批量更新账单的账户ID

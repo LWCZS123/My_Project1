@@ -325,9 +325,9 @@ public class BmobApiImpl {
 
             // 🔍 验证日志
             for (CloudSubCategory sub : subList) {
-                Log.d(TAG, "  ├─ " + sub.getName() +
-                        " (cloudId: " + sub.getObjectId() +
-                        ", parentCloudId: " + sub.getParentCloudId() + ")");
+//                Log.d(TAG, "  ├─ " + sub.getName() +
+//                        " (cloudId: " + sub.getObjectId() +
+//                        ", parentCloudId: " + sub.getParentCloudId() + ")");
             }
 
             return subList;

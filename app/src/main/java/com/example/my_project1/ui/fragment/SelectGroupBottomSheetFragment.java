@@ -110,7 +110,7 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
 
                 // 设置圆角背景
                 bottomSheet.setBackground(
-                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet)
+                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1)
                 );
 
                 // 一打开就全展开

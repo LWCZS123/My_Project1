@@ -23,11 +23,10 @@ import java.util.List;
 import io.reactivex.annotations.NonNull;
 
 /**
- * BillAdapter (聚合卡片版)
+ * BillAdapter (聚合卡片版) - 修复向左滑动菜单
  * -------------------------------------------------------
  * ✅ 每个 Item 代表一天的账单组，由一个大卡片包裹
- * ✅ 内部动态添加账单项，实现完美的阴影和分割线效果
- * ✅ 修复：点击事件无效、账单图片不显示的问题
+ * ✅ 内部项支持向左滑动显示：退款、编辑、删除
  */
 public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
 
@@ -47,50 +46,18 @@ public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
 
                 @Override
                 public boolean areContentsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
-                    if (!oldItem.header.dateText.equals(newItem.header.dateText)
-                            || !oldItem.header.expenseText.equals(newItem.header.expenseText)
-                            || !oldItem.header.incomeText.equals(newItem.header.incomeText)) {
-                        return false;
-                    }
-                    if (oldItem.bills.size() != newItem.bills.size()) return false;
-                    for (int i = 0; i < oldItem.bills.size(); i++) {
-                        if (!oldItem.bills.get(i).diffKey.equals(newItem.bills.get(i).diffKey)) return false;
-                        if (!oldItem.bills.get(i).amountText.equals(newItem.bills.get(i).amountText)) return false;
-                    }
-                    return true;
+                    return oldItem.equals(newItem);
                 }
             };
 
     private final AsyncListDiffer<BillGroup> differ = new AsyncListDiffer<>(this, DIFF_CALLBACK);
 
-    // ──────────── 数据结构 ──────────────
-    public static class DateHeader {
-        public final String dateKey;
-        public final String dateText;
-        public final String expenseText;
-        public final String incomeText;
-
-        public DateHeader(String dateKey, String dateText, String expenseText, String incomeText) {
-            this.dateKey = dateKey;
-            this.dateText = dateText;
-            this.expenseText = expenseText;
-            this.incomeText = incomeText;
-        }
-    }
-
-    public static class BillGroup {
-        public final DateHeader header;
-        public final List<BillUiModel> bills;
-
-        public BillGroup(DateHeader header, List<BillUiModel> bills) {
-            this.header = header;
-            this.bills = bills;
-        }
-    }
-
     public interface OnBillClickListener {
         void onBillClick(long localId, String objectId, View itemView);
         void onPhotoClick(String imageUrl, int position);
+        void onBillDelete(BillUiModel bill);
+        void onBillEdit(BillUiModel bill);
+        void onBillRefund(BillUiModel bill);
     }
 
     public BillAdapter(Context context, OnBillClickListener listener) {
@@ -128,62 +95,73 @@ public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
         }
 
         void bind(BillGroup group) {
-            // 1. 设置头部数据
             b.tvDate.setText(group.header.dateText);
             b.tvDaySummary.setText(group.header.expenseText + " | " + group.header.incomeText);
 
-            // 2. 清空并填充账单项
-            b.llBillContainer.removeAllViews();
-            for (int i = 0; i < group.bills.size(); i++) {
-                BillUiModel bill = group.bills.get(i);
-                ItemBillBinding ib = ItemBillBinding.inflate(
-                        LayoutInflater.from(context), b.llBillContainer, false);
-
-                // 数据绑定
-                ib.tvCategory.setText(bill.categoryName);
-                ib.tvAmount.setText(bill.amountText);
-                ib.tvAmount.setTextColor(bill.amountColor);
-                
-                String subInfo = bill.timeText;
-                if (bill.remarkText != null && !bill.remarkText.isEmpty()) {
-                    subInfo += " | " + bill.remarkText;
-                }
-                ib.tvSubInfo.setText(subInfo);
-                ib.tvAccount.setText(bill.accountName);
-
-                ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, ib.ivCategoryIcon);
-
-                // 图片列表处理
-                if (bill.imageUrls != null && !bill.imageUrls.isEmpty()) {
-                    ib.ivBillImage.setVisibility(View.VISIBLE);
-                    ib.ivBillImage.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
-                    ib.ivBillImage.setRecycledViewPool(sharedPhotoPool);
-                    
-                    PhotoAdapter photoAdapter = new PhotoAdapter(context, new ArrayList<>(), false,
-                            new PhotoAdapter.OnPhotoClickListener() {
-                                @Override
-                                public void onPhotoClick(String url, int pos) {
-                                    if (listener != null) listener.onPhotoClick(url, pos);
-                                }
-                                @Override public void onDeleteClick(int pos) { }
-                            });
-                    ib.ivBillImage.setAdapter(photoAdapter);
-                    photoAdapter.setPhotos(bill.imageUrls);
-                } else {
-                    ib.ivBillImage.setVisibility(View.GONE);
-                }
-
-                // 分割线处理
-                ib.billDivider.setVisibility(i == group.bills.size() - 1 ? View.GONE : View.VISIBLE);
-
-                // 点击事件 (设置在 layoutMain 上)
-                ib.layoutMain.setOnClickListener(v -> {
-                    if (listener != null)
-                        listener.onBillClick(bill.localId, bill.objectId, ib.getRoot());
-                });
-
-                b.llBillContainer.addView(ib.getRoot());
+            // 使用内嵌 RecyclerView 替代 manualaddView，支持更好的滑动效果和性能
+            if (b.rvBills.getAdapter() == null) {
+                b.rvBills.setLayoutManager(new LinearLayoutManager(context));
+                b.rvBills.setAdapter(new BillRowAdapter(context, listener, sharedPhotoPool));
             }
+            
+            BillRowAdapter rowAdapter = (BillRowAdapter) b.rvBills.getAdapter();
+            if (rowAdapter != null) {
+                rowAdapter.setBills(group.bills);
+            }
+        }
+    }
+
+    public static class DateHeader {
+        public final String dateKey;
+        public final String dateText;
+        public final String expenseText;
+        public final String incomeText;
+
+        public DateHeader(String dateKey, String dateText, String expenseText, String incomeText) {
+            this.dateKey = dateKey;
+            this.dateText = dateText;
+            this.expenseText = expenseText;
+            this.incomeText = incomeText;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            DateHeader that = (DateHeader) o;
+            return java.util.Objects.equals(dateKey, that.dateKey) &&
+                    java.util.Objects.equals(dateText, that.dateText) &&
+                    java.util.Objects.equals(expenseText, that.expenseText) &&
+                    java.util.Objects.equals(incomeText, that.incomeText);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(dateKey, dateText, expenseText, incomeText);
+        }
+    }
+
+    public static class BillGroup {
+        public final DateHeader header;
+        public final List<BillUiModel> bills;
+
+        public BillGroup(DateHeader header, List<BillUiModel> bills) {
+            this.header = header;
+            this.bills = bills;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            BillGroup billGroup = (BillGroup) o;
+            return java.util.Objects.equals(header, billGroup.header) &&
+                    java.util.Objects.equals(bills, billGroup.bills);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(header, bills);
         }
     }
 }

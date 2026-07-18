@@ -30,8 +30,11 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             "¥0.00",
             "¥0.00",
             "¥0.00",
+            "¥0.00",
             "¥0.00"
     );
+
+    private int currentMode = 0; // 0: 净资产, 1: 总收入, 2: 总支出, 3: 周结余
 
 
     public interface OnRefreshClickListener {
@@ -72,14 +75,32 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
         HeaderVH(ItemHomeHeaderBinding binding) {
             super(binding.getRoot());
             this.b = binding;
-            // 刷新按钮点击
-//            b.ivRefresh.setOnClickListener(v -> {
-//                if (refreshClickListener != null) refreshClickListener.onRefreshClick();
-//            });
+            
+            b.llHeaderTitle.setOnClickListener(v -> {
+                currentMode = (currentMode + 1) % 4;
+                bind(data);
+            });
         }
 
         void bind(HeaderUiModel model) {
-            b.tvTotalAmount.setText(model.mainBalance);
+            switch (currentMode) {
+                case 0:
+                    b.tvTitle.setText("我的净资产");
+                    b.tvTotalAmount.setText(model.mainBalance);
+                    break;
+                case 1:
+                    b.tvTitle.setText("总收入");
+                    b.tvTotalAmount.setText(model.totalIncome);
+                    break;
+                case 2:
+                    b.tvTitle.setText("总支出");
+                    b.tvTotalAmount.setText(model.totalExpense);
+                    break;
+                case 3:
+                    b.tvTitle.setText("周结余");
+                    b.tvTotalAmount.setText(model.weeklyBalance);
+                    break;
+            }
             
             // 设置今日变化颜色：收入>支出为绿色，支出>收入为红色
             String changeText = model.todayChange;

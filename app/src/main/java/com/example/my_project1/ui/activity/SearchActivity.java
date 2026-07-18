@@ -146,6 +146,21 @@ public class SearchActivity extends AppCompatActivity {
             public void onPhotoClick(String imageUrl, int position) {
                 Toast.makeText(SearchActivity.this, "查看图片", Toast.LENGTH_SHORT).show();
             }
+
+            @Override
+            public void onBillDelete(BillUiModel bill) {
+
+            }
+
+            @Override
+            public void onBillEdit(BillUiModel bill) {
+
+            }
+
+            @Override
+            public void onBillRefund(BillUiModel bill) {
+
+            }
         });
 
         binding.rvResult.setLayoutManager(new LinearLayoutManager(this));

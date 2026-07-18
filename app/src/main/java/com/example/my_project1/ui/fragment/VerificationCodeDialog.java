@@ -147,8 +147,8 @@ public class VerificationCodeDialog extends DialogFragment {
     // ==================== 初始化 ====================
 
     private void setupUI() {
-        binding.tvTitle.setText("提示");
-        binding.tvMessage.setText("确定不迁入任何账户吗？如果不选择账户则这些账单会被设置为无账户哦～");
+        binding.tvTitle.setText("安全验证");
+        binding.tvMessage.setText("正在执行敏感删除操作，请输入下方确认码以继续。此操作不可撤销，请谨慎操作。");
         binding.tvVerificationCode.setText("输入确认码：" + verificationCode);
 
         // 初始隐藏进度条

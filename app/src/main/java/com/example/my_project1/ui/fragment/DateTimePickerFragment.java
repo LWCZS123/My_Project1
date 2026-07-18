@@ -126,7 +126,7 @@ public class DateTimePickerFragment extends BottomSheetDialogFragment {
                 behavior.setDraggable(true);
 
                 bottomSheet.setBackground(
-                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet));
+                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1));
             }
         });
         return dialog;

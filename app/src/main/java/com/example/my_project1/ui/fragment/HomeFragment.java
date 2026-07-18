@@ -14,10 +14,12 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ConcatAdapter;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.user.UserProfile;
 import com.example.my_project1.databinding.FragmentHomeBinding;
 import com.example.my_project1.ui.activity.BillDetailActivity;
@@ -27,10 +29,13 @@ import com.example.my_project1.ui.activity.SearchActivity;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
 import com.example.my_project1.ui.adapter.bill.FooterAdapter;
 import com.example.my_project1.ui.adapter.bill.HeaderAdapter;
+import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.PagingState;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
+import com.example.my_project1.utils.SwipeToDeleteCallback;
 import com.google.android.material.snackbar.Snackbar;
 
 import cn.bmob.v3.BmobUser;
@@ -148,6 +153,20 @@ public class HomeFragment extends Fragment {
             @Override
             public void onPhotoClick(String imageUrl, int position) {
                 openImageViewer(imageUrl);
+            }
+            @Override
+            public void onBillDelete(BillUiModel bill) {
+                handleBillDelete(bill);
+            }
+            @Override
+            public void onBillEdit(BillUiModel bill) {
+                Intent intent = new Intent(getActivity(), com.example.my_project1.ui.activity.AddBillActivity.class);
+                intent.putExtra("editBillLocalId", bill.localId);
+                startActivity(intent);
+            }
+            @Override
+            public void onBillRefund(BillUiModel bill) {
+                showSnackbar("已触发退款申请");
             }
         });
 
@@ -320,6 +339,20 @@ public class HomeFragment extends Fragment {
     // ════════════════════════════════════════════════════
     //  页面跳转
     // ════════════════════════════════════════════════════
+
+    private void handleBillDelete(BillUiModel billUiModel) {
+        if (billUiModel == null) return;
+        
+        AppExecutors.get().diskIO().execute(() -> {
+            Bill bill = billViewModel.saveBillLocal(billUiModel.localId);
+            if (bill != null) {
+                AppExecutors.get().mainThread().execute(() -> {
+                    billViewModel.deleteBill(bill);
+                    showSnackbar("已标记删除账单");
+                });
+            }
+        });
+    }
 
     private void openBillDetail(long localId, String objectId) {
         try {

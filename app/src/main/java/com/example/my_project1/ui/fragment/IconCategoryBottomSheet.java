@@ -276,7 +276,7 @@ public class IconCategoryBottomSheet extends BottomSheetDialogFragment {
                     com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null && isAdded()) {
                 bottomSheet.setBackground(
-                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet)
+                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1)
                 );
                 BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
                 behavior.setSkipCollapsed(true);

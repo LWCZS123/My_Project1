@@ -3,106 +3,172 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet1"
     android:orientation="vertical"
     android:padding="24dp">
+
+    <View
+        android:layout_width="32dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="#DDDDDD" />
 
     <!-- 标题 -->
     <TextView
         android:id="@+id/tv_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="删除账户"
+        android:text="账户处理"
         android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="@android:color/black"
         android:gravity="center"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="24dp"/>
 
     <!-- 提示信息卡片 -->
-    <androidx.cardview.widget.CardView
+    <LinearLayout
         android:id="@+id/view_info_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="0dp"
-        app:cardBackgroundColor="#E3F2FD">
+        android:orientation="vertical"
+        android:visibility="visible">
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="16dp"
-            android:gravity="start">
+            android:text="检测到该账户下存有账单，请选择您的处理策略："
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="16dp"/>
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_alarm"
-                android:layout_marginEnd="12dp"/>
+        <!-- 选项1：完全删除 -->
+        <LinearLayout
+            android:id="@+id/layout_option_delete_all"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_delete_option_unselected"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
-                android:id="@+id/tv_info"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="发现该账户下有账单，请先迁移。点击迁入账户选择（若不选择这些账单将被设置为无账户）"
-                android:textSize="14sp"
-                android:textColor="#1976D2"
-                android:lineSpacingExtra="2dp"/>
+                android:text="彻底清理"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:textSize="15sp"/>
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="删除账户及其关联的所有账单数据，不可恢复。"
+                android:textColor="#999999"
+                android:textSize="12sp"
+                android:layout_marginTop="4dp"/>
         </LinearLayout>
 
-    </androidx.cardview.widget.CardView>
+        <!-- 选项2：保留账单 -->
+        <LinearLayout
+            android:id="@+id/layout_option_keep_bills"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_delete_option_selected"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="保留数据"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:textSize="15sp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="删除账户，但保留账单记录并将其标记为“无账户”。"
+                android:textColor="#999999"
+                android:textSize="12sp"
+                android:layout_marginTop="4dp"/>
+        </LinearLayout>
+
+        <!-- 选项3：迁移账单 -->
+        <LinearLayout
+            android:id="@+id/layout_option_migrate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_delete_option_unselected"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="资产迁移"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:textSize="15sp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="将当前账单迁移至另一个账户后，再删除当前账户。"
+                android:textColor="#999999"
+                android:textSize="12sp"
+                android:layout_marginTop="4dp"/>
+        </LinearLayout>
+
+    </LinearLayout>
 
     <!-- 源账户和目标账户展示 -->
     <LinearLayout
+        android:id="@+id/layout_migration_display"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="24dp"
+        android:visibility="gone">
 
-        <!-- 源账户（要删除的账户） -->
+        <!-- 源账户 -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center">
-
             <ImageView
                 android:id="@+id/iv_account_icon"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_close"
-                android:backgroundTint="#FFE0E0"
-               />
-
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_wallet" />
             <TextView
                 android:id="@+id/tv_account_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="QQ钱包"
-                android:textSize="14sp"
-                android:textColor="@android:color/black"
-                android:layout_marginTop="8dp"
-                android:maxLines="1"
-                android:ellipsize="end"/>
-
+                android:text="源账户"
+                android:textSize="12sp"
+                android:layout_marginTop="4dp"/>
         </LinearLayout>
 
-        <!-- 箭头 -->
         <ImageView
-            android:id="@+id/iv_arrow"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:src="@drawable/ic_arrow_right"
-            android:tint="#666666"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"/>
+            app:tint="#CCCCCC"/>
 
-        <!-- 目标账户选择区域 -->
+        <!-- 目标账户选择 -->
         <LinearLayout
             android:id="@+id/layout_target_account"
             android:layout_width="0dp"
@@ -110,59 +176,49 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:padding="12dp"
             android:clickable="true"
             android:focusable="true">
-
             <ImageView
                 android:id="@+id/iv_target_icon"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_request"
-                android:backgroundTint="#E0E0E0"
-                />
-
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_request" />
             <TextView
                 android:id="@+id/tv_target_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="迁入账户"
-                android:textSize="14sp"
-                android:textColor="#666666"
-                android:layout_marginTop="8dp"
-                android:maxLines="1"
-                android:ellipsize="end"/>
-
+                android:text="点击选择目标"
+                android:textSize="12sp"
+                android:textColor="#4285F4"
+                android:layout_marginTop="4dp"/>
         </LinearLayout>
-
     </LinearLayout>
 
     <!-- 按钮区域 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:orientation="horizontal"
-        android:gravity="center">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_cancel"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:text="取消"
-            android:textColor="#000000"
-            app:cornerRadius="22dp"
-            app:backgroundTint="#E3E3E3"
+            android:text="稍后处理"
+            android:textColor="#666666"
+            app:cornerRadius="12dp"
+            app:backgroundTint="#F5F5F5"
             android:layout_marginEnd="8dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_migrate"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:text="迁移并删除"
+            android:text="立即执行"
             android:textColor="@android:color/white"
-            app:cornerRadius="22dp"
+            app:cornerRadius="12dp"
             app:backgroundTint="#4285F4"
             android:layout_marginStart="8dp"/>
 

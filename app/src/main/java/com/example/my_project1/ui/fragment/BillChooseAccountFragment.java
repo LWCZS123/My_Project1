@@ -111,6 +111,15 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
             // 组展开 → 加载账户
             @Override public void onGroupExpand(String groupId) {}
 
+            @Override
+            public void onAccountDelete(Account account) {}
+
+            @Override
+            public void onAccountHide(Account account) {}
+
+            @Override
+            public void onAccountEdit(Account account) {}
+
             // 点击账户 → 返回 AddBillActivity
             @Override public void onAccount(Account account) {
                 // 🔴 防止选择要删除的账户（迁移模式）
@@ -253,7 +262,7 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
 
             if (bottomSheet != null) {
                 bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.bg_bottom_sheet));
+                        R.drawable.bg_bottom_sheet1));
 
                 ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();
                 params.height = (int) (getScreenHeight() * 0.65);

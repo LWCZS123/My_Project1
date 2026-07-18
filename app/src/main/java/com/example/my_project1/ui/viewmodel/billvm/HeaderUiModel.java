@@ -15,6 +15,7 @@ public class HeaderUiModel {
     public final String totalIncome;      // 总收入
     public final String monthlyExpense;   // 月支出
     public final String totalExpense;     // 总支出
+    public final String weeklyBalance;    // 周结余
 
     public HeaderUiModel(String mainBalance,
                          String todayChange,
@@ -23,7 +24,8 @@ public class HeaderUiModel {
                          String monthlyIncome,
                          String totalIncome,
                          String monthlyExpense,
-                         String totalExpense) {
+                         String totalExpense,
+                         String weeklyBalance) {
         this.mainBalance    = mainBalance;
         this.todayChange    = todayChange;
         this.assets         = assets;
@@ -32,5 +34,6 @@ public class HeaderUiModel {
         this.totalIncome    = totalIncome;
         this.monthlyExpense = monthlyExpense;
         this.totalExpense   = totalExpense;
+        this.weeklyBalance  = weeklyBalance;
     }
 }

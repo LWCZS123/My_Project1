@@ -47,6 +47,9 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
     public interface OnGroupActionClickListener {
         void onEditGroup(AccountGroup group);
         void onAccount(Account account);
+        void onAccountDelete(Account account);
+        void onAccountHide(Account account);
+        void onAccountEdit(Account account);
         void onGroupExpand(String groupId);
     }
 
@@ -268,9 +271,30 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
             //
             binding.rvSubAccounts.setNestedScrollingEnabled(false);
 
-            subAdapter.setOnAccountClickListener(account -> {
-                if (groupActionClickListener != null)
-                    groupActionClickListener.onAccount(account);
+            subAdapter.setOnAccountClickListener(new AccountSubAdapter.OnAccountClickListener() {
+                @Override
+                public void onAccountClick(Account account) {
+                    if (groupActionClickListener != null)
+                        groupActionClickListener.onAccount(account);
+                }
+
+                @Override
+                public void onAccountDelete(Account account) {
+                    if (groupActionClickListener != null)
+                        groupActionClickListener.onAccountDelete(account);
+                }
+
+                @Override
+                public void onAccountHide(Account account) {
+                    if (groupActionClickListener != null)
+                        groupActionClickListener.onAccountHide(account);
+                }
+
+                @Override
+                public void onAccountEdit(Account account) {
+                    if (groupActionClickListener != null)
+                        groupActionClickListener.onAccountEdit(account);
+                }
             });
 
             // 编辑组

@@ -257,17 +257,28 @@ public class BillRepository {
     /**
      * 删除账户下的所有账单
      */
-    public void deleteBillsByAccount(String userId, String accountId, ApiResponse.Callback<Integer> callback) {
+    public void deleteBillsByAccount(String userId, String accountId, long localAccountId, ApiResponse.Callback<Integer> callback) {
         executors.diskIO().execute(() -> {
             try {
-                int count = billDao.deleteBillsByAccountId(userId, accountId);
-                Log.d(TAG, "✅ 删除账户账单: " + count + " 条");
+                // 使用 SQL 批量更新，显著提升性能，减少卡顿
+                long now = System.currentTimeMillis();
+                int count = billDao.markBillsAsDeletedByAccountId(userId, accountId, localAccountId, now);
+                
+                Log.d(TAG, "✅ 批量标记删除账户账单: " + count + " 条");
 
-                executors.mainThread().execute(() ->
-                        callback.onComplete(ApiResponse.success(count, "删除成功"))
-                );
+                final int finalCount = count;
+                executors.mainThread().execute(() -> {
+                    callback.onComplete(ApiResponse.success(finalCount, "删除成功"));
+                    
+                    // 触发后台同步
+                    try {
+                        BillSyncWorker.enqueue(context);
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ 触发同步失败: " + e.getMessage());
+                    }
+                });
             } catch (Exception e) {
-                Log.e(TAG, "删除账户账单异常", e);
+                Log.e(TAG, "批量标记删除账单异常", e);
                 executors.mainThread().execute(() ->
                         callback.onComplete(ApiResponse.error(e))
                 );
@@ -283,15 +294,25 @@ public class BillRepository {
      * @param bill 新增的账单
      */
     private void updateAccountBalanceForNewBill(Bill bill) {
-        if (bill.getAccountId() == null || bill.getAccountId().isEmpty()) {
-            Log.d(TAG, "⚠️ 账单未关联账户,跳过余额更新");
+        String accountId = bill.getAccountId();
+        long localAccountId = bill.getLocalAccountId();
+
+        if ((accountId == null || accountId.isEmpty()) && localAccountId <= 0) {
+            Log.d(TAG, "⚠️ 账单未关联任何账户(云端或本地),跳过余额更新");
             return;
         }
 
         try {
-            Account account = accountDao.getAccountByCloudId(bill.getAccountId());
+            Account account = null;
+            if (accountId != null && !accountId.isEmpty()) {
+                account = accountDao.getAccountByCloudId(accountId);
+            }
+            if (account == null && localAccountId > 0) {
+                account = accountDao.getAccountByLocalId(localAccountId);
+            }
+
             if (account == null) {
-                Log.w(TAG, "⚠️ 未找到账户: " + bill.getAccountId());
+                Log.w(TAG, "⚠️ 未找到对应账户: cloud=" + accountId + ", local=" + localAccountId);
                 return;
             }
 
@@ -338,13 +359,30 @@ public class BillRepository {
     private void updateAccountBalanceForBillUpdate(Bill oldBill, Bill newBill) {
         try {
             String oldAccountId = oldBill.getAccountId();
+            long oldLocalAccountId = oldBill.getLocalAccountId();
             String newAccountId = newBill.getAccountId();
+            long newLocalAccountId = newBill.getLocalAccountId();
+
+            // 是否是同一个账户（云端ID相同 或 本地ID相同）
+            boolean isSameAccount = false;
+            if (oldAccountId != null && !oldAccountId.isEmpty() && oldAccountId.equals(newAccountId)) {
+                isSameAccount = true;
+            } else if (oldLocalAccountId > 0 && oldLocalAccountId == newLocalAccountId) {
+                isSameAccount = true;
+            }
 
             // 情况1: 账户未改变
-            if (oldAccountId != null && oldAccountId.equals(newAccountId)) {
-                Account account = accountDao.getAccountByCloudId(newAccountId);
+            if (isSameAccount) {
+                Account account = null;
+                if (newAccountId != null && !newAccountId.isEmpty()) {
+                    account = accountDao.getAccountByCloudId(newAccountId);
+                }
+                if (account == null && newLocalAccountId > 0) {
+                    account = accountDao.getAccountByLocalId(newLocalAccountId);
+                }
+
                 if (account == null) {
-                    Log.w(TAG, "⚠️ 未找到账户: " + newAccountId);
+                    Log.w(TAG, "⚠️ 未找到账户进行余额更新");
                     return;
                 }
 
@@ -356,18 +394,12 @@ public class BillRepository {
                 double balance = account.getBalance();
 
                 // 先恢复旧账单的影响
-                if (oldType == 1) {
-                    balance -= oldAmount; // 恢复收入
-                } else {
-                    balance += oldAmount; // 恢复支出
-                }
+                if (oldType == 1) balance -= oldAmount; // 恢复收入
+                else balance += oldAmount; // 恢复支出
 
                 // 再应用新账单的影响
-                if (newType == 1) {
-                    balance += newAmount; // 新收入
-                } else {
-                    balance -= newAmount; // 新支出
-                }
+                if (newType == 1) balance += newAmount; // 新收入
+                else balance -= newAmount; // 新支出
 
                 account.setBalance(balance);
                 account.setUpdatedAt(new Date());
@@ -376,61 +408,52 @@ public class BillRepository {
 
                 try {
                     AccountSyncWorker.enqueue(context);
-                    Log.d(TAG, "✅ 已触发账户同步任务");
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ 触发账户同步失败: " + e.getMessage(), e);
-                }
+                } catch (Exception ignored) {}
 
                 Log.d(TAG, "✅ 账户余额已调整: " + account.getName() + " = " + balance);
             }
-            // 情况2: 账户改变了(从oldAccount转到newAccount)
+            // 情况2: 账户改变了
             else {
                 // 恢复旧账户余额
+                Account oldAccount = null;
                 if (oldAccountId != null && !oldAccountId.isEmpty()) {
-                    Account oldAccount = accountDao.getAccountByCloudId(oldAccountId);
-                    if (oldAccount != null) {
-                        double oldBalance = oldAccount.getBalance();
-                        if (oldBill.getType() == 1) {
-                            oldBalance -= oldBill.getAmount(); // 恢复收入
-                        } else {
-                            oldBalance += oldBill.getAmount(); // 恢复支出
-                        }
-                        oldAccount.setBalance(oldBalance);
-                        oldAccount.setUpdatedAt(new Date());
-                        oldAccount.setSyncState(SyncState.TO_UPDATE);
-                        accountDao.update(oldAccount);
-                        try {
-                            AccountSyncWorker.enqueue(context);
-                            Log.d(TAG, "✅ 已触发账户同步任务");
-                        } catch (Exception e) {
-                            Log.e(TAG, "❌ 触发账户同步失败: " + e.getMessage(), e);
-                        }
-                        Log.d(TAG, "✅ 旧账户余额已恢复: " + oldAccount.getName());
-                    }
+                    oldAccount = accountDao.getAccountByCloudId(oldAccountId);
+                }
+                if (oldAccount == null && oldLocalAccountId > 0) {
+                    oldAccount = accountDao.getAccountByLocalId(oldLocalAccountId);
+                }
+
+                if (oldAccount != null) {
+                    double oldBalance = oldAccount.getBalance();
+                    if (oldBill.getType() == 1) oldBalance -= oldBill.getAmount();
+                    else oldBalance += oldBill.getAmount();
+                    
+                    oldAccount.setBalance(oldBalance);
+                    oldAccount.setUpdatedAt(new Date());
+                    oldAccount.setSyncState(SyncState.TO_UPDATE);
+                    accountDao.update(oldAccount);
+                    try { AccountSyncWorker.enqueue(context); } catch (Exception ignored) {}
                 }
 
                 // 更新新账户余额
+                Account newAccount = null;
                 if (newAccountId != null && !newAccountId.isEmpty()) {
-                    Account newAccount = accountDao.getAccountByCloudId(newAccountId);
-                    if (newAccount != null) {
-                        double newBalance = newAccount.getBalance();
-                        if (newBill.getType() == 1) {
-                            newBalance += newBill.getAmount(); // 新收入
-                        } else {
-                            newBalance -= newBill.getAmount(); // 新支出
-                        }
-                        newAccount.setBalance(newBalance);
-                        newAccount.setUpdatedAt(new Date());
-                        newAccount.setSyncState(SyncState.TO_UPDATE);
-                        accountDao.update(newAccount);
-                        try {
-                            AccountSyncWorker.enqueue(context);
-                            Log.d(TAG, "✅ 已触发账户同步任务");
-                        } catch (Exception e) {
-                            Log.e(TAG, "❌ 触发账户同步失败: " + e.getMessage(), e);
-                        }
-                        Log.d(TAG, "✅ 新账户余额已更新: " + newAccount.getName());
-                    }
+                    newAccount = accountDao.getAccountByCloudId(newAccountId);
+                }
+                if (newAccount == null && newLocalAccountId > 0) {
+                    newAccount = accountDao.getAccountByLocalId(newLocalAccountId);
+                }
+
+                if (newAccount != null) {
+                    double newBalance = newAccount.getBalance();
+                    if (newBill.getType() == 1) newBalance += newBill.getAmount();
+                    else newBalance -= newBill.getAmount();
+                    
+                    newAccount.setBalance(newBalance);
+                    newAccount.setUpdatedAt(new Date());
+                    newAccount.setSyncState(SyncState.TO_UPDATE);
+                    accountDao.update(newAccount);
+                    try { AccountSyncWorker.enqueue(context); } catch (Exception ignored) {}
                 }
             }
         } catch (Exception e) {
@@ -444,15 +467,25 @@ public class BillRepository {
      * @param bill 被删除的账单
      */
     private void restoreAccountBalanceForDeletedBill(Bill bill) {
-        if (bill.getAccountId() == null || bill.getAccountId().isEmpty()) {
-            Log.d(TAG, "⚠️ 账单未关联账户,跳过余额恢复");
+        String accountId = bill.getAccountId();
+        long localAccountId = bill.getLocalAccountId();
+
+        if ((accountId == null || accountId.isEmpty()) && localAccountId <= 0) {
+            Log.d(TAG, "⚠️ 账单未关联任何账户(云端或本地),跳过余额恢复");
             return;
         }
 
         try {
-            Account account = accountDao.getAccountByCloudId(bill.getAccountId());
+            Account account = null;
+            if (accountId != null && !accountId.isEmpty()) {
+                account = accountDao.getAccountByCloudId(accountId);
+            }
+            if (account == null && localAccountId > 0) {
+                account = accountDao.getAccountByLocalId(localAccountId);
+            }
+
             if (account == null) {
-                Log.w(TAG, "⚠️ 未找到账户: " + bill.getAccountId());
+                Log.w(TAG, "⚠️ 未找到对应账户: cloud=" + accountId + ", local=" + localAccountId);
                 return;
             }
 
@@ -498,12 +531,12 @@ public class BillRepository {
      * @param toAccountId 目标账户ID
      * @param callback 回调
      */
-    public void migrateBillsToAccount(String fromAccountId, String toAccountId,
+    public void migrateBillsToAccount(String fromAccountId, long fromLocalId, String toAccountId,
                                       ApiResponse.Callback<Integer> callback) {
         executors.diskIO().execute(() -> {
             try {
                 // 1. 查询原账户下的所有账单
-                List<Bill> bills = billDao.getBillsByAccountSync(fromAccountId);
+                List<Bill> bills = billDao.getBillsByAccountSync(fromAccountId, fromLocalId);
 
                 if (bills == null || bills.isEmpty()) {
                     Log.d(TAG, "⚠️ 没有需要迁移的账单");
@@ -621,11 +654,11 @@ public class BillRepository {
      * @param accountId 账户ID
      * @param callback 回调
      */
-    public void setBillsToNoAccount(String accountId, ApiResponse.Callback<Integer> callback) {
+    public void setBillsToNoAccount(String accountId, long localAccountId, ApiResponse.Callback<Integer> callback) {
         executors.diskIO().execute(() -> {
             try {
                 // 1. 查询账户下的所有账单
-                List<Bill> bills = billDao.getBillsByAccountSync(accountId);
+                List<Bill> bills = billDao.getBillsByAccountSync(accountId, localAccountId);
 
                 if (bills == null || bills.isEmpty()) {
                     Log.d(TAG, "⚠️ 没有需要处理的账单");
@@ -638,7 +671,13 @@ public class BillRepository {
                 Log.d(TAG, "📦 开始设置账单为无账户: " + bills.size() + " 条");
 
                 // 2. 获取账户（用于恢复余额）
-                Account account = accountDao.getAccountByCloudId(accountId);
+                Account account = null;
+                if (accountId != null && !accountId.isEmpty()) {
+                    account = accountDao.getAccountByCloudId(accountId);
+                }
+                if (account == null && localAccountId > 0) {
+                    account = accountDao.getAccountByLocalId(localAccountId);
+                }
 
                 // 3. 逐条设置账单并恢复余额
                 int successCount = 0;
@@ -657,10 +696,8 @@ public class BillRepository {
                         // 恢复余额（与删除账单逻辑相同）
                         if (billType == 1) {
                             balance -= amount; // 删除收入
-                            Log.d(TAG, "🔄 恢复收入: " + amount + ", 余额: " + balance);
                         } else {
                             balance += amount; // 删除支出
-                            Log.d(TAG, "🔄 恢复支出: " + amount + ", 余额: " + balance);
                         }
 
                         account.setBalance(balance);
@@ -668,6 +705,7 @@ public class BillRepository {
 
                     // 3.2 设置账单为无账户
                     bill.setAccountId(null);
+                    bill.setLocalAccountId(-1); // 🔴 修复：同时重置本地 ID
                     bill.setUpdatedAt(now);
                     bill.setSyncState(SyncState.TO_UPDATE);
 

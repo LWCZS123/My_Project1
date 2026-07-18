@@ -28,6 +28,9 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
 
     public interface OnAccountClickListener {
         void onAccountClick(Account account);
+        void onAccountDelete(Account account);
+        void onAccountHide(Account account);
+        void onAccountEdit(Account account);
     }
 
     public void setOnAccountClickListener(OnAccountClickListener listener) {
@@ -148,8 +151,22 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
             }
 
             // 点击事件
-            binding.getRoot().setOnClickListener(v -> {
+            binding.contentView.setOnClickListener(v -> {
                 if (listener != null) listener.onAccountClick(account);
+            });
+
+            // 菜单点击事件
+            binding.btnDelete.setOnClickListener(v -> {
+                if (listener != null) listener.onAccountDelete(account);
+                binding.swipeLayout.quickClose();
+            });
+            binding.btnHide.setOnClickListener(v -> {
+                if (listener != null) listener.onAccountHide(account);
+                binding.swipeLayout.quickClose();
+            });
+            binding.btnEdit.setOnClickListener(v -> {
+                if (listener != null) listener.onAccountEdit(account);
+                binding.swipeLayout.quickClose();
             });
         }
     }

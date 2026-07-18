@@ -268,8 +268,8 @@ public class BillDetailActivity extends AppCompatActivity {
             binding.tvAmount.setTextColor(getColor(R.color.green));
         }
 
-        // 4. 根据accountId获取账户名称
-        loadAccountName(bill.getAccountId());
+        // 4. 根据accountId或localAccountId获取账户名称
+        loadAccountName(bill.getAccountId(), bill.getLocalAccountId());
 
         // 5. 时间
         if (bill.getBillTime() != null) {
@@ -323,26 +323,39 @@ public class BillDetailActivity extends AppCompatActivity {
     /**
      * 根据accountId加载账户名称
      */
-    private void loadAccountName(String accountId) {
-        if (accountId == null || accountId.isEmpty()) {
+    private void loadAccountName(String accountId, long localAccountId) {
+        if ((accountId == null || accountId.isEmpty()) && localAccountId <= 0) {
             binding.tvAccount.setText("未设置");
             return;
         }
 
         binding.tvAccount.setText("加载中...");
 
-        accountViewModel.getAccountNameById(accountId, new AccountViewModel.ResultCallback() {
-            @Override
-            public void onResult(boolean success, String accountName) {
-                if (success && accountName != null) {
-                    binding.tvAccount.setText(accountName);
-                    Log.d(TAG, "✅ 账户名称加载成功: " + accountName);
-                } else {
-                    binding.tvAccount.setText("未知账户");
-                    Log.e(TAG, "❌ 账户名称加载失败: accountId=" + accountId);
+        if (accountId != null && !accountId.isEmpty()) {
+            accountViewModel.getAccountNameById(accountId, new AccountViewModel.ResultCallback() {
+                @Override
+                public void onResult(boolean success, String accountName) {
+                    updateAccountNameUI(success, accountName, accountId);
                 }
-            }
-        });
+            });
+        } else {
+            accountViewModel.getAccountNameByLocalId(localAccountId, new AccountViewModel.ResultCallback() {
+                @Override
+                public void onResult(boolean success, String accountName) {
+                    updateAccountNameUI(success, accountName, String.valueOf(localAccountId));
+                }
+            });
+        }
+    }
+
+    private void updateAccountNameUI(boolean success, String accountName, String id) {
+        if (success && accountName != null) {
+            binding.tvAccount.setText(accountName);
+            Log.d(TAG, "✅ 账户名称加载成功: " + accountName);
+        } else {
+            binding.tvAccount.setText("未知账户");
+            Log.e(TAG, "❌ 账户名称加载失败: id=" + id);
+        }
     }
 
     /**

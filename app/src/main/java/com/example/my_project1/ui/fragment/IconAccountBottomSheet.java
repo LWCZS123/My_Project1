@@ -199,7 +199,7 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
 
             if (sheet != null) {
                 sheet.setBackground(
-                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet)
+                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1)
                 );
 
                 ViewGroup.LayoutParams params = sheet.getLayoutParams();

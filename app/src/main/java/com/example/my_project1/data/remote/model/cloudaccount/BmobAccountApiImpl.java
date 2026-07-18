@@ -5,7 +5,6 @@ import android.util.Log;
 
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.SyncState;
-import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.BmobPointerUtil;
 
 import java.util.List;
@@ -25,11 +24,6 @@ import cn.bmob.v3.listener.UpdateListener;
  *   - 上传 / 更新 / 删除 账户(Account)
  *   - 拉取当前用户的账户及分组
  *   - 与本地 Room 数据表同步
- *
- * 说明：
- *   - 所有方法均基于 Bmob SDK 的异步回调接口（SaveListener / UpdateListener / FindListener）
- *   - Repository 层可封装成协程、LiveData 或 RxJava 形式使用
- *   - CloudAccount / CloudAccountGroup 在 Bmob 云端需建立对应表结构
  */
 public class BmobAccountApiImpl {
 
@@ -43,7 +37,6 @@ public class BmobAccountApiImpl {
         this.db = AppDatabase.getInstance(this.context);
     }
 
-    // 无参构造器（用于单元测试或静态调用）
     public BmobAccountApiImpl() {
         this.context = null;
         this.db = null;
@@ -51,7 +44,7 @@ public class BmobAccountApiImpl {
 
     /** 获取当前登录用户 ID */
     public String getCurrentUserId() {
-        BmobUser user = BmobUser.getCurrentUser(BmobUser.class);
+        BmobUser user = BmobUser.getCurrentUser();
         return user != null ? user.getObjectId() : null;
     }
 
@@ -59,7 +52,7 @@ public class BmobAccountApiImpl {
     // 🟢 账户组（AccountGroup）部分
     // ----------------------------------------------------------------------
 
-    /** 上传账户组 */
+    /** 上传账户组 (异步) */
     public void uploadAccountGroup(com.example.my_project1.data.model.account.AccountGroup localGroup, SaveListener<String> listener) {
         AccountGroup cloud = AccountGroup.fromLocal(localGroup);
         cloud.setUser(BmobPointerUtil.user(getCurrentUserId()));
@@ -68,55 +61,39 @@ public class BmobAccountApiImpl {
             @Override
             public void done(String objectId, BmobException e) {
                 if (e == null) {
-                    Log.d(TAG, "✅ 上传账户组成功: " + objectId);
                     localGroup.setObjectId(objectId);
                     localGroup.setSyncState(SyncState.SYNCED);
                     listener.done(objectId, null);
                 } else {
-                    Log.e(TAG, "❌ 上传账户组失败: " + e.getMessage());
                     listener.done(null, e);
                 }
             }
         });
     }
 
-    /** 更新账户组 */
+    /** 更新账户组 (异步) */
     public void updateAccountGroup(com.example.my_project1.data.model.account.AccountGroup localGroup, UpdateListener listener) {
         if (localGroup.getObjectId() == null) {
             listener.done(new BmobException(900, "cloudId为空，无法更新账户组"));
             return;
         }
-
         AccountGroup cloud = AccountGroup.fromLocal(localGroup);
-
-        cloud.update(localGroup.getObjectId(), new UpdateListener() {
-            @Override
-            public void done(BmobException e) {
-                if (e == null) {
-                    Log.d(TAG, "✅ 更新账户组成功: " + localGroup.getName());
-                    localGroup.setSyncState(SyncState.SYNCED);
-                    listener.done(null);
-                } else {
-                    Log.e(TAG, "❌ 更新账户组失败: " + e.getMessage());
-                    listener.done(e);
-                }
-            }
-        });
+        cloud.setObjectId(localGroup.getObjectId());
+        cloud.update(localGroup.getObjectId(), listener);
     }
 
-    /** 删除账户组 */
+    /** 删除账户组 (异步) */
     public void deleteAccountGroup(String cloudId, UpdateListener listener) {
         if (cloudId == null) {
             listener.done(new BmobException(901, "cloudId为空，无法删除账户组"));
             return;
         }
-
         AccountGroup cloud = new AccountGroup();
         cloud.setObjectId(cloudId);
         cloud.delete(listener);
     }
 
-    /** 拉取用户的所有账户组 */
+    /** 拉取用户的所有账户组 (异步) */
     public void fetchAccountGroups(FindListener<AccountGroup> listener) {
         String userId = getCurrentUserId();
         if (userId == null) {
@@ -129,204 +106,141 @@ public class BmobAccountApiImpl {
         query.findObjects(listener);
     }
 
+    /**
+     * 🔴 同步上传账户组 (阻塞)
+     * 用于后台同步任务，包含去重逻辑
+     */
+    public boolean uploadAccountGroupSync(com.example.my_project1.data.model.account.AccountGroup local) {
+        try {
+            String userId = getCurrentUserId();
+            if (userId == null) return false;
+
+            AccountGroup cloud = AccountGroup.fromLocal(local);
+            cloud.setUser(BmobPointerUtil.user(userId));
+
+            String cloudId = local.getObjectId();
+            if (cloudId == null || cloudId.isEmpty()) {
+                // 1. 去重检查：根据名称查找该用户下是否已存在同名组
+                BmobQuery<AccountGroup> query = new BmobQuery<>();
+                query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
+                query.addWhereEqualTo("name", local.getName());
+                List<AccountGroup> existing = query.findObjectsSync(AccountGroup.class);
+                
+                if (existing != null && !existing.isEmpty()) {
+                    cloudId = existing.get(0).getObjectId();
+                    Log.d(TAG, "♻️ 云端已存在同名账户组: " + local.getName() + " -> " + cloudId);
+                } else {
+                    // 2. 创建新账户组
+                    cloudId = cloud.saveSync();
+                    if (cloudId == null || cloudId.isEmpty()) return false;
+                    Log.d(TAG, "✅ 同步创建账户组成功: " + local.getName() + " -> " + cloudId);
+                }
+                local.setObjectId(cloudId);
+            } else {
+                // 更新现有账户组
+                cloud.setObjectId(cloudId);
+                cloud.updateSync(cloudId);
+                Log.d(TAG, "✅ 同步更新账户组成功: " + local.getName());
+            }
+
+            local.setSyncState(SyncState.SYNCED);
+            if (db != null) {
+                db.accountDao().updateGroup(local);
+            }
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "❌ 同步上传账户组失败: " + e.getMessage(), e);
+            return false;
+        }
+    }
+
     // ----------------------------------------------------------------------
     // 🟡 账户（Account）部分
     // ----------------------------------------------------------------------
 
-    /** 上传账户 */
+    /** 上传账户 (异步) */
     public void uploadAccount(com.example.my_project1.data.model.account.Account local, SaveListener<String> listener) {
         String userId = getCurrentUserId();
         if (userId == null) {
             listener.done(null, new BmobException(903, "用户未登录"));
             return;
         }
-
         Account cloud = Account.fromLocal(local);
-        cloud.setUser(BmobPointerUtil.user(getCurrentUserId()));
-
-        // 关联账户组（如果存在 groupCloudId）
+        cloud.setUser(BmobPointerUtil.user(userId));
         if (local.getGroupId() != null) {
             cloud.setGroup(BmobPointerUtil.group(local.getGroupId()));
         }
-
-        cloud.save(new SaveListener<String>() {
-            @Override
-            public void done(String objectId, BmobException e) {
-                if (e == null) {
-                    Log.d(TAG, "✅ 上传账户成功: " + local.getName());
-                    local.setObjectId(objectId);
-                    local.setSyncState(SyncState.SYNCED);
-                    listener.done(objectId, null);
-                } else {
-                    Log.e(TAG, "❌ 上传账户失败: " + e.getMessage());
-                    listener.done(null, e);
-                }
-            }
-        });
+        cloud.save(listener);
     }
 
-
-    /**
-     * 🔴 新增：同步上传单个账户组（阻塞）
-     */
-    public boolean uploadAccountGroupSync(com.example.my_project1.data.model.account.AccountGroup local) {
-        try {
-            AccountGroup cloud = AccountGroup.fromLocal(local);
-            cloud.setUser(BmobPointerUtil.user(getCurrentUserId()));
-
-            String cloudId;
-            if (local.getObjectId() == null || local.getObjectId().isEmpty()) {
-                // 创建新账户组
-                cloudId = cloud.saveSync();
-                local.setObjectId(cloudId);
-                Log.d(TAG, "✅ 同步创建账户组成功: " + local.getName() + " -> " + cloudId);
-            } else {
-                // 更新现有账户组
-                cloud.updateSync(local.getObjectId());
-                cloudId = local.getObjectId();
-                Log.d(TAG, "✅ 同步更新账户组成功: " + local.getName());
-            }
-
-            local.setSyncState(SyncState.SYNCED);
-
-            if (db != null) {
-                AppExecutors.get().diskIO().execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        db.accountDao().updateGroup(local);
-                    }
-                });
-            }
-
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "❌ 同步上传账户组失败: " + e.getMessage(), e);
-            return false;
-        }
-    }
-
-    /**
-     * 🔴 新增：同步上传单个账户组（阻塞）
-     */
-    public boolean uploadAccountSync(com.example.my_project1.data.model.account.AccountGroup local) {
-        try {
-            AccountGroup cloud = AccountGroup.fromLocal(local);
-            cloud.setUser(BmobPointerUtil.user(getCurrentUserId()));
-
-            String cloudId;
-            if (local.getObjectId() == null || local.getObjectId().isEmpty()) {
-                // 创建新账户组
-                cloudId = cloud.saveSync();
-                local.setObjectId(cloudId);
-                Log.d(TAG, "✅ 同步创建账户组成功: " + local.getName() + " -> " + cloudId);
-            } else {
-                // 更新现有账户组
-                cloud.updateSync(local.getObjectId());
-                cloudId = local.getObjectId();
-                Log.d(TAG, "✅ 同步更新账户组成功: " + local.getName());
-            }
-
-            local.setSyncState(SyncState.SYNCED);
-
-            if (db != null) {
-                AppExecutors.get().diskIO().execute(() -> db.accountDao().updateGroup(local));
-            }
-
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "❌ 同步上传账户组失败: " + e.getMessage(), e);
-            return false;
-        }
-    }
-
-    /** 更新账户 */
+    /** 更新账户 (异步) */
     public void updateAccount(com.example.my_project1.data.model.account.Account local, UpdateListener listener) {
         if (local.getObjectId() == null) {
             listener.done(new BmobException(904, "cloudId为空，无法更新账户"));
             return;
         }
-
         Account cloud = Account.fromLocal(local);
-
+        cloud.setObjectId(local.getObjectId());
         if (local.getGroupId() != null) {
             cloud.setGroup(BmobPointerUtil.group(local.getGroupId()));
         }
-
-        cloud.update(local.getObjectId(), new UpdateListener() {
-            @Override
-            public void done(BmobException e) {
-                if (e == null) {
-                    Log.d(TAG, "✅ 更新账户成功: " + local.getName());
-                    local.setSyncState(SyncState.SYNCED);
-                    listener.done(null);
-                } else {
-                    Log.e(TAG, "❌ 更新账户失败: " + e.getMessage());
-                    listener.done(e);
-                }
-            }
-        });
+        cloud.update(local.getObjectId(), listener);
     }
 
-    /** 删除账户 */
+    /** 删除账户 (异步) */
     public void deleteAccount(String cloudId, UpdateListener listener) {
         if (cloudId == null) {
             listener.done(new BmobException(905, "cloudId为空，无法删除账户"));
             return;
         }
-
         Account cloud = new Account();
         cloud.setObjectId(cloudId);
         cloud.delete(listener);
     }
 
-    /** 拉取当前用户的所有账户 */
+    /** 拉取当前用户的所有账户 (异步) */
     public void fetchAccounts(FindListener<Account> listener) {
         String userId = getCurrentUserId();
         if (userId == null) {
             listener.done(null, new BmobException(906, "用户未登录"));
             return;
         }
-
         BmobQuery<Account> query = new BmobQuery<>();
         query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
-        query.include("group"); // 展开账户组对象
+        query.include("group");
         query.order("createdAt");
         query.findObjects(listener);
     }
 
-    // ----------------------------------------------------------------------
-    // 🧩 同步接口（同步方法，仅在后台任务或初始化使用）
-    // ----------------------------------------------------------------------
-
-    /** 同步上传单个账户（阻塞） */
+    /** 同步上传单个账户 (阻塞) */
     public boolean uploadAccountSync(com.example.my_project1.data.model.account.Account local) {
         try {
-            Account cloud = Account.fromLocal(local);
-            cloud.setUser(BmobPointerUtil.user(getCurrentUserId()));
+            String userId = getCurrentUserId();
+            if (userId == null) return false;
 
-            // 关联账户组（如果存在 groupCloudId）
+            Account cloud = Account.fromLocal(local);
+            cloud.setUser(BmobPointerUtil.user(userId));
+
+            // 关联账户组 (确保使用 objectId)
             if (local.getGroupId() != null && !local.getGroupId().isEmpty()) {
                 cloud.setGroup(BmobPointerUtil.group(local.getGroupId()));
             }
 
-            String cloudId;
-            if (local.getObjectId() == null || local.getObjectId().isEmpty()) {
-                // 🔴 新建：直接 saveSync，由云端分配 objectId
+            String cloudId = local.getObjectId();
+            if (cloudId == null || cloudId.isEmpty()) {
+                // 🔴 关键逻辑：如果 group 还是本地临时 ID，上传会失败。
+                // 但 Worker 逻辑保证了 Group 先同步，所以此时 groupId 应该是 objectId。
                 cloudId = cloud.saveSync();
+                if (cloudId == null || cloudId.isEmpty()) return false;
                 local.setObjectId(cloudId);
             } else {
-                // 🔴 修复：必须先把 objectId 设置到 cloud 对象本身，
-                //    Bmob updateSync 内部通过 getObjectId() 构建 URL，
-                //    如果 objectId 为空，请求体序列化为 null，导致 NPE。
-                cloud.setObjectId(local.getObjectId());
-                cloud.updateSync(local.getObjectId());
-                cloudId = local.getObjectId();
+                cloud.setObjectId(cloudId);
+                cloud.updateSync(cloudId);
             }
 
             local.setSyncState(SyncState.SYNCED);
-
             if (db != null) {
-                AppExecutors.get().diskIO().execute(() -> db.accountDao().update(local));
+                db.accountDao().update(local);
             }
 
             Log.d(TAG, "✅ 同步上传账户成功: " + local.getName() + " -> " + cloudId);

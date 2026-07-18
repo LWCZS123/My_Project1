@@ -58,12 +58,13 @@
                     android:textSize="12sp" />
             </RelativeLayout>
 
-            <!-- 账单列表容器 (动态添加 item_bill_inner) -->
-            <LinearLayout
-                android:id="@+id/llBillContainer"
+            <!-- 账单列表容器 (改为 RecyclerView 提升性能) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvBills"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </LinearLayout>

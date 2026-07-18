@@ -50,6 +50,9 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     public interface OnBillClickListener {
         void onBillClick(Bill bill);
+        void onBillDelete(Bill bill);
+        void onBillRefund(Bill bill);
+        void onBillEdit(Bill bill);
     }
 
     public AccountBillAdapter(Context context) {
@@ -58,6 +61,13 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     public void setOnBillClickListener(OnBillClickListener listener) {
         this.listener = listener;
+    }
+
+    public Object getItem(int position) {
+        if (position >= 0 && position < displayItems.size()) {
+            return displayItems.get(position);
+        }
+        return null;
     }
 
     /**
@@ -226,17 +236,41 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         }
     }
 
-    class BillViewHolder extends RecyclerView.ViewHolder {
+    public class BillViewHolder extends RecyclerView.ViewHolder {
         private final ItemAccountTransactionBinding binding;
 
         BillViewHolder(ItemAccountTransactionBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
             
-            binding.getRoot().setOnClickListener(v -> {
+            binding.contentView.setOnClickListener(v -> {
                 int pos = getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && listener != null) {
                     listener.onBillClick((Bill) displayItems.get(pos));
+                }
+            });
+
+            binding.btnDelete.setOnClickListener(v -> {
+                int pos = getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && listener != null) {
+                    listener.onBillDelete((Bill) displayItems.get(pos));
+                    binding.swipeLayout.quickClose();
+                }
+            });
+
+            binding.btnRefund.setOnClickListener(v -> {
+                int pos = getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && listener != null) {
+                    listener.onBillRefund((Bill) displayItems.get(pos));
+                    binding.swipeLayout.quickClose();
+                }
+            });
+
+            binding.btnEdit.setOnClickListener(v -> {
+                int pos = getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && listener != null) {
+                    listener.onBillEdit((Bill) displayItems.get(pos));
+                    binding.swipeLayout.quickClose();
                 }
             });
         }
@@ -273,6 +307,26 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             String balanceLabel = isCredit ? "欠款: " : "余额: ";
             double displayBalance = isCredit ? Math.abs(balanceAfter) : balanceAfter;
             binding.tvBalanceAfter.setText(balanceLabel + "¥" + df.format(displayBalance));
+
+            // 侧滑菜单点击
+            binding.btnDelete.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onBillDelete(bill);
+                    binding.swipeLayout.quickClose();
+                }
+            });
+            binding.btnRefund.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onBillRefund(bill);
+                    binding.swipeLayout.quickClose();
+                }
+            });
+            binding.btnEdit.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onBillEdit(bill);
+                    binding.swipeLayout.quickClose();
+                }
+            });
         }
     }
 

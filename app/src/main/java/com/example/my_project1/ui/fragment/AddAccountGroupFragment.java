@@ -193,7 +193,7 @@ public class AddAccountGroupFragment extends BottomSheetDialogFragment {
 
             if (bottomSheet != null) {
                 bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.bg_bottom_sheet));
+                        R.drawable.bg_bottom_sheet1));
 
                 ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();
                 params.height = (int) (getScreenHeight() * 0.75);

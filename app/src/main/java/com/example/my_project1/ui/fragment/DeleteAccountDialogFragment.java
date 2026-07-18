@@ -14,6 +14,7 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.databinding.FragmentDeleteAccountDialogBinding;
 import com.example.my_project1.utils.ImageLoaderUtils;
+import com.example.my_project1.utils.SnackbarUtils;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
@@ -111,7 +112,7 @@ public class DeleteAccountDialogFragment extends BottomSheetDialogFragment {
 
             if (bottomSheet != null) {
                 bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.bg_bottom_sheet));
+                        R.drawable.bg_bottom_sheet1));
 
                 ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();
                 params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -129,9 +130,11 @@ public class DeleteAccountDialogFragment extends BottomSheetDialogFragment {
 
     // ==================== 初始化 ====================
 
+    private int currentMode = 1; // 0: delete all, 1: keep bills, 2: migrate
+
     private void setupUI() {
         // 设置标题
-        binding.tvTitle.setText("删除账户");
+        binding.tvTitle.setText("账户处理策略");
 
         // 设置账户名称
         binding.tvAccountName.setText(accountName);
@@ -144,20 +147,35 @@ public class DeleteAccountDialogFragment extends BottomSheetDialogFragment {
         // 根据是否有账单显示不同的提示信息
         if (hasBills) {
             binding.viewInfoCard.setVisibility(View.VISIBLE);
-            binding.tvInfo.setText("发现该账户下有账单，请先迁移。点击迁入账户选择（若不选择这些账单将被设置为无账户）");
-            binding.layoutTargetAccount.setVisibility(View.VISIBLE);
-            binding.btnMigrate.setText("迁移并删除");
+            updateModeUI(1); // 默认保留账单
         } else {
             binding.viewInfoCard.setVisibility(View.GONE);
-            binding.layoutTargetAccount.setVisibility(View.GONE);
-            binding.ivArrow.setVisibility(View.GONE);
+            binding.layoutMigrationDisplay.setVisibility(View.GONE);
             binding.btnMigrate.setText("确认删除");
+        }
+    }
+
+    private void updateModeUI(int mode) {
+        currentMode = mode;
+        binding.layoutOptionDeleteAll.setBackgroundResource(mode == 0 ? R.drawable.bg_delete_option_selected : R.drawable.bg_delete_option_unselected);
+        binding.layoutOptionKeepBills.setBackgroundResource(mode == 1 ? R.drawable.bg_delete_option_selected : R.drawable.bg_delete_option_unselected);
+        binding.layoutOptionMigrate.setBackgroundResource(mode == 2 ? R.drawable.bg_delete_option_selected : R.drawable.bg_delete_option_unselected);
+
+        if (mode == 2) {
+            binding.layoutMigrationDisplay.setVisibility(View.VISIBLE);
+        } else {
+            binding.layoutMigrationDisplay.setVisibility(View.GONE);
         }
     }
 
     private void setupListeners() {
         // 取消按钮
         binding.btnCancel.setOnClickListener(v -> dismiss());
+
+        // 选项点击
+        binding.layoutOptionDeleteAll.setOnClickListener(v -> updateModeUI(0));
+        binding.layoutOptionKeepBills.setOnClickListener(v -> updateModeUI(1));
+        binding.layoutOptionMigrate.setOnClickListener(v -> updateModeUI(2));
 
         // 点击选择目标账户
         binding.layoutTargetAccount.setOnClickListener(v -> {
@@ -170,23 +188,24 @@ public class DeleteAccountDialogFragment extends BottomSheetDialogFragment {
         binding.btnMigrate.setOnClickListener(v -> handleMigrateOrDelete());
     }
 
-    // ==================== 业务逻辑 ====================
-
     /**
      * 处理迁移或删除操作
      */
     private void handleMigrateOrDelete() {
         if (hasBills) {
-            // 有账单的情况
-            if (selectedTargetAccount != null) {
-                // 用户选择了迁移账户
-                if (listener != null) {
-                    listener.onMigrateAndDelete(selectedTargetAccount);
-                }
+            if (currentMode == 0) {
+                if (listener != null) listener.onDeleteAll();
                 dismiss();
-            } else {
-                // 用户没有选择迁移账户，弹出验证码对话框
-                showVerificationDialog();
+            } else if (currentMode == 1) {
+                if (listener != null) listener.onDeleteWithoutMigration();
+                dismiss();
+            } else if (currentMode == 2) {
+                if (selectedTargetAccount != null) {
+                    if (listener != null) listener.onMigrateAndDelete(selectedTargetAccount);
+                    dismiss();
+                } else {
+                    SnackbarUtils.showWarning(binding.getRoot(), "请选择迁入的目标账户");
+                }
             }
         } else {
             // 没有账单，直接删除
@@ -266,6 +285,11 @@ public class DeleteAccountDialogFragment extends BottomSheetDialogFragment {
          * 不迁移，直接删除（账单设置为无账户）
          */
         void onDeleteWithoutMigration();
+
+        /**
+         * 删除账户及所有账单
+         */
+        void onDeleteAll();
 
         /**
          * 直接删除（无账单的情况）

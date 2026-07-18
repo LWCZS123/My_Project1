@@ -1,86 +1,167 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.example.my_project1.utils.ui.SwipeMenuLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/swipeLayout"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
-    android:paddingHorizontal="16dp"
-    android:paddingVertical="12dp">
+    android:layout_height="wrap_content">
 
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/iv_category_icon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_category"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:shapeAppearanceOverlay="@style/CircleAppearance" />
-
-    <TextView
-        android:id="@+id/tv_category_name"
-        android:layout_width="wrap_content"
+    <!-- 1. 正面内容 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/contentView"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:text="理发"
-        android:textColor="#333333"
-        android:textSize="15sp"
-        android:textStyle="bold"
-        app:layout_constraintStart_toEndOf="@+id/iv_category_icon"
-        app:layout_constraintTop_toTopOf="@+id/iv_category_icon" />
+        android:background="#FFFFFF"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="12dp">
 
-    <TextView
-        android:id="@+id/tv_transaction_time"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:ellipsize="end"
-        android:singleLine="true"
-        android:text="07-18 00:34 · 备注"
-        android:textColor="#999999"
-        android:textSize="12sp"
-        app:layout_constraintEnd_toStartOf="@+id/ll_amount_area"
-        app:layout_constraintStart_toStartOf="@+id/tv_category_name"
-        app:layout_constraintTop_toBottomOf="@+id/tv_category_name" />
-
-    <LinearLayout
-        android:id="@+id/ll_amount_area"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="end"
-        android:orientation="vertical"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        <ImageView
+            android:id="@+id/iv_category_icon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:background="@drawable/bg_circle_grey"
+            android:src="@drawable/ic_category"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:shapeAppearanceOverlay="@style/CircleAppearance" />
 
         <TextView
-            android:id="@+id/tv_amount"
+            android:id="@+id/tv_category_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="-¥96.00"
-            android:textColor="#FF6B6B"
+            android:layout_marginStart="12dp"
+            android:text="理发"
+            android:textColor="#2D3436"
             android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            app:layout_constraintStart_toEndOf="@+id/iv_category_icon"
+            app:layout_constraintTop_toTopOf="@+id/iv_category_icon" />
 
         <TextView
-            android:id="@+id/tv_balance_after"
-            android:layout_width="wrap_content"
+            android:id="@+id/tv_transaction_time"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="欠款: ¥58,965.00"
-            android:textColor="#999999"
-            android:textSize="11sp" />
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="07-18 00:34 · 备注"
+            android:textColor="#636E72"
+            android:textSize="12sp"
+            app:layout_constraintEnd_toStartOf="@+id/ll_amount_area"
+            app:layout_constraintStart_toStartOf="@+id/tv_category_name"
+            app:layout_constraintTop_toBottomOf="@+id/tv_category_name" />
+
+        <LinearLayout
+            android:id="@+id/ll_amount_area"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/tv_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-¥96.00"
+                android:textColor="#E74C3C"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_balance_after"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="欠款: ¥58,965.00"
+                android:textColor="#999999"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 2. 侧滑菜单 (退款、编辑、删除) -->
+    <LinearLayout
+        android:id="@+id/menuView"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <!-- 退款 (蓝色) -->
+        <LinearLayout
+            android:id="@+id/btnRefund"
+            android:layout_width="70dp"
+            android:layout_height="match_parent"
+            android:background="#F8F9FA"
+            android:gravity="center"
+            android:orientation="vertical">
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_circle_blue"
+                android:src="@drawable/ic_convert"
+                app:tint="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="退款"
+                android:textColor="#666666"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- 编辑 (黑色) -->
+        <LinearLayout
+            android:id="@+id/btnEdit"
+            android:layout_width="70dp"
+            android:layout_height="match_parent"
+            android:background="#F8F9FA"
+            android:gravity="center"
+            android:orientation="vertical">
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_circle_gray"
+                android:src="@drawable/ic_edit"
+                app:tint="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="编辑"
+                android:textColor="#666666"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- 删除 (红色) -->
+        <LinearLayout
+            android:id="@+id/btnDelete"
+            android:layout_width="70dp"
+            android:layout_height="match_parent"
+            android:background="#F8F9FA"
+            android:gravity="center"
+            android:orientation="vertical">
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_circle_red"
+                android:src="@drawable/ic_trash"
+                app:tint="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="删除"
+                android:textColor="#666666"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
     </LinearLayout>
 
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0.5dp"
-        android:layout_marginTop="12dp"
-        android:background="#EEEEEE"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_category_name" />
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+</com.example.my_project1.utils.ui.SwipeMenuLayout>

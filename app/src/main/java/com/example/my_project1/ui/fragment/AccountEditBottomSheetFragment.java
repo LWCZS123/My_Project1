@@ -278,6 +278,11 @@ public class AccountEditBottomSheetFragment extends BottomSheetDialogFragment {
                 }
 
                 @Override
+                public void onDeleteAll() {
+                    deleteAllBillsAndAccount();
+                }
+
+                @Override
                 public void onDirectDelete() {
                     directDeleteAccount();
                 }
@@ -323,8 +328,8 @@ public class AccountEditBottomSheetFragment extends BottomSheetDialogFragment {
         // 🔑 设置标记，等待迁移完成
         isWaitingForMigration = true;
 
-        // 🔑 调用 ViewModel 方法（无回调）
-        billViewModel.migrateBillsToAccount(accountId, targetAccount.getObjectId());
+        // 🔑 调用 ViewModel 方法
+        billViewModel.migrateBillsToAccount(accountId, account_id, targetAccount.getObjectId());
     }
 
     /**
@@ -368,8 +373,26 @@ public class AccountEditBottomSheetFragment extends BottomSheetDialogFragment {
         // 🔑 设置标记，等待设置完成
         isWaitingForSetNoAccount = true;
 
-        // 🔑 调用 ViewModel 方法（无回调）
-        billViewModel.setBillsToNoAccount(accountId);
+        // 🔑 调用 ViewModel 方法 (传入 objectId 和 localId)
+        billViewModel.setBillsToNoAccount(accountId, account_id);
+    }
+
+    /**
+     * 🔴 删除账户及所有账单（新增）
+     */
+    private void deleteAllBillsAndAccount() {
+        if (accountId == null && account_id <= 0) {
+            SnackbarUtils.showError(binding.getRoot(), "当前账户为空");
+            return;
+        }
+
+        Log.d(TAG, "🗑️ 开始删除账户及所有账单: " + accountName);
+        
+        // 🔑 设置标记，等待完成
+        isWaitingForSetNoAccount = true;
+        
+        // 🔑 调用 ViewModel 方法删除所有账单
+        billViewModel.deleteAllBillsByAccount(accountId, account_id);
     }
 
     /**
@@ -642,7 +665,7 @@ public class AccountEditBottomSheetFragment extends BottomSheetDialogFragment {
             if (bottomSheet != null) {
                 bottomSheet.setBackground(
                         ContextCompat.getDrawable(requireContext(),
-                                R.drawable.bg_bottom_sheet)
+                                R.drawable.bg_bottom_sheet1)
                 );
 
                 ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();

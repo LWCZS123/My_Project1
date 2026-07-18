@@ -26,7 +26,7 @@ public class Account extends BmobObject {
     private String currency;
     private Integer billingDay;
     private Integer repaymentDay;
-    private Boolean includeBillInCurrentPeriod;
+    private Boolean includeBill; // 修复 Bmob 字段名长度限制问题 (fieldName length can't larger than 20)
     private Boolean includeInTotal;
     private Boolean canBeSelected;
 
@@ -73,8 +73,8 @@ public class Account extends BmobObject {
     public Integer getRepaymentDay() { return repaymentDay; }
     public void setRepaymentDay(Integer repaymentDay) { this.repaymentDay = repaymentDay; }
 
-    public Boolean getIncludeBillInCurrentPeriod() { return includeBillInCurrentPeriod; }
-    public void setIncludeBillInCurrentPeriod(Boolean includeBillInCurrentPeriod) { this.includeBillInCurrentPeriod = includeBillInCurrentPeriod; }
+    public Boolean getIncludeBill() { return includeBill; }
+    public void setIncludeBill(Boolean includeBill) { this.includeBill = includeBill; }
 
     public Boolean getIncludeInTotal() { return includeInTotal; }
     public void setIncludeInTotal(Boolean includeInTotal) { this.includeInTotal = includeInTotal; }
@@ -110,7 +110,7 @@ public class Account extends BmobObject {
         local.setCurrency(currency != null ? currency : "CNY");
         local.setBillingDay(billingDay != null ? billingDay : 0);
         local.setRepaymentDay(repaymentDay != null ? repaymentDay : 0);
-        local.setIncludeBillInCurrentPeriod(includeBillInCurrentPeriod != null ? includeBillInCurrentPeriod : false);
+        local.setIncludeBill(includeBill != null ? includeBill : false);
         local.setIncludeInTotal(includeInTotal != null ? includeInTotal : true);
         local.setCanBeSelected(canBeSelected != null ? canBeSelected : true);
         local.setCreatedAt(DateConvertUtil.safeConvertToDate(getCreatedAt()));
@@ -137,7 +137,7 @@ public class Account extends BmobObject {
         cloud.setCurrency(local.getCurrency());
         cloud.setBillingDay(local.getBillingDay());
         cloud.setRepaymentDay(local.getRepaymentDay());
-        cloud.setIncludeBillInCurrentPeriod(local.isIncludeBillInCurrentPeriod());
+        cloud.setIncludeBill(local.isIncludeBill());
         cloud.setIncludeInTotal(local.isIncludeInTotal());
         cloud.setCanBeSelected(local.isCanBeSelected());
 

@@ -58,6 +58,34 @@ public class BillUiModel {
                 ? objectId : String.valueOf(localId);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BillUiModel that = (BillUiModel) o;
+        return localId == that.localId &&
+                amountColor == that.amountColor &&
+                isFirstOfDay == that.isFirstOfDay &&
+                isLastOfDay == that.isLastOfDay &&
+                java.util.Objects.equals(objectId, that.objectId) &&
+                java.util.Objects.equals(timeText, that.timeText) &&
+                java.util.Objects.equals(categoryName, that.categoryName) &&
+                java.util.Objects.equals(categoryIconUrl, that.categoryIconUrl) &&
+                java.util.Objects.equals(amountText, that.amountText) &&
+                java.util.Objects.equals(accountName, that.accountName) &&
+                java.util.Objects.equals(accountIconUrl, that.accountIconUrl) &&
+                java.util.Objects.equals(remarkText, that.remarkText) &&
+                java.util.Objects.equals(locationText, that.locationText) &&
+                java.util.Objects.equals(imageUrls, that.imageUrls);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(localId, objectId, timeText, categoryName, categoryIconUrl,
+                amountText, amountColor, accountName, accountIconUrl, remarkText, locationText,
+                imageUrls, isFirstOfDay, isLastOfDay);
+    }
+
     public static Builder builder() { return new Builder(); }
 
     public static class Builder {

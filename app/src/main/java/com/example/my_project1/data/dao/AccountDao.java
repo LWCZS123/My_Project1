@@ -113,6 +113,10 @@ public interface AccountDao {
     @Query("SELECT * FROM accounts WHERE object_id = :id LIMIT 1")
     LiveData<Account> getAccountByIdLive(String id);
 
+    /** 同步查询所有账户（排除标记删除的） */
+    @Query("SELECT * FROM accounts WHERE sync_state != 'TO_DELETE' ORDER BY createdAt ASC")
+    List<Account> getAllAccountsSyncExcludeDeleted();
+
     /** 同步查询所有账户 */
     @Query("SELECT * FROM accounts ORDER BY createdAt ASC")
     List<Account> getAllAccountsSync();
@@ -126,7 +130,7 @@ public interface AccountDao {
     List<Account> getAccountsByGroupIdSync(String groupId);
 
     /**查询所有需要同步的账户*/
-    @Query("SELECT * FROM accounts WHERE sync_state != 0")
+    @Query("SELECT * FROM accounts WHERE sync_state != 'SYNCED'")
     List<Account> getPendingSyncAccounts();
 
 
@@ -152,6 +156,10 @@ public interface AccountDao {
 
     // 查询所有需要同步的账户组
 
+
+    /** 批量标记删除某个账户组下的所有账户 (性能优化) */
+    @Query("UPDATE accounts SET sync_state = 'TO_DELETE', updatedAt = :now WHERE group_id = :groupId")
+    int markAccountsAsDeletedByGroup(String groupId, long now);
 
     /** 删除某个账户组下的所有账户（返回受影响行数） */
     @Query("DELETE FROM accounts WHERE group_id = :groupId")

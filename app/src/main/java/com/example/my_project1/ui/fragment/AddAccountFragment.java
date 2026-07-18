@@ -328,7 +328,7 @@ public class AddAccountFragment extends BottomSheetDialogFragment {
 
             if (bottomSheet != null) {
                 bottomSheet.setBackground(
-                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet)
+                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1)
                 );
 
                 ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();

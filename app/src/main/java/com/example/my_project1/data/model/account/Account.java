@@ -39,7 +39,8 @@ public class Account  implements Serializable {
     private String currency = "CNY"; // 币种
     private int billingDay; // 账单日
     private int repaymentDay; // 还款日
-    private boolean includeBillInCurrentPeriod; // 出账日账单计入当期
+    @ColumnInfo(name = "includeBillInCurrentPeriod")
+    private boolean includeBill; // 出账日账单计入当期
     private boolean includeInTotal = true; // 是否计入总资产
     private boolean canBeSelected = true; // 记账时是否可选
     private Date createdAt;
@@ -115,8 +116,8 @@ public class Account  implements Serializable {
     public int getRepaymentDay() { return repaymentDay; }
     public void setRepaymentDay(int repaymentDay) { this.repaymentDay = repaymentDay; }
 
-    public boolean isIncludeBillInCurrentPeriod() { return includeBillInCurrentPeriod; }
-    public void setIncludeBillInCurrentPeriod(boolean includeBillInCurrentPeriod) { this.includeBillInCurrentPeriod = includeBillInCurrentPeriod; }
+    public boolean isIncludeBill() { return includeBill; }
+    public void setIncludeBill(boolean includeBill) { this.includeBill = includeBill; }
 
     public boolean isIncludeInTotal() { return includeInTotal; }
     public void setIncludeInTotal(boolean includeInTotal) { this.includeInTotal = includeInTotal; }

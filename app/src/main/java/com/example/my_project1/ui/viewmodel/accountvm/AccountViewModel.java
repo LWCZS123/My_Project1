@@ -11,6 +11,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.data.repository.account.AccountRepository;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ui.UiMessageLiveData;
 import com.example.my_project1.utils.ui.UiState;
 
@@ -407,29 +408,33 @@ public class AccountViewModel extends AndroidViewModel {
         });
     }
 
-    /**
-     * 根据accountId获取账户名称
-     */
     public void getAccountNameById(String accountId, ResultCallback callback) {
         if (accountId == null || accountId.isEmpty()) {
-            if (callback != null) {
-                callback.onResult(false, null);
-            }
+            if (callback != null) callback.onResult(false, null);
             return;
         }
 
         repository.getAccountNameById(accountId, (success, accountName) -> {
-            if (success && accountName != null) {
-                Log.d(TAG, "✅ 获取账户名称成功: " + accountName);
+            if (callback != null) callback.onResult(success, accountName);
+        });
+    }
+
+    public void getAccountNameByLocalId(long localId, ResultCallback callback) {
+        if (localId <= 0) {
+            if (callback != null) callback.onResult(false, null);
+            return;
+        }
+
+        // 🔴 关键：在后台线程执行同步查询，避免阻塞主线程
+        AppExecutors.get().diskIO().execute(() -> {
+            Account account = repository.getAccountByLocalIdSync(localId);
+            String name = account != null ? account.getName() : null;
+            
+            AppExecutors.get().mainThread().execute(() -> {
                 if (callback != null) {
-                    callback.onResult(true, accountName);
+                    callback.onResult(account != null, name);
                 }
-            } else {
-                Log.e(TAG, "❌ 获取账户名称失败: accountId=" + accountId);
-                if (callback != null) {
-                    callback.onResult(false, null);
-                }
-            }
+            });
         });
     }
 

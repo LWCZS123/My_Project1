@@ -13,12 +13,14 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.ActivityAddAccountBinding;
+import com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment;
 import com.example.my_project1.ui.fragment.IconAccountBottomSheet;
 import com.example.my_project1.ui.fragment.SelectGroupBottomSheetFragment;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.utils.SnackbarUtils;
 
 import java.util.Calendar;
+import java.util.Locale;
 
 import cn.bmob.v3.BmobUser;
 
@@ -39,6 +41,9 @@ public class AddAccountActivity extends AppCompatActivity {
     private int billingDay = 0;
     private int repaymentDay = 0;
 
+    private Account editAccount;
+    private boolean isEditMode = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,36 +55,95 @@ public class AddAccountActivity extends AppCompatActivity {
         parseIntent();
         initUi();
         setupListeners();
-        findDefaultGroup(); // 恢复自动匹配分组逻辑
+        if (!isEditMode) {
+            findDefaultGroup(); // 恢复自动匹配分组逻辑
+        }
     }
 
     private void parseIntent() {
-        accountType = getIntent().getStringExtra("accountName");
-        iconRes = getIntent().getIntExtra("accountIconRes", R.drawable.ic_wallet);
-        accountCategory = getIntent().getStringExtra("accountCategory");
+        editAccount = (Account) getIntent().getSerializableExtra("editAccount");
+        if (editAccount != null) {
+            isEditMode = true;
+            accountType = editAccount.getAccountType();
+            accountCategory = editAccount.getCategory();
+            selectedIconUrl = editAccount.getIconUrl();
+            selectedGroupId = editAccount.getGroupId();
+            isCreditType = editAccount.isCredit();
+            billingDay = editAccount.getBillingDay();
+            repaymentDay = editAccount.getRepaymentDay();
+        } else {
+            accountType = getIntent().getStringExtra("accountName");
+            iconRes = getIntent().getIntExtra("accountIconRes", R.drawable.ic_wallet);
+            accountCategory = getIntent().getStringExtra("accountCategory");
 
-        if (accountCategory != null) {
-            isCreditType = accountCategory.equals("信用账户");
+            if (accountCategory != null) {
+                isCreditType = accountCategory.equals("信用账户");
+            }
         }
     }
 
     private void initUi() {
-        binding.etAccountName.setText(accountType);
-        binding.ivAccountIcon.setImageResource(iconRes);
-        
-        if (isCreditType) {
-            binding.tvToolbarTitle.setText("添加信用账户");
-            binding.tvBalanceLabel.setText("当前欠款");
-            binding.etBalance.setHint("请输入当前欠款金额");
+        if (isEditMode) {
+            binding.tvToolbarTitle.setText("编辑账户");
+            binding.etAccountName.setText(editAccount.getName());
+            binding.etAccountRemark.setText(editAccount.getRemark());
+            binding.etCardNumber.setText(editAccount.getCardNumber());
+            binding.switchIncludeTotal.setChecked(editAccount.isIncludeInTotal());
+            binding.switchCanBeSelected.setChecked(editAccount.isCanBeSelected());
             
-            binding.layoutCreditLimit.setVisibility(View.VISIBLE);
-            binding.dividerLimit.setVisibility(View.VISIBLE);
-            binding.cardDateInfo.setVisibility(View.VISIBLE);
+            if (selectedIconUrl != null) {
+                com.example.my_project1.utils.ImageLoaderUtils.loadThumbnail(this, selectedIconUrl, binding.ivAccountIcon);
+            } else {
+                binding.ivAccountIcon.setImageResource(R.drawable.ic_wallet);
+            }
+
+            if (isCreditType) {
+                binding.tvBalanceLabel.setText("当前欠款");
+                binding.etBalance.setText(String.valueOf(Math.abs(editAccount.getBalance())));
+                binding.etCreditLimit.setText(String.valueOf(editAccount.getCreditLimit()));
+                binding.switchIncludeBill.setChecked(editAccount.isIncludeBill());
+                if (billingDay > 0) binding.tvBillingDay.setText("每月" + billingDay + "日");
+                if (repaymentDay > 0) binding.tvRepaymentDay.setText("每月" + repaymentDay + "日");
+                
+                binding.layoutCreditLimit.setVisibility(View.VISIBLE);
+                binding.dividerLimit.setVisibility(View.VISIBLE);
+                binding.cardDateInfo.setVisibility(View.VISIBLE);
+            } else {
+                binding.tvBalanceLabel.setText("账户余额");
+                binding.etBalance.setText(String.valueOf(editAccount.getBalance()));
+                binding.cardDateInfo.setVisibility(View.GONE);
+            }
+            
+            if (selectedGroupId != null) {
+                viewModel.getAccountGroups().observe(this, groups -> {
+                    if (groups != null) {
+                        for (AccountGroup group : groups) {
+                            if (group.getObjectId().equals(selectedGroupId)) {
+                                binding.btnMoveGroup.setText("所属分组：" + group.getName());
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
         } else {
-            binding.tvToolbarTitle.setText("添加账户");
-            binding.tvBalanceLabel.setText("账户余额");
-            binding.etBalance.setHint("请输入账户余额");
-            binding.cardDateInfo.setVisibility(View.GONE);
+            binding.etAccountName.setText(accountType);
+            binding.ivAccountIcon.setImageResource(iconRes);
+            
+            if (isCreditType) {
+                binding.tvToolbarTitle.setText("添加信用账户");
+                binding.tvBalanceLabel.setText("当前欠款");
+                binding.etBalance.setHint("请输入当前欠款金额");
+                
+                binding.layoutCreditLimit.setVisibility(View.VISIBLE);
+                binding.dividerLimit.setVisibility(View.VISIBLE);
+                binding.cardDateInfo.setVisibility(View.VISIBLE);
+            } else {
+                binding.tvToolbarTitle.setText("添加账户");
+                binding.tvBalanceLabel.setText("账户余额");
+                binding.etBalance.setHint("请输入账户余额");
+                binding.cardDateInfo.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -89,6 +153,42 @@ public class AddAccountActivity extends AppCompatActivity {
         binding.btnSave.setOnClickListener(v -> saveAccount());
         
         binding.btnMoveGroup.setOnClickListener(v -> showSelectGroupDialog());
+
+        // 🔑 点击余额输入框，弹出计算器键盘
+        binding.etBalance.setFocusable(false);
+        binding.etBalance.setOnClickListener(v -> {
+            Account tempAccount = new Account();
+            tempAccount.setCredit(isCreditType);
+            String currentVal = binding.etBalance.getText().toString().trim();
+            try {
+                double val = Double.parseDouble(currentVal);
+                tempAccount.setBalance(isCreditType ? -val : val);
+            } catch (Exception ignored) {}
+
+            BalanceAdjustmentBottomSheetFragment fragment = BalanceAdjustmentBottomSheetFragment.newInstance(tempAccount);
+            fragment.setOnBalanceAdjustedListener((newBalance, recordAsTransaction) -> {
+                binding.etBalance.setText(String.format(Locale.US, "%.2f", Math.abs(newBalance)));
+            });
+            fragment.show(getSupportFragmentManager(), "BalanceAdjustment");
+        });
+
+        // 🔑 信用卡额度输入框，也弹出计算器键盘
+        binding.etCreditLimit.setFocusable(false);
+        binding.etCreditLimit.setOnClickListener(v -> {
+            Account tempAccount = new Account();
+            tempAccount.setCredit(false); // 额度输入总是显示正数，不按债务逻辑反转
+            String currentVal = binding.etCreditLimit.getText().toString().trim();
+            try {
+                double val = Double.parseDouble(currentVal);
+                tempAccount.setBalance(val);
+            } catch (Exception ignored) {}
+
+            BalanceAdjustmentBottomSheetFragment fragment = BalanceAdjustmentBottomSheetFragment.newInstance(tempAccount);
+            fragment.setOnBalanceAdjustedListener((newVal, recordAsTransaction) -> {
+                binding.etCreditLimit.setText(String.format(Locale.US, "%.2f", Math.abs(newVal)));
+            });
+            fragment.show(getSupportFragmentManager(), "CreditLimitInput");
+        });
 
         binding.ivAccountIcon.setOnClickListener(v -> {
             if ("储蓄卡".equals(accountType) || "信用卡".equals(accountType)) {
@@ -180,14 +280,6 @@ public class AddAccountActivity extends AppCompatActivity {
             return;
         }
 
-        // 🔴 移除强制选择账户组的限制，如果没有选择组，默认属于该大类
-        /*
-        if (selectedGroupId == null) {
-            SnackbarUtils.showError(binding.getRoot(), "请选择所属分组");
-            return;
-        }
-        */
-
         double balance = 0;
         try {
             balance = Double.parseDouble(balanceStr);
@@ -198,7 +290,7 @@ public class AddAccountActivity extends AppCompatActivity {
             balance = -balance;
         }
 
-        Account account = new Account();
+        Account account = isEditMode ? editAccount : new Account();
         account.setName(name);
         account.setBalance(balance);
         account.setRemark(binding.etAccountRemark.getText().toString().trim());
@@ -219,7 +311,7 @@ public class AddAccountActivity extends AppCompatActivity {
                 limit = Double.parseDouble(limitStr);
             } catch (Exception ignored) {}
             account.setCreditLimit(limit);
-            account.setIncludeBillInCurrentPeriod(binding.switchIncludeBill.isChecked());
+            account.setIncludeBill(binding.switchIncludeBill.isChecked());
             account.setBillingDay(billingDay);
             account.setRepaymentDay(repaymentDay);
         }
@@ -229,13 +321,24 @@ public class AddAccountActivity extends AppCompatActivity {
             account.setUserId(user.getObjectId());
         }
 
-        viewModel.insertAccount(account, (success, message) -> {
-            if (success) {
-                Toast.makeText(this, "保存成功", Toast.LENGTH_SHORT).show();
-                finish();
-            } else {
-                SnackbarUtils.showError(binding.getRoot(), "保存失败: " + message);
-            }
-        });
+        if (isEditMode) {
+            viewModel.updateAccount(account, (success, message) -> {
+                if (success) {
+                    Toast.makeText(this, "更新成功", Toast.LENGTH_SHORT).show();
+                    finish();
+                } else {
+                    SnackbarUtils.showError(binding.getRoot(), "更新失败: " + message);
+                }
+            });
+        } else {
+            viewModel.insertAccount(account, (success, message) -> {
+                if (success) {
+                    Toast.makeText(this, "保存成功", Toast.LENGTH_SHORT).show();
+                    finish();
+                } else {
+                    SnackbarUtils.showError(binding.getRoot(), "保存失败: " + message);
+                }
+            });
+        }
     }
 }
