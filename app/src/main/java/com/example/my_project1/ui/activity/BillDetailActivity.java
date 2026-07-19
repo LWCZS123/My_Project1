@@ -646,13 +646,8 @@ public class BillDetailActivity extends AppCompatActivity {
         billViewModel.operationState.observeForever(response -> {
             if (response.isSuccess()) {
                 billViewModel.operationState.removeObserver(observer -> {});
-
-                SnackbarUtils.showSuccess(binding.getRoot(), "删除成功");
                 setResult(RESULT_OK);
-
-                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                    finish();
-                }, 500);
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::finish, 100);
             } else if (response.isError()) {
                 SnackbarUtils.showError(binding.getRoot(), "删除失败: " + response.message);
             }

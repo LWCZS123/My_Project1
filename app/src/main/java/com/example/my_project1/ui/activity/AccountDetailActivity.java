@@ -8,14 +8,12 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
@@ -32,10 +30,8 @@ import com.example.my_project1.ui.fragment.DeleteAccountDialogFragment;
 import com.example.my_project1.ui.fragment.VerificationCodeDialog;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
-import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
-import com.example.my_project1.utils.SwipeToDeleteCallback;
 import com.github.mikephil.charting.animation.Easing;
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.Legend;
@@ -146,7 +142,7 @@ public class AccountDetailActivity extends AppCompatActivity {
         }
 
         // 加载账户数据
-        loadAccountData(accountId, localId);
+        observeAccountData(accountId, localId);
 
         // 设置RecyclerView
         setupRecyclerView();
@@ -169,29 +165,28 @@ public class AccountDetailActivity extends AppCompatActivity {
 
     // ==================== 初始化 ====================
 
-    private void loadAccountData(String accountId, long localId) {
-        AppExecutors.get().diskIO().execute(() -> {
-            Account account;
-            if (accountId != null && !accountId.isEmpty()) {
-                account = accountViewModel.getAccountByIdSync(accountId);
-            } else {
-                account = accountViewModel.getAccountByLocalIdSync(localId);
-            }
+    private void observeAccountData(String accountId, long localId) {
+        LiveData<Account> accountLiveData;
+        if (accountId != null && !accountId.isEmpty()) {
+            accountLiveData = accountViewModel.getAccountById(accountId);
+        } else {
+            accountLiveData = accountViewModel.getAccountByLocalId(localId);
+        }
 
-            AppExecutors.get().mainThread().execute(() -> {
-                if (account != null) {
-                    currentAccount = account;
-                    updateAccountInfo(account);
-                    
-                    // 如果账单数据已经先到了，由于 currentAccount 为空没刷新，这里多刷新一次
-                    if (!filteredBills.isEmpty() && billAdapter != null) {
-                        billAdapter.setData(filteredBills, currentAccount.getBalance(), currentAccount.isCredit());
-                    }
-                } else {
+        accountLiveData.observe(this, account -> {
+            if (account != null) {
+                currentAccount = account;
+                updateAccountInfo(account);
+                
+                if (!filteredBills.isEmpty() && billAdapter != null) {
+                    billAdapter.setData(filteredBills, currentAccount.getBalance(), currentAccount.isCredit());
+                }
+            } else {
+                if (currentAccount == null) {
                     SnackbarUtils.showError(binding.getRoot(), "账户不存在");
                     finish();
                 }
-            });
+            }
         });
     }
 
@@ -287,7 +282,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                 if (currentAccount != null) {
                     currentAccount.setIncludeInTotal(false);
                     accountViewModel.updateAccount(currentAccount);
-                    SnackbarUtils.showInfo(binding.getRoot(), "已隐藏账户（不计入总资产）");
+                    // 🔕 移除提示
                 }
             }
 
@@ -388,10 +383,6 @@ public class AccountDetailActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 🔑 每次回到详情页，重新加载账户数据以确保实时性（如从修改页面返回）
-        String accountId = getIntent().getStringExtra(EXTRA_ACCOUNT_ID);
-        long localId = getIntent().getLongExtra(EXTRA_ACCOUNT_LOCAL_ID, -1);
-        loadAccountData(accountId, localId);
     }
 
     private void showVerificationBeforeDelete() {
@@ -456,8 +447,6 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             // 无论数据是否为空，都尝试刷新 UI (addSystemBills 保证了 allBills 不为空)
             if (!allBills.isEmpty()) {
-                Log.d(TAG, "📊 刷新交易列表: " + allBills.size() + " 条");
-
                 binding.cardTransactions.setVisibility(View.VISIBLE);
                 binding.rvTransactions.setVisibility(View.VISIBLE);
                 binding.cardOverview.setVisibility(View.VISIBLE);
@@ -656,7 +645,6 @@ public class AccountDetailActivity extends AppCompatActivity {
 
     private void updateStatisticsUI() {
         // 由于现在使用月度折叠列表，全局统计可以仅记录 Log 或者更新其他通用 UI
-        Log.d(TAG, String.format("📊 全局统计: 流入=%.2f, 流出=%.2f", totalIncome, totalExpense));
         
         // 如果有特定的全局统计 View 可以这里更新
     }
@@ -839,7 +827,6 @@ public class AccountDetailActivity extends AppCompatActivity {
         if (bill == null || bill.getId() < 0) return; // 排除系统虚拟账单
         
         billViewModel.deleteBill(bill);
-        SnackbarUtils.showInfo(binding.getRoot(), "已标记删除账单");
     }
 
     private void filterBillsByDate() {
@@ -951,6 +938,7 @@ public class AccountDetailActivity extends AppCompatActivity {
      */
     private void migrateBillsAndDeleteAccount(Account targetAccount) {
         if (targetAccount == null || currentAccount == null) {
+            Log.e(TAG, "❌ 迁移中止：目标账户或当前账户为空");
             SnackbarUtils.showError(binding.getRoot(), "目标账户或当前账户为空");
             return;
         }
@@ -961,14 +949,11 @@ public class AccountDetailActivity extends AppCompatActivity {
         //  设置标记，等待迁移完成
         isWaitingForMigration = true;
 
-
         billViewModel.migrateBillsToAccount(
                 currentAccount.getObjectId(),
                 currentAccount.getId(),
                 targetAccount.getObjectId()
         );
-
-
     }
 
     /**
@@ -997,6 +982,7 @@ public class AccountDetailActivity extends AppCompatActivity {
      */
     private void deleteAccountWithoutMigration() {
         if (currentAccount == null) {
+            Log.e(TAG, "❌ 删除中止：当前账户为空");
             SnackbarUtils.showError(binding.getRoot(), "当前账户为空");
             return;
         }

@@ -49,6 +49,7 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
         void onAccount(Account account);
         void onAccountDelete(Account account);
         void onAccountHide(Account account);
+        void onAccountArchive(Account account);
         void onAccountEdit(Account account);
         void onGroupExpand(String groupId);
     }
@@ -288,6 +289,12 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
                 public void onAccountHide(Account account) {
                     if (groupActionClickListener != null)
                         groupActionClickListener.onAccountHide(account);
+                }
+
+                @Override
+                public void onAccountArchive(Account account) {
+                    if (groupActionClickListener != null)
+                        groupActionClickListener.onAccountArchive(account);
                 }
 
                 @Override

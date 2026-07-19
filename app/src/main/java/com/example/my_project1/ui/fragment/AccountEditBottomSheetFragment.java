@@ -640,7 +640,7 @@ public class AccountEditBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     private void performMoveAccount(String accountId, AccountGroup newGroup) {
-        accountViewModel.moveSingleAccount(accountId, newGroup.getObjectId(),
+        accountViewModel.moveSingleAccount(accountId, accountGroupId, newGroup.getObjectId(),
                 (moveSuccess, moveMessage) -> {
                     if (moveSuccess) {
                         SnackbarUtils.showSuccess(binding.getRoot(), moveMessage);

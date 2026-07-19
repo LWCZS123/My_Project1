@@ -2,6 +2,8 @@ package com.example.my_project1.ui.fragment;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -49,9 +51,11 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
 
     // 要排除的账户ID（用于删除账户时不显示自己）
     private String excludeAccountId = null;
+    private String currentSearchKeyword = "";
 
-    // 保存观察者 (防止重复监听)
-    private Map<String, Observer<List<Account>>> accountObservers = new HashMap<>();
+    // 保存所有获取到的原始数据
+    private List<AccountGroup> originalGroups = new ArrayList<>();
+    private List<Account> originalAccounts = new ArrayList<>();
 
     /**
      * 创建实例 - 普通模式（显示所有账户）
@@ -92,8 +96,25 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
         observeGroupData();
         loadAccountGroupsFromCloud();
         setupNoAccountOption(); // 默认“无账户”
+        setupSearch();
 
         return binding.getRoot();
+    }
+
+    private void setupSearch() {
+        binding.etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                currentSearchKeyword = s.toString().trim();
+                processAndFilterData(originalGroups, originalAccounts);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
     }
 
     /** ================== RecyclerView 显示账户组 ================== **/
@@ -116,6 +137,9 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
 
             @Override
             public void onAccountHide(Account account) {}
+
+            @Override
+            public void onAccountArchive(Account account) {}
 
             @Override
             public void onAccountEdit(Account account) {}
@@ -175,6 +199,9 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
     }
 
     private void processAndFilterData(List<AccountGroup> groups, List<Account> allAccounts) {
+        this.originalGroups = groups;
+        this.originalAccounts = allAccounts;
+
         List<AccountGroup> displayGroups = new java.util.ArrayList<>();
         Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
 
@@ -188,6 +215,13 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
                     if (!acc.isCanBeSelected()) continue;
                     if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
                     
+                    // 搜索过滤
+                    if (!currentSearchKeyword.isEmpty()) {
+                        if (!acc.getName().toLowerCase().contains(currentSearchKeyword.toLowerCase())) {
+                            continue;
+                        }
+                    }
+
                     activeAccounts.add(acc);
                 }
             }
@@ -206,6 +240,13 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
                     if (acc.getSyncState() == SyncState.TO_DELETE) continue;
                     if (!acc.isCanBeSelected()) continue;
                     if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
+
+                    // 搜索过滤
+                    if (!currentSearchKeyword.isEmpty()) {
+                        if (!acc.getName().toLowerCase().contains(currentSearchKeyword.toLowerCase())) {
+                            continue;
+                        }
+                    }
 
                     activeAccounts.add(acc);
                 }
@@ -263,10 +304,6 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
             if (bottomSheet != null) {
                 bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
                         R.drawable.bg_bottom_sheet1));
-
-                ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();
-                params.height = (int) (getScreenHeight() * 0.65);
-                bottomSheet.setLayoutParams(params);
 
                 BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
                 behavior.setSkipCollapsed(true);

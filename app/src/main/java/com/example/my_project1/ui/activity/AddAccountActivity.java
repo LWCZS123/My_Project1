@@ -75,6 +75,7 @@ public class AddAccountActivity extends AppCompatActivity {
             accountType = getIntent().getStringExtra("accountName");
             iconRes = getIntent().getIntExtra("accountIconRes", R.drawable.ic_wallet);
             accountCategory = getIntent().getStringExtra("accountCategory");
+            selectedGroupId = getIntent().getStringExtra("groupId"); // 🔑 获取传入的分组ID
 
             if (accountCategory != null) {
                 isCreditType = accountCategory.equals("信用账户");
@@ -114,18 +115,7 @@ public class AddAccountActivity extends AppCompatActivity {
                 binding.cardDateInfo.setVisibility(View.GONE);
             }
             
-            if (selectedGroupId != null) {
-                viewModel.getAccountGroups().observe(this, groups -> {
-                    if (groups != null) {
-                        for (AccountGroup group : groups) {
-                            if (group.getObjectId().equals(selectedGroupId)) {
-                                binding.btnMoveGroup.setText("所属分组：" + group.getName());
-                                break;
-                            }
-                        }
-                    }
-                });
-            }
+            updateGroupNameText();
         } else {
             binding.etAccountName.setText(accountType);
             binding.ivAccountIcon.setImageResource(iconRes);
@@ -144,6 +134,25 @@ public class AddAccountActivity extends AppCompatActivity {
                 binding.etBalance.setHint("请输入账户余额");
                 binding.cardDateInfo.setVisibility(View.GONE);
             }
+
+            if (selectedGroupId != null) {
+                updateGroupNameText();
+            }
+        }
+    }
+
+    private void updateGroupNameText() {
+        if (selectedGroupId != null) {
+            viewModel.getAccountGroups().observe(this, groups -> {
+                if (groups != null) {
+                    for (AccountGroup group : groups) {
+                        if (group.getObjectId().equals(selectedGroupId)) {
+                            binding.btnMoveGroup.setText("所属分组：" + group.getName());
+                            break;
+                        }
+                    }
+                }
+            });
         }
     }
 

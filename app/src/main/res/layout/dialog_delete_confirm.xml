@@ -1,81 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="@drawable/bg_dialog_rounded1"
-    android:padding="0dp">
+    app:cardCornerRadius="24dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="#FFFFFF">
 
-    <!-- 标题区域 -->
-    <TextView
-        android:id="@+id/tv_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="删除"
-        android:textSize="20sp"
-        android:textColor="#1A1A1A"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:paddingTop="32dp"
-        android:paddingBottom="16dp" />
-
-    <!-- 提示信息 -->
-    <TextView
-        android:id="@+id/tv_message"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="确定要删除该账单吗?"
-        android:textSize="16sp"
-        android:textColor="#666666"
-        android:gravity="center"
-        android:paddingStart="24dp"
-        android:paddingEnd="24dp"
-        android:paddingBottom="32dp"
-        android:lineSpacingExtra="4dp" />
-
-    <!-- 分割线 -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0.5dp"
-        android:background="#E5E5E5" />
-
-    <!-- 按钮区域 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:orientation="horizontal"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-       >
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:gravity="center_horizontal">
 
-        <!-- 取消按钮 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_cancel"
-            android:layout_width="0dp"
-            android:layout_height="58dp"
-            android:layout_weight="1"
-            android:text="取消"
-            android:textSize="16sp"
-            android:textColor="#1A1A1A"
-            app:backgroundTint="#E5E7EB"
-            app:cornerRadius="14dp"
-            android:layout_marginEnd="12dp" />
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="删除分组"
+            android:textColor="#333333"
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
-        <!-- 确定按钮 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_confirm"
-            android:layout_width="0dp"
-            android:layout_height="58dp"
-            android:layout_weight="1"
-            android:text="确定"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            app:backgroundTint="#4285F4"
-            app:cornerRadius="14dp"
-            android:layout_marginStart="12dp" />
+        <TextView
+            android:id="@+id/tv_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="该分组下包含资产账户，如果删除该分组，所包含的账户将被归属到默认分组中，请确定是否执行删除？"
+            android:textColor="#666666"
+            android:textSize="14sp"
+            android:lineSpacingExtra="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btn_cancel"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_capsule"
+                android:backgroundTint="#F5F5F5"
+                android:gravity="center"
+                android:text="取消"
+                android:textColor="#333333"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_delete"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_capsule"
+                android:backgroundTint="#FFF1F0"
+                android:gravity="center"
+                android:text="删除"
+                android:textColor="#FF5252"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

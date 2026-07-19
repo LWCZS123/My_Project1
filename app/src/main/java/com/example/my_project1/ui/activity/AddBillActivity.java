@@ -139,7 +139,6 @@ public class AddBillActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(android.os.Bundle outState) {
         super.onSaveInstanceState(outState);
-        // 🔴 修复：Activity 被系统回收重建时（如从地图选点返回），保存关键状态
         if (currentUserId != null) outState.putString("saved_user_id", currentUserId);
         if (selectedLocationName != null) outState.putString("saved_location_name", selectedLocationName);
         if (selectedLocationAddress != null) outState.putString("saved_location_address", selectedLocationAddress);
@@ -242,8 +241,6 @@ public class AddBillActivity extends AppCompatActivity {
             if (getSupportActionBar() != null) {
                 getSupportActionBar().setTitle("编辑账单");
             }
-
-            Log.d(TAG, "⭐ 进入编辑模式: billId=" + editBillId + ", localId=" + editBillLocalId);
         }
     }
 
@@ -266,8 +263,6 @@ public class AddBillActivity extends AppCompatActivity {
         selectedCategoryCloudId = intent.getStringExtra("category_id");
         selectedCategoryName = intent.getStringExtra("category_name");
         selectedCategoryImageUrl = intent.getStringExtra("category_icon");
-
-        Log.d(TAG, "⭐ 加载分类数据: name=" + selectedCategoryName + ", id=" + selectedCategoryCloudId);
 
         // 4. 账户
         String accountId = intent.getStringExtra("account_id");
@@ -330,7 +325,6 @@ public class AddBillActivity extends AppCompatActivity {
             // ⭐ 通知Adapter选中指定分类
             if (pagerAdapter != null && selectedCategoryCloudId != null) {
                 pagerAdapter.setSelectedCategory(billType, selectedCategoryCloudId);
-                Log.d(TAG, "⭐ 已通知Adapter选中分类: type=" + billType + ", id=" + selectedCategoryCloudId);
             }
         }, 200);
 
@@ -429,8 +423,6 @@ public class AddBillActivity extends AppCompatActivity {
             selectedCategoryName = displayName;
             selectedCategoryCloudId = categoryCloudId;
             selectedCategoryImageUrl = categoryImageUrl;
-
-            Log.d(TAG, "⭐ 用户选择分类: " + displayName + ", id=" + categoryCloudId);
         });
 
         // 页面切换监听
@@ -841,7 +833,6 @@ public class AddBillActivity extends AppCompatActivity {
                     }
 
                     if (bill == null) {
-                        Log.e(TAG, "❌ 数据库中找不到该账单: id=" + editBillId + ", localId=" + editBillLocalId);
                         AppExecutors.get().mainThread().execute(() -> {
                             isSaving = false;
                             showSnackbar("找不到要编辑的账单", SnackbarUtils.Type.ERROR);
@@ -849,20 +840,11 @@ public class AddBillActivity extends AppCompatActivity {
                         return;
                     }
 
-                    Log.d(TAG, "✅ 成功查询到原始Bill对象: ID=" + bill.getId() +
-                            ", ObjectId=" + bill.getObjectId() +
-                            ", Amount=" + bill.getAmount());
-
                     // 在主线程更新数据并保存
                     final Bill finalBill = bill;
                     AppExecutors.get().mainThread().execute(() -> {
                         // 更新账单数据
                         updateBillData(finalBill, imageObjectKeys);
-
-                        // 调用ViewModel更新
-                        Log.d(TAG, "⭐ 调用updateBill: ID=" + finalBill.getId() +
-                                ", ObjectId=" + finalBill.getObjectId() +
-                                ", Amount=" + finalBill.getAmount());
 
                         billViewModel.updateBill(finalBill);
                     });
@@ -934,18 +916,15 @@ public class AddBillActivity extends AppCompatActivity {
 
         if (isEditMode) {
             // 编辑模式：返回详情页
-            showSnackbar("修改成功", SnackbarUtils.Type.SUCCESS);
             setResult(RESULT_OK);
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 500);
+            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 100);
         } else if (isRepeatMode) {
             // 再记一笔：重置输入
             resetForRepeat();
-            showSnackbar("已保存，可继续记账", SnackbarUtils.Type.SUCCESS);
         } else {
             // 完成：返回上一页
-            showSnackbar("保存成功", SnackbarUtils.Type.SUCCESS);
             setResult(RESULT_OK);
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 500);
+            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 100);
         }
     }
 

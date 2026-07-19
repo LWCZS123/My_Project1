@@ -568,8 +568,20 @@ public class AccountRepository {
         return accountDao.getGroupsByUser(userId);
     }
 
+    public List<com.example.my_project1.data.model.account.AccountGroup> getAccountGroupsSync(String userId) {
+        return accountDao.getAllGroupsSync();
+    }
+
+    public List<com.example.my_project1.data.model.account.Account> getAccountsByGroupIdSync(String groupId) {
+        return accountDao.getAccountsByGroupIdSync(groupId);
+    }
+
     public LiveData<com.example.my_project1.data.model.account.Account> getAccountById(String accountId) {
         return accountDao.getAccountByIdLive(accountId);
+    }
+
+    public LiveData<com.example.my_project1.data.model.account.Account> getAccountByLocalId(long localId) {
+        return accountDao.getAccountByLocalIdLive(localId);
     }
 
     // -------------------------------
@@ -661,10 +673,15 @@ public class AccountRepository {
                         existingAccount.setSyncState(SyncState.TO_UPDATE);
                     }
 
+                    boolean visibilityChanged = (existingAccount.isIncludeInTotal() != account.isIncludeInTotal());
+                    
                     accountDao.update(existingAccount);
 
+                    // 🔑 修复点：如果所属组发生变化，或者显隐状态发生变化，更新组计数
                     if (oldGroupId != null && !oldGroupId.equals(account.getGroupId())) {
                         updateGroupAccountCountInternal(oldGroupId);
+                        updateGroupAccountCountInternal(account.getGroupId());
+                    } else if (visibilityChanged && account.getGroupId() != null) {
                         updateGroupAccountCountInternal(account.getGroupId());
                     }
 
@@ -797,7 +814,8 @@ public class AccountRepository {
             int actualCount = 0;
             if (accounts != null) {
                 for (com.example.my_project1.data.model.account.Account acc : accounts) {
-                    if (acc.getSyncState() != SyncState.TO_DELETE) {
+                    // 🔑 修复点：账户计数仅包含未删除且未隐藏（includeInTotal为true）的账户
+                    if (acc.getSyncState() != SyncState.TO_DELETE && acc.isIncludeInTotal()) {
                         actualCount++;
                     }
                 }

@@ -49,22 +49,9 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
 
         holder.binding.tvGroupName.setText(group.getName());
 
-        String iconUrl = group.getIconUrl();
+        // 🔴 逻辑调整：在选择分组界面隐藏图标显示
+        holder.binding.ivGroupIcon.setVisibility(View.GONE);
 
-        if (iconUrl == null || iconUrl.trim().isEmpty()) {
-            // 没有图标 → 隐藏
-            holder.binding.ivGroupIcon.setVisibility(View.GONE);
-
-        } else {
-            // 有图标 → 显示 + 加载
-            holder.binding.ivGroupIcon.setVisibility(View.VISIBLE);
-
-            ImageLoaderUtils.load(
-                    holder.itemView.getContext(),
-                    iconUrl,
-                    holder.binding.ivGroupIcon
-            );
-        }
         holder.binding.ivCheck.setVisibility(
                 position == selectedPosition ? View.VISIBLE : View.GONE
         );

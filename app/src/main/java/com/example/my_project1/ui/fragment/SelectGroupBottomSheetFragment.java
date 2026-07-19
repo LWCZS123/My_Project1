@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.FrameLayout;
 
 import androidx.core.content.ContextCompat;
@@ -30,6 +29,7 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
     private static final String ARG_LIST = "group_list";
     private static final String ARG_SELECTED_ID = "selected_id";
     private static final String ARG_IS_DELETE_MODE = "is_delete_mode";
+    private static final String ARG_FILTER_CUSTOM = "filter_custom"; // 🔴 新增过滤标志
 
     private FragmentSelectGroupBottomSheetBinding binding;
 
@@ -47,17 +47,25 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
     }
     public static SelectGroupBottomSheetFragment newInstance(List<AccountGroup> list,
                                                              String selectId) {
-        return newInstance(list, selectId, false);
+        return newInstance(list, selectId, false, false);
     }
 
     public static SelectGroupBottomSheetFragment newInstance(List<AccountGroup> list,
                                                              String selectId,
                                                              boolean isDeleteMode) {
+        return newInstance(list, selectId, isDeleteMode, false);
+    }
+
+    public static SelectGroupBottomSheetFragment newInstance(List<AccountGroup> list,
+                                                             String selectId,
+                                                             boolean isDeleteMode,
+                                                             boolean filterCustom) {
         SelectGroupBottomSheetFragment fragment = new SelectGroupBottomSheetFragment();
         Bundle b = new Bundle();
         b.putSerializable(ARG_LIST, (java.io.Serializable) list);
         b.putString(ARG_SELECTED_ID, selectId);
         b.putBoolean(ARG_IS_DELETE_MODE, isDeleteMode);
+        b.putBoolean(ARG_FILTER_CUSTOM, filterCustom);
         fragment.setArguments(b);
         return fragment;
     }
@@ -76,11 +84,28 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
         groupList = (List<AccountGroup>) getArguments().getSerializable(ARG_LIST);
         selectedGroupId = getArguments().getString(ARG_SELECTED_ID);
         boolean isDeleteMode = getArguments().getBoolean(ARG_IS_DELETE_MODE, false);
+        boolean filterCustom = getArguments().getBoolean(ARG_FILTER_CUSTOM, false);
+
+        // 🔴 逻辑优化：过滤逻辑
+        if (groupList != null) {
+            java.util.List<AccountGroup> filtered = new java.util.ArrayList<>();
+            for (AccountGroup g : groupList) {
+                // 1. 如果开启了 filterCustom，排除默认分组
+                if (filterCustom && isDefaultGroupName(g.getName())) {
+                    continue;
+                }
+                // 2. 🔑 排除自身：移动账户时排除账户当前所属的分组
+                if (selectedGroupId != null && selectedGroupId.equals(g.getObjectId())) {
+                    continue;
+                }
+                filtered.add(g);
+            }
+            groupList = filtered;
+        }
 
         GroupAdapter adapter = new GroupAdapter(groupList);
         binding.recyclerGroup.setLayoutManager(new LinearLayoutManager(getContext()));
         binding.recyclerGroup.setAdapter(adapter);
-
 
         adapter.setSelectedGroup(selectedGroupId);
 
@@ -89,6 +114,7 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
         } else {
             binding.cardWarn.setVisibility(View.GONE);
         }
+        
         // 默认隐藏提示和按钮
         binding.btnCancel.setVisibility(View.GONE);
         binding.btnConfirm.setVisibility(View.GONE);
@@ -98,6 +124,11 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
             dismiss();
         });
     }
+
+    private boolean isDefaultGroupName(String name) {
+        return "资金账户".equals(name) || "信用账户".equals(name) || "充值账户".equals(name);
+    }
+
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);

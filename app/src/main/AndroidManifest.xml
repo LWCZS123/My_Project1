@@ -181,6 +181,22 @@
             android:theme="@style/Theme.TransparentStatusBar"
             />
         <activity
+            android:name=".ui.activity.AccountGroupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
+            android:name=".ui.activity.AddAccountGroupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
+            android:name=".ui.activity.ArchivedAccountsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
+            android:name=".ui.activity.HiddenAccountsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
             android:name=".ui.activity.LoginActivity"
             android:exported="true"
             android:theme="@style/Theme.TransparentStatusBar"

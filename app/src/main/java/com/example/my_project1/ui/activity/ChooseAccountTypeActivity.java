@@ -35,6 +35,7 @@ public class ChooseAccountTypeActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
+        String groupId = getIntent().getStringExtra("groupId");
         List<Object> items = new ArrayList<>();
 
         // 资金账户
@@ -60,6 +61,7 @@ public class ChooseAccountTypeActivity extends AppCompatActivity {
             intent.putExtra("accountName", type.name);
             intent.putExtra("accountIconRes", type.iconRes);
             intent.putExtra("accountCategory", type.category);
+            intent.putExtra("groupId", groupId);
             startActivity(intent);
         });
 

@@ -140,7 +140,6 @@ public class HomeFragment extends Fragment {
         // ── 三段 Adapter ─────────────────────────────
         headerAdapter = new HeaderAdapter();
         headerAdapter.setRefreshClickListener(() -> {
-            Log.d(TAG, "🔄 用户点击刷新按钮");
             showSnackbar("正在同步...");
             billViewModel.forceSyncFromCloud();
         });
@@ -214,7 +213,6 @@ public class HomeFragment extends Fragment {
     private void setupSwipeRefresh() {
         binding.swipeRefreshLayout.setColorSchemeResources(R.color.accent_color);
         binding.swipeRefreshLayout.setOnRefreshListener(() -> {
-            Log.d(TAG, "🔄 下拉刷新触发");
             // 重置页码 + 清除缓存 + 重新请求
             billViewModel.refresh();
         });
@@ -247,7 +245,6 @@ public class HomeFragment extends Fragment {
     private void observeData() {
         // ── 1. 账单列表（已预处理为 UiModel 混合列表）──
         billViewModel.billItems.observe(getViewLifecycleOwner(), items -> {
-            Log.d(TAG, "📦 billItems 更新, size=" + (items != null ? items.size() : 0));
             billAdapter.submitList(items);        // AsyncListDiffer 后台计算 diff，丝滑刷新
             binding.swipeRefreshLayout.setRefreshing(false);
         });
@@ -299,7 +296,6 @@ public class HomeFragment extends Fragment {
         if (user != null) newId = user.getObjectId();
 
         if (!isUserIdEqual(currentUserId, newId)) {
-            Log.d(TAG, "🔄 检测到用户切换");
             currentUserId = newId;
             if (billViewModel != null) billViewModel.checkUserSwitch();
             loadUserAvatar();
@@ -348,7 +344,6 @@ public class HomeFragment extends Fragment {
             if (bill != null) {
                 AppExecutors.get().mainThread().execute(() -> {
                     billViewModel.deleteBill(bill);
-                    showSnackbar("已标记删除账单");
                 });
             }
         });

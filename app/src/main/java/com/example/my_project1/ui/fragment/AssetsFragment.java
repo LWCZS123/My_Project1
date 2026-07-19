@@ -23,6 +23,9 @@ import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.FragmentAssetsBinding;
 import com.example.my_project1.ui.activity.AccountDetailActivity;
+import com.example.my_project1.ui.activity.AccountGroupActivity;
+import com.example.my_project1.ui.activity.ArchivedAccountsActivity;
+import com.example.my_project1.ui.activity.HiddenAccountsActivity;
 import com.example.my_project1.ui.adapter.account.AssetsGroupAdapter;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
@@ -42,9 +45,6 @@ import io.reactivex.annotations.NonNull;
 public class AssetsFragment extends Fragment {
 
     private static final String TAG = "AssetsFragment";
-    private static final String TIME_TAG = "APP_LOAD_TIME";
-    private long fragmentStartTime;
-    private long dataLoadStartTime;
 
     private boolean isAmountHidden = false;
 
@@ -64,22 +64,14 @@ public class AssetsFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        fragmentStartTime = System.currentTimeMillis();
-        Log.d(TIME_TAG, "==================== 【AssetsFragment】启动 ====================");
-        Log.d(TIME_TAG, "AssetsFragment → onCreateView 开始");
-
-
         binding = FragmentAssetsBinding.inflate(inflater, container, false);
         return binding.getRoot();
-
-
     }
 
     @Override
     public void onViewCreated(@NonNull View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Log.d(TIME_TAG, "AssetsFragment → onViewCreated 开始");
         viewModel = new ViewModelProvider(requireActivity()).get(AccountViewModel.class);
         userViewModel = new ViewModelProvider(requireActivity()).get(UserProfileViewModel.class);
 
@@ -122,6 +114,8 @@ public class AssetsFragment extends Fragment {
             }
         } catch (Exception e) {}
 
+        binding.btnMore.setOnClickListener(v -> showMoreMenu());
+
         binding.ivEves.setOnClickListener(v -> {
             isAmountHidden = !isAmountHidden;
 
@@ -145,9 +139,35 @@ public class AssetsFragment extends Fragment {
 
             adapter.setAmountHidden(isAmountHidden);
         });
+    }
 
-        long cost = System.currentTimeMillis() - fragmentStartTime;
-        Log.d(TIME_TAG, "AssetsFragment → onViewCreated 完成，耗时：" + cost + "ms");
+    private void showMoreMenu() {
+        com.example.my_project1.ui.popup.AssetsMorePopup popup = new com.example.my_project1.ui.popup.AssetsMorePopup(requireContext(), new com.example.my_project1.ui.popup.AssetsMorePopup.OnOptionClickListener() {
+            @Override
+            public void onAssetGrouping() {
+                Intent intent = new Intent(requireContext(), AccountGroupActivity.class);
+                startActivity(intent);
+            }
+
+            @Override
+            public void onArchivedAccounts() {
+                Intent intent = new Intent(requireContext(), ArchivedAccountsActivity.class);
+                startActivity(intent);
+            }
+
+            @Override
+            public void onHiddenAccounts() {
+                Intent intent = new Intent(requireContext(), HiddenAccountsActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        // 获取按钮在屏幕上的位置
+        int[] location = new int[2];
+        binding.btnMore.getLocationOnScreen(location);
+
+        // 计算弹出位置，使其出现在按钮下方并右对齐
+        popup.showAsDropDown(binding.btnMore, -100, 0);
     }
 
     private void setupRecyclerView() {
@@ -164,13 +184,11 @@ public class AssetsFragment extends Fragment {
         adapter.setOnGroupActionClickListener(new AssetsGroupAdapter.OnGroupActionClickListener() {
             @Override
             public void onEditGroup(AccountGroup group) {
-                Log.d(TAG, "编辑账户组: " + group.getName());
                 // TODO: 实现编辑账户组功能
             }
 
             @Override
             public void onAccount(Account account) {
-                Log.d(TAG, "查看账户: " + account.getName());
                 Intent intent = new Intent(requireContext(), AccountDetailActivity.class);
                 intent.putExtra(AccountDetailActivity.EXTRA_ACCOUNT_ID, account.getObjectId());
                 intent.putExtra(AccountDetailActivity.EXTRA_ACCOUNT_LOCAL_ID, account.getId());
@@ -203,7 +221,14 @@ public class AssetsFragment extends Fragment {
             public void onAccountHide(Account account) {
                 account.setIncludeInTotal(false);
                 viewModel.updateAccount(account);
-                SnackbarUtils.showInfo(binding.getRoot(), "已隐藏账户: " + account.getName());
+                // 🔕 移除提示，按用户要求静默隐藏
+            }
+
+            @Override
+            public void onAccountArchive(Account account) {
+                account.setCanBeSelected(false);
+                viewModel.updateAccount(account);
+                SnackbarUtils.showInfo(binding.getRoot(), "已归档账户: " + account.getName());
             }
 
             @Override
@@ -256,16 +281,6 @@ public class AssetsFragment extends Fragment {
                 processCombinedData(data.groups, data.accounts);
             }
         });
-
-        // 🔥 观察账户组更新通知 (保持兼容)
-        viewModel.groupAccountsUpdate.observe(getViewLifecycleOwner(), updateMap -> {
-            if (updateMap != null && !updateMap.isEmpty()) {
-                for (Map.Entry<String, List<Account>> entry : updateMap.entrySet()) {
-                    adapter.updateAccountsForExpandedGroup(entry.getKey(), entry.getValue());
-                    updateTotalAssets();
-                }
-            }
-        });
     }
 
     private static class CombinedData {
@@ -277,6 +292,15 @@ public class AssetsFragment extends Fragment {
         List<AccountGroup> displayGroups = new java.util.ArrayList<>();
         Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
         
+        // 0. 过滤掉不计入总资产（已隐藏）的账户
+        List<Account> visibleAccounts = new ArrayList<>();
+        for (Account acc : allAccounts) {
+            if (acc.isIncludeInTotal()) {
+                visibleAccounts.add(acc);
+            }
+        }
+        allAccounts = visibleAccounts;
+
         // 1. 先将所有账户按 groupId 分组 (O(A))
         Map<String, List<Account>> tempMap = new HashMap<>();
         Map<String, List<Account>> categoryMap = new HashMap<>();
@@ -298,6 +322,8 @@ public class AssetsFragment extends Fragment {
         for (AccountGroup group : groups) {
             List<Account> accountsInGroup = tempMap.get(group.getObjectId());
             if (accountsInGroup != null && !accountsInGroup.isEmpty()) {
+                // 🔑 修复点：确保显示的账户组数量仅包含可见账户（实时同步）
+                group.setAccountCount(accountsInGroup.size());
                 displayGroups.add(group);
                 groupToAccountsMap.put(group.getObjectId(), accountsInGroup);
             }
@@ -395,8 +421,6 @@ public class AssetsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        Log.d(TAG, "📱 onResume - 触发云同步");
-        Log.d(TIME_TAG, "AssetsFragment → onResume");
         // 🔴 onResume 时重新加载数据
         viewModel.syncFromCloud();
 
@@ -414,7 +438,5 @@ public class AssetsFragment extends Fragment {
         clearAllObservers();
 
         binding = null;
-
-        Log.d(TIME_TAG, "AssetsFragment → onDestroyView");
     }
 }

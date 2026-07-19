@@ -15,7 +15,45 @@
         android:textStyle="bold"
         android:gravity="center"
         android:layout_marginTop="12dp"
-        android:paddingBottom="12dp"/>
+        android:paddingBottom="8dp"/>
+
+    <!-- 搜索框 -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="8dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#F5F5F5">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_search"
+                app:tint="#999999" />
+
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"
+                android:hint="搜索账户"
+                android:imeOptions="actionSearch"
+                android:singleLine="true"
+                android:textColor="#333333"
+                android:textColorHint="#999999"
+                android:textSize="14sp"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- NestedScrollView 控制整体滑动 -->
     <androidx.core.widget.NestedScrollView

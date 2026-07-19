@@ -66,7 +66,7 @@ public class ConfirmDialog {
      * 设置确认按钮点击事件
      */
     public ConfirmDialog setConfirmListener(Runnable confirmAction) {
-        binding.btnConfirm.setOnClickListener(v -> {
+        binding.btnDelete.setOnClickListener(v -> {
             if (confirmAction != null) confirmAction.run();
             dialog.dismiss();
         });

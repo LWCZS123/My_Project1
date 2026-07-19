@@ -104,6 +104,20 @@ public class AccountViewModel extends AndroidViewModel {
         return accountLiveDataMap.get(accountId);
     }
 
+    /**
+     * 根据本地 ID 获取账户 LiveData
+     */
+    public LiveData<Account> getAccountByLocalId(long localId) {
+        String key = "local_" + localId;
+        if (!accountLiveDataMap.containsKey(key)) {
+            // Need a way to get LiveData by localId from repository
+            // I'll check if repository has it or add it to Dao
+            LiveData<Account> accountLiveData = repository.getAccountByLocalId(localId);
+            accountLiveDataMap.put(key, accountLiveData);
+        }
+        return accountLiveDataMap.get(key);
+    }
+
     public LiveData<List<AccountGroup>> getAccountGroups() {
         if (allGroups == null) {
             Log.d(TAG,"首次进入无数据 → 自动加载账户组");
@@ -310,23 +324,122 @@ public class AccountViewModel extends AndroidViewModel {
     }
 
     public void deleteAccountGroup(AccountGroup group, ResultCallback callback) {
+        Log.d(TAG, "🚀 开始执行账户组删除流程: " + group.getName());
         repository.deleteAccountGroup(group, (success, message) -> {
             if (success) {
                 uiMessage.postMessage("删除账户组成功:" + group.getName());
-                Log.d(TAG, "✅ 删除账户组成功:" + group.getName());
-
-                if (callback != null) {
-                    callback.onResult(true, "删除账户组成功");
-                }
+                Log.d(TAG, "✅ 账户组物理/标记删除成功: " + group.getName());
+                if (callback != null) callback.onResult(true, "删除成功");
             } else {
                 uiMessage.postMessage("删除账户组失败:" + (message != null ? message : ""));
-                Log.e(TAG, "❌ 删除账户组失败:" + (message != null ? message : ""));
-
-                if (callback != null) {
-                    callback.onResult(false, message != null ? message : "删除账户组失败");
-                }
+                Log.e(TAG, "❌ 账户组删除失败: " + message);
+                if (callback != null) callback.onResult(false, message);
             }
         });
+    }
+
+    /**
+     * 优化逻辑：将指定分组下的所有账户，根据其 category 重置回默认分组
+     */
+    public void resetAccountsToDefaultGroups(String sourceGroupId, List<Account> accounts, List<AccountGroup> allGroups, ResultCallback callback) {
+        if (accounts == null || accounts.isEmpty()) {
+            if (callback != null) callback.onResult(true, "无需迁移");
+            return;
+        }
+
+        // 建立 category -> objectId 的映射
+        Map<String, String> categoryToIdMap = new HashMap<>();
+        for (AccountGroup g : allGroups) {
+            categoryToIdMap.put(g.getName(), g.getObjectId());
+        }
+
+        final int total = accounts.size();
+        final int[] finished = {0};
+        final boolean[] hasError = {false};
+
+        Log.d(TAG, "📦 准备重置 " + total + " 个账户到默认分组");
+
+        for (Account acc : accounts) {
+            String targetGroupId = categoryToIdMap.get(acc.getCategory());
+            // 兜底方案：如果找不到对应大类，默认回流到“资金账户”
+            if (targetGroupId == null) targetGroupId = categoryToIdMap.get("资金账户");
+
+            if (targetGroupId != null) {
+                Log.d(TAG, "🔄 账户 [" + acc.getName() + "] (" + acc.getCategory() + ") -> 重置回组ID: " + targetGroupId);
+                // 🔑 传入当前账户的 groupId 作为 oldGroupId，避免内部重复查询触发主键异常
+                moveSingleAccount(acc.getObjectId(), acc.getGroupId(), targetGroupId, (success, msg) -> {
+                    synchronized (finished) {
+                        finished[0]++;
+                        if (!success) hasError[0] = true;
+                        if (finished[0] == total) {
+                            if (callback != null) callback.onResult(!hasError[0], hasError[0] ? "部分账户重置失败" : "全部重置成功");
+                        }
+                    }
+                });
+            } else {
+                synchronized (finished) {
+                    finished[0]++;
+                    if (finished[0] == total) {
+                        if (callback != null) callback.onResult(!hasError[0], "找不到目标默认组");
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 🚀 增强版删除逻辑：自动处理账户回流到默认分组，无需 Activity 传入列表
+     */
+    public void deleteGroupWithAutoMigration(AccountGroup group, ResultCallback callback) {
+        Log.d(TAG, "🗑️ 准备自动迁移并删除分组: " + group.getName());
+
+        AppExecutors.get().diskIO().execute(() -> {
+            try {
+                String userId = BmobUser.getCurrentUser().getObjectId();
+                // 1. 获取所有分组，用于寻找默认组
+                List<AccountGroup> allGroupsList = repository.getAccountGroupsSync(userId);
+                if (allGroupsList == null || allGroupsList.isEmpty()) {
+                    postOnMain(() -> callback.onResult(false, "获取账户组列表失败"));
+                    return;
+                }
+
+                // 2. 获取该组下的所有账户
+                List<Account> accountsInGroup = repository.getAccountsByGroupIdSync(group.getObjectId());
+
+                if (accountsInGroup == null || accountsInGroup.isEmpty()) {
+                    Log.d(TAG, "⚡ 分组下无账户，直接执行物理删除");
+                    postOnMain(() -> deleteAccountGroup(group, callback));
+                    return;
+                }
+
+                // 3. 执行归流
+                Log.d(TAG, "🔄 正在自动回流 " + accountsInGroup.size() + " 个账户...");
+                resetAccountsToDefaultGroups(group.getObjectId(), accountsInGroup, allGroupsList, (success, message) -> {
+                    if (success) {
+                        Log.d(TAG, "✅ 账户回流成功，开始删除分组");
+                        deleteAccountGroup(group, callback);
+                    } else {
+                        Log.e(TAG, "❌ 账户回流中途失败: " + message);
+                        if (callback != null) callback.onResult(false, "账户回流失败，删除已中止");
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ 自动删除分组流程异常", e);
+                postOnMain(() -> callback.onResult(false, "删除操作异常: " + e.getMessage()));
+            }
+        });
+    }
+
+    private void postOnMain(Runnable runnable) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(runnable);
+    }
+
+    /**
+     * 获取指定用户的所有分组 (同步版)
+     */
+    public List<AccountGroup> getAccountGroupsSync(String userId) {
+        return repository.getAccountGroupsSync(userId);
     }
 
     public void moveAccountsToGroup(String oldGroupId, String newGroupId, ResultCallback callback) {
@@ -340,7 +453,7 @@ public class AccountViewModel extends AndroidViewModel {
                 }
             } else {
                 uiMessage.postMessage("移动账户失败:" + (message != null ? message : ""));
-                Log.e(TAG, "❌ 移动账户失败:" + (message != null ? message : ""));
+                Log.e(TAG, "❌ 账户移动失败:" + (message != null ? message : ""));
 
                 if (callback != null) {
                     callback.onResult(false, message != null ? message : "移动账户失败");
@@ -350,35 +463,52 @@ public class AccountViewModel extends AndroidViewModel {
     }
 
     /**
-     * 移动单个账户后确保两个组都更新
+     * 移动单个账户后确保两个组都更新 (兼容旧接口)
      */
     public void moveSingleAccount(String accountId, String newGroupId, ResultCallback callback) {
-        String oldGroupId = repository.getGroupIdByAccountId(accountId);
+        moveSingleAccount(accountId, null, newGroupId, callback);
+    }
 
-        repository.moveSingleAccountToGroup(accountId, newGroupId, (success, message) -> {
-            if (success) {
-                uiMessage.postMessage(message != null ? message : "账户移动成功");
-                Log.d(TAG, "✅ 单个账户移动成功:" + message);
-
-                // 🔴 关键修复：确保两个组都已经订阅了 LiveData
-                if (newGroupId != null) {
-                    getAccountsByGroupId(newGroupId); // 确保新组已订阅
-                }
-                if (oldGroupId != null && !oldGroupId.equals(newGroupId)) {
-                    getAccountsByGroupId(oldGroupId); // 确保旧组已订阅
-                }
-
-                if (callback != null) {
-                    callback.onResult(true, message != null ? message : "账户移动成功");
-                }
+    /**
+     * 移动单个账户后确保两个组都更新 (带旧组ID，避免主线程查询)
+     */
+    public void moveSingleAccount(String accountId, String oldGroupId, String newGroupId, ResultCallback callback) {
+        // 🔑 开启后台线程执行，避免 getGroupIdByAccountId 触发 Room 主线程报错
+        AppExecutors.get().diskIO().execute(() -> {
+            final String finalOldGroupId;
+            if (oldGroupId == null) {
+                // 如果外部没传，后台查一遍
+                finalOldGroupId = repository.getGroupIdByAccountId(accountId);
             } else {
-                uiMessage.postMessage("移动账户失败:" + (message != null ? message : ""));
-                Log.e(TAG, "❌ 单个账户移动失败:" + (message != null ? message : ""));
-
-                if (callback != null) {
-                    callback.onResult(false, message != null ? message : "移动账户失败");
-                }
+                finalOldGroupId = oldGroupId;
             }
+
+            // 调用仓库执行移动 (仓库内部也是异步的)
+            repository.moveSingleAccountToGroup(accountId, newGroupId, (success, message) -> {
+                if (success) {
+                    uiMessage.postMessage(message != null ? message : "账户移动成功");
+                    Log.d(TAG, "✅ 单个账户移动成功:" + message);
+
+                    // 确保两个组都已经订阅了 LiveData
+                    if (newGroupId != null) {
+                        getAccountsByGroupId(newGroupId);
+                    }
+                    if (finalOldGroupId != null && !finalOldGroupId.equals(newGroupId)) {
+                        getAccountsByGroupId(finalOldGroupId);
+                    }
+
+                    if (callback != null) {
+                        callback.onResult(true, message != null ? message : "账户移动成功");
+                    }
+                } else {
+                    uiMessage.postMessage("移动账户失败:" + (message != null ? message : ""));
+                    Log.e(TAG, "❌ 单个账户移动失败:" + (message != null ? message : ""));
+
+                    if (callback != null) {
+                        callback.onResult(false, message != null ? message : "移动账户失败");
+                    }
+                }
+            });
         });
     }
 

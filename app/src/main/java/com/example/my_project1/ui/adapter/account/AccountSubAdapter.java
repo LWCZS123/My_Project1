@@ -22,6 +22,7 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
     private static final String TAG = "AccountSubAdapter";
 
     private boolean isAmountHidden = false;
+    private boolean isSwipeEnabled = true;
 
     private final List<Account> accountList = new ArrayList<>();
     private OnAccountClickListener listener;
@@ -30,6 +31,7 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
         void onAccountClick(Account account);
         void onAccountDelete(Account account);
         void onAccountHide(Account account);
+        void onAccountArchive(Account account);
         void onAccountEdit(Account account);
     }
 
@@ -38,6 +40,11 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
     }
     public void setAmountHidden(boolean hidden) {
         this.isAmountHidden = hidden;
+        notifyDataSetChanged();
+    }
+
+    public void setSwipeEnabled(boolean enabled) {
+        this.isSwipeEnabled = enabled;
         notifyDataSetChanged();
     }
 
@@ -96,7 +103,7 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
         }
 
         void bind(Account account) {
-            Log.d(TAG, "🎨 bind() 账户: " + account.getName());
+            binding.swipeLayout.setSwipeEnable(isSwipeEnabled);
 
             binding.tvName.setText(account.getName());
 
@@ -162,6 +169,10 @@ public class AccountSubAdapter extends RecyclerView.Adapter<AccountSubAdapter.Ac
             });
             binding.btnHide.setOnClickListener(v -> {
                 if (listener != null) listener.onAccountHide(account);
+                binding.swipeLayout.quickClose();
+            });
+            binding.btnArchive.setOnClickListener(v -> {
+                if (listener != null) listener.onAccountArchive(account);
                 binding.swipeLayout.quickClose();
             });
             binding.btnEdit.setOnClickListener(v -> {

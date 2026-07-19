@@ -26,6 +26,7 @@ public class SwipeMenuLayout extends ViewGroup {
     private float mLastX;
     private float mLastY;
     private boolean isSwipe = false;
+    private boolean isSwipeEnable = true;
 
     public SwipeMenuLayout(Context context) {
         this(context, null);
@@ -35,6 +36,10 @@ public class SwipeMenuLayout extends ViewGroup {
         super(context, attrs);
         mScaledTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         mScroller = new Scroller(context);
+    }
+
+    public void setSwipeEnable(boolean swipeEnable) {
+        isSwipeEnable = swipeEnable;
     }
 
     @Override
@@ -76,6 +81,7 @@ public class SwipeMenuLayout extends ViewGroup {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (!isSwipeEnable) return false;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 mLastX = ev.getX();
@@ -98,6 +104,7 @@ public class SwipeMenuLayout extends ViewGroup {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+        if (!isSwipeEnable) return super.onTouchEvent(ev);
         if (mVelocityTracker == null) {
             mVelocityTracker = VelocityTracker.obtain();
         }

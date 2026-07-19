@@ -151,6 +151,11 @@ public class AccountGroupAdapter extends RecyclerView.Adapter<AccountGroupAdapte
                 }
 
                 @Override
+                public void onAccountArchive(Account account) {
+
+                }
+
+                @Override
                 public void onAccountEdit(Account account) {
                     if (groupActionClickListener != null)
                         groupActionClickListener.onAccountEdit(account);

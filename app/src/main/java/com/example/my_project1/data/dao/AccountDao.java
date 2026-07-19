@@ -150,6 +150,10 @@ public interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :localId LIMIT 1")
     Account getAccountByLocalId(long localId);
 
+    /** 根据本地 ID 查询账户 (LiveData) */
+    @Query("SELECT * FROM accounts WHERE id = :localId LIMIT 1")
+    LiveData<Account> getAccountByLocalIdLive(long localId);
+
     // ----------------------------------------------------------------------
     // 🧩 联合操作
     // ----------------------------------------------------------------------
