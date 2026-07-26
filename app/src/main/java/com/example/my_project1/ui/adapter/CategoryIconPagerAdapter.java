@@ -25,7 +25,9 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
     private String userId;
     private CategoryGridFragment expenseFragment;
     private CategoryGridFragment incomeFragment;
+    private com.example.my_project1.ui.fragment.TransferFragment transferFragment; // 🔑 替换为专门的转账 Fragment
     private OnCategorySelectedListener listener;
+    private com.example.my_project1.ui.fragment.TransferFragment.OnTransferAccountSelectedListener transferListener;
 
     // ⭐ 新增：保存预选中的分类信息（用于Fragment还未创建的情况）
     private String pendingCategoryId = null;
@@ -42,108 +44,90 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
 
     public void setOnCategorySelectedListener(OnCategorySelectedListener listener) {
         this.listener = listener;
-        // 如果Fragment已经创建，立即设置监听器
-        if (expenseFragment != null) {
-            expenseFragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
-                if (this.listener != null) {
-                    this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
-                }
-            });
+        if (expenseFragment != null) setupFragmentListener(expenseFragment);
+        if (incomeFragment != null) setupFragmentListener(incomeFragment);
+    }
+
+    public void setOnTransferAccountSelectedListener(com.example.my_project1.ui.fragment.TransferFragment.OnTransferAccountSelectedListener listener) {
+        this.transferListener = listener;
+        if (transferFragment != null) {
+            transferFragment.setOnTransferAccountSelectedListener(transferListener);
         }
-        if (incomeFragment != null) {
-            incomeFragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
-                if (this.listener != null) {
-                    this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
-                }
-            });
-        }
+    }
+
+    private void setupFragmentListener(CategoryGridFragment fragment) {
+        fragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
+            if (this.listener != null) {
+                this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
+            }
+        });
     }
 
     /**
      * ⭐ 新增：设置指定类型页面的选中分类
-     * @param type 0=支出, 1=收入
+     * @param type 0=支出, 1=收入, 2=转账
      * @param categoryId 要选中的分类cloudId
      */
     public void setSelectedCategory(int type, String categoryId) {
         Log.d(TAG, "⭐ setSelectedCategory: type=" + type + ", categoryId=" + categoryId);
 
-        CategoryGridFragment targetFragment = (type == 0) ? expenseFragment : incomeFragment;
-
-        if (targetFragment != null) {
-            // Fragment已经创建，直接设置
-            Log.d(TAG, "✅ Fragment已存在，直接设置选中");
-            targetFragment.setSelectedCategory(categoryId);
+        if (type == 0 && expenseFragment != null) {
+            expenseFragment.setSelectedCategory(categoryId);
+        } else if (type == 1 && incomeFragment != null) {
+            incomeFragment.setSelectedCategory(categoryId);
+        } else if (type >= 2) {
+            // 转账暂不支持通过此方式选中分类图标，因为已被卡片覆盖
+            pendingCategoryId = categoryId;
+            pendingType = type;
         } else {
-            // Fragment还未创建，保存待设置的值
-            Log.d(TAG, "⚠️ Fragment未创建，保存待设置的值");
             pendingCategoryId = categoryId;
             pendingType = type;
         }
     }
 
     /**
-     * ⭐ 新增：获取指定类型的Fragment（如果存在）
+     * ⭐ 获取转账 Fragment 实例
      */
-    public CategoryGridFragment getFragment(int type) {
-        return (type == 0) ? expenseFragment : incomeFragment;
+    public com.example.my_project1.ui.fragment.TransferFragment getTransferFragment() {
+        return transferFragment;
     }
 
     @NonNull
     @Override
     public Fragment createFragment(int position) {
-        CategoryGridFragment fragment;
-
         if (position == 0) {
-            // 支出页面
             expenseFragment = CategoryGridFragment.newInstance("expense", userId);
-            if (listener != null) {
-                expenseFragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
-                    listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
-                });
-            }
-            fragment = expenseFragment;
-
-            // ⭐ 检查是否有待设置的选中分类
-            if (pendingType == 0 && pendingCategoryId != null) {
-                Log.d(TAG, "✅ 支出Fragment创建时应用待设置的选中: " + pendingCategoryId);
-                // 延迟设置，确保Fragment完全初始化
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    expenseFragment.setSelectedCategory(pendingCategoryId);
-                    // 清除待设置的值
-                    pendingCategoryId = null;
-                    pendingType = -1;
-                }, 100);
-            }
-
-        } else {
-            // 收入页面
+            if (listener != null) setupFragmentListener(expenseFragment);
+            applyPending(expenseFragment, 0);
+            return expenseFragment;
+        } else if (position == 1) {
             incomeFragment = CategoryGridFragment.newInstance("income", userId);
-            if (listener != null) {
-                incomeFragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
-                    listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
-                });
+            if (listener != null) setupFragmentListener(incomeFragment);
+            applyPending(incomeFragment, 1);
+            return incomeFragment;
+        } else {
+            transferFragment = com.example.my_project1.ui.fragment.TransferFragment.newInstance();
+            if (transferListener != null) {
+                transferFragment.setOnTransferAccountSelectedListener(transferListener);
             }
-            fragment = incomeFragment;
-
-            // ⭐ 检查是否有待设置的选中分类
-            if (pendingType == 1 && pendingCategoryId != null) {
-                Log.d(TAG, "✅ 收入Fragment创建时应用待设置的选中: " + pendingCategoryId);
-                // 延迟设置，确保Fragment完全初始化
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    incomeFragment.setSelectedCategory(pendingCategoryId);
-                    // 清除待设置的值
-                    pendingCategoryId = null;
-                    pendingType = -1;
-                }, 100);
-            }
+            return transferFragment;
         }
+    }
 
-        return fragment;
+    private void applyPending(CategoryGridFragment fragment, int type) {
+        if (pendingType == type && pendingCategoryId != null) {
+            final String cid = pendingCategoryId;
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                fragment.setSelectedCategory(cid);
+                pendingCategoryId = null;
+                pendingType = -1;
+            }, 100);
+        }
     }
 
     @Override
     public int getItemCount() {
-        return 2; // 支出和收入两页
+        return 3; // 支出、收入、转账
     }
 
     /**

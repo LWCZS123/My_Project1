@@ -64,6 +64,10 @@ public class BudgetRepository {
         return dao.getMonthBudgetLive(userId, year, month);
     }
 
+    public LiveData<Budget> getWeekBudgetLive(String userId, int year, int month) {
+        return dao.getWeekBudgetLive(userId, year, month);
+    }
+
     public LiveData<Budget> getYearBudgetLive(String userId, int year) {
         return dao.getYearBudgetLive(userId, year);
     }
@@ -72,6 +76,10 @@ public class BudgetRepository {
 
     public Budget getMonthBudgetSync(String userId, int year, int month) {
         return dao.getMonthBudgetSync(userId, year, month);
+    }
+
+    public Budget getWeekBudgetSync(String userId, int year, int month) {
+        return dao.getWeekBudgetSync(userId, year, month);
     }
 
     public Budget getYearBudgetSync(String userId, int year) {
@@ -348,6 +356,20 @@ public class BudgetRepository {
             return sum;
         } catch (Exception e) {
             Log.e(TAG, "统计总支出失败：" + e.getMessage());
+            return 0;
+        }
+    }
+
+    public double getTotalIncomeInPeriod(String userId, long startMs, long endMs) {
+        if (userId == null) return 0;
+        try {
+            List<Bill> bills = db.billDao().getIncomeBillsInRange(userId, startMs, endMs);
+            if (bills == null) return 0;
+            double sum = 0;
+            for (Bill b : bills) { if (!b.isExcludeBudget()) sum += b.getAmount(); }
+            return sum;
+        } catch (Exception e) {
+            Log.e(TAG, "统计总收入失败：" + e.getMessage());
             return 0;
         }
     }

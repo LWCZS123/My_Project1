@@ -53,7 +53,7 @@ import cn.bmob.v3.BmobUser;
  * ✅ ⭐ 数据同步：确保修改后同步到云端和本地数据库
  * ✅ ⭐ 性能优化：优化初始化流程和内存使用
  */
-public class AddBillActivity extends AppCompatActivity {
+public class AddBillActivity extends AppCompatActivity implements com.example.my_project1.ui.fragment.TransferFragment.OnTransferAccountSelectedListener {
 
     private static final String TAG = "AddBillActivity";
 
@@ -81,7 +81,7 @@ public class AddBillActivity extends AppCompatActivity {
     private long    editBillLocalId = -1;
     private Bill originalBill = null; // ⭐ 保存原始账单对象
 
-    // 账单类型：0-支出，1-收入
+    // 账单类型：0-支出，1-收入，2-转账，3-还款
     private int billType = 0;
 
     // 分类相关
@@ -94,6 +94,7 @@ public class AddBillActivity extends AppCompatActivity {
 
     // 账户
     private Account selectedAccount = null;
+    private Account selectedTargetAccount = null; // 🔑 新增：转入账户 (用于转账/还款)
 
     // 日期时间
     private Date selectedBillTime = new Date();
@@ -133,6 +134,7 @@ public class AddBillActivity extends AppCompatActivity {
 
     private static final int REQUEST_LOCATION = 1003;
     private Bill bill;
+    private String uriStr;
 
     // ==================== 生命周期方法 ====================
 
@@ -202,10 +204,106 @@ public class AddBillActivity extends AppCompatActivity {
         if (isEditMode) {
             loadBillDataForEdit();
         } else {
+            // 🔑 检查是否为还款流程
+            int type = getIntent().getIntExtra("bill_type", 0);
+            if (type == 3 || getIntent().getBooleanExtra("is_repayment", false)) {
+                billType = 3;
+                String accountId = getIntent().getStringExtra("account_id");
+                if (accountId != null) {
+                    AppExecutors.get().diskIO().execute(() -> {
+                        Account account = accountViewModel.getAccountByIdSync(accountId);
+                        if (account != null) {
+                            AppExecutors.get().mainThread().execute(() -> {
+                                selectedTargetAccount = account;
+                                binding.tvTargetAccount.setText(account.getName());
+                                if (account.getIconUrl() != null) {
+                                    ImageLoaderUtils.load(getApplication(), account.getIconUrl(), binding.ivTargetAccount);
+                                }
+                                switchToTransferTab(3);
+                            });
+                        }
+                    });
+                } else {
+                    switchToTransferTab(3);
+                }
+            }
             updateAmountDisplay();
+            
+            // 🔑 优化：初始化账户选中逻辑（ Intent 传参 > 上次使用 ）
+            initAccountSelection();
         }
 
         observeViewModels();
+    }
+
+    private void switchToTransferTab(int type) {
+        billType = type;
+        binding.viewpagerCategory.setVisibility(View.VISIBLE);
+        binding.viewpagerCategory.setCurrentItem(2, false); // 🔑 切到转账页 (index 2)
+        updateTabSelection(type);
+        updateTransferUi();
+    }
+
+    private void updateTransferUi() {
+        boolean isTransfer = (billType == 2 || billType == 3);
+        
+        // 🔑 核心重构：在转账模式下，隐藏底部的横向账户选择卡片，改由 Fragment 处理
+        binding.cardAccount.setVisibility(isTransfer ? View.GONE : View.VISIBLE);
+        binding.ivTransferArrow.setVisibility(View.GONE); 
+        binding.cardTargetAccount.setVisibility(View.GONE); 
+        
+        if (isTransfer) {
+            syncTransferUi();
+        }
+    }
+
+    @Override
+    public void onAccountSelected(Account account, boolean isTarget) {
+        if (isTarget) {
+            this.selectedTargetAccount = account;
+        } else {
+            this.selectedAccount = account;
+            updateBaseAccountUi(account);
+        }
+    }
+
+    @Override
+    public void onSwapRequested() {
+        Account temp = selectedAccount;
+        selectedAccount = selectedTargetAccount;
+        selectedTargetAccount = temp;
+        syncTransferUi();
+    }
+
+    private void syncTransferUi() {
+        com.example.my_project1.ui.fragment.TransferFragment fragment = pagerAdapter.getTransferFragment();
+        if (fragment != null) {
+            updateTransferFragmentUi(fragment, selectedAccount, false);
+            updateTransferFragmentUi(fragment, selectedTargetAccount, true);
+        }
+        updateBaseAccountUi(selectedAccount);
+    }
+
+    private void updateTransferFragmentUi(com.example.my_project1.ui.fragment.TransferFragment fragment, Account account, boolean isTarget) {
+        if (account != null) {
+            if (isTarget) fragment.updateTargetUi(account, account.getIconUrl(), account.getName());
+            else fragment.updateSourceUi(account, account.getIconUrl(), account.getName());
+        } else {
+            if (isTarget) fragment.updateTargetUi(null, null, "请选择转入账户");
+            else fragment.updateSourceUi(null, null, "请选择转出账户");
+        }
+    }
+
+    private void updateBaseAccountUi(Account account) {
+        if (account != null) {
+            binding.tvAccount.setText(account.getName());
+            if (account.getIconUrl() != null) {
+                ImageLoaderUtils.load(getApplication(), account.getIconUrl(), binding.ivAccount);
+            }
+        } else {
+            binding.tvAccount.setText("无账户");
+            binding.ivAccount.setImageResource(R.drawable.ic_unselect_account);
+        }
     }
 
     /**
@@ -266,7 +364,37 @@ public class AddBillActivity extends AppCompatActivity {
 
         // 4. 账户
         String accountId = intent.getStringExtra("account_id");
-        // TODO: 根据accountId加载账户对象
+        String toAccountId = intent.getStringExtra("to_account_id"); // 🔑 新增
+
+        if (accountId != null) {
+            AppExecutors.get().diskIO().execute(() -> {
+                Account account = accountViewModel.getAccountByIdSync(accountId);
+                if (account != null) {
+                    AppExecutors.get().mainThread().execute(() -> {
+                        selectedAccount = account;
+                        binding.tvAccount.setText(account.getName());
+                        if (account.getIconUrl() != null) {
+                            ImageLoaderUtils.load(getApplication(), account.getIconUrl(), binding.ivAccount);
+                        }
+                    });
+                }
+            });
+        }
+
+        if (toAccountId != null) {
+            AppExecutors.get().diskIO().execute(() -> {
+                Account account = accountViewModel.getAccountByIdSync(toAccountId);
+                if (account != null) {
+                    AppExecutors.get().mainThread().execute(() -> {
+                        selectedTargetAccount = account;
+                        binding.tvTargetAccount.setText(account.getName());
+                        if (account.getIconUrl() != null) {
+                            ImageLoaderUtils.load(getApplication(), account.getIconUrl(), binding.ivTargetAccount);
+                        }
+                    });
+                }
+            });
+        }
 
         // 5. 时间
         long billTime = intent.getLongExtra("bill_time", System.currentTimeMillis());
@@ -336,28 +464,62 @@ public class AddBillActivity extends AppCompatActivity {
         billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
         accountViewModel = new ViewModelProvider(this).get(com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel.class);
         uploadViewModel = new ViewModelProvider(this).get(ImageUploadViewModel.class);
-        
-        loadLastUsedAccount();
     }
 
-    private void loadLastUsedAccount() {
+    /**
+     * 🔑 核心优化：初始化账户选中逻辑
+     * 优先级：Intent 传入账户 > 上次使用账户 > 不选
+     * 同时考虑账户是否被删除或归档
+     */
+    private void initAccountSelection() {
+        if (isEditMode) return;
+
+        Intent intent = getIntent();
+        String intentAccountId = intent.getStringExtra("account_id");
+        // 如果是还款模式，intentAccountId 是作为 TargetAccount (转入账户) 的，所以不应作为 selectedAccount (转出账户)
+        boolean isRepayment = (intent.getIntExtra("bill_type", 0) == 3 || intent.getBooleanExtra("is_repayment", false));
+
         android.content.SharedPreferences prefs = getSharedPreferences("bill_prefs", MODE_PRIVATE);
         String lastAccountId = prefs.getString(PREF_LAST_ACCOUNT_ID, null);
-        
-        if (lastAccountId != null && !isEditMode) {
-            AppExecutors.get().diskIO().execute(() -> {
-                Account account = accountViewModel.getAccountByIdSync(lastAccountId);
-                if (account != null) {
-                    AppExecutors.get().mainThread().execute(() -> {
-                        selectedAccount = account;
-                        binding.tvAccount.setText(account.getName());
-                        if (account.getIconUrl() != null) {
-                            ImageLoaderUtils.load(getApplication(), account.getIconUrl(), binding.ivAccount);
-                        }
-                    });
+
+        AppExecutors.get().diskIO().execute(() -> {
+            Account accountToSelect = null;
+
+            // 1. 优先尝试从 Intent 获取（仅在非还款流程中作为主账户）
+            if (intentAccountId != null && !isRepayment) {
+                Account account = accountViewModel.getAccountByIdSync(intentAccountId);
+                if (isValidAccount(account)) {
+                    accountToSelect = account;
                 }
-            });
-        }
+            }
+
+            // 2. 如果没获取到，尝试上次使用的账户
+            if (accountToSelect == null && lastAccountId != null) {
+                Account account = accountViewModel.getAccountByIdSync(lastAccountId);
+                if (isValidAccount(account)) {
+                    accountToSelect = account;
+                }
+            }
+
+            if (accountToSelect != null) {
+                Account finalAccount = accountToSelect;
+                AppExecutors.get().mainThread().execute(() -> {
+                    selectedAccount = finalAccount;
+                    updateBaseAccountUi(finalAccount);
+                    
+                    // 如果已经初始化了 ViewPager 且处于转账模式，同步 UI
+                    if (billType == 2 || billType == 3) {
+                        syncTransferUi();
+                    }
+                });
+            }
+        });
+    }
+
+    private boolean isValidAccount(Account account) {
+        return account != null 
+                && account.getSyncState() != com.example.my_project1.data.model.SyncState.TO_DELETE
+                && account.isCanBeSelected();
     }
 
     // ==================== 观察ViewModel ====================
@@ -417,6 +579,12 @@ public class AddBillActivity extends AppCompatActivity {
     private void setupViewPager() {
         pagerAdapter = new CategoryIconPagerAdapter(this, currentUserId);
         binding.viewpagerCategory.setAdapter(pagerAdapter);
+        
+        // 🔑 性能优化：预加载所有页面，减少切换时的布局渲染耗时
+        binding.viewpagerCategory.setOffscreenPageLimit(3);
+
+        // 🔑 设置转账监听
+        pagerAdapter.setOnTransferAccountSelectedListener(this);
 
         // 分类选择监听
         pagerAdapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
@@ -432,27 +600,14 @@ public class AddBillActivity extends AppCompatActivity {
                 super.onPageSelected(position);
                 billType = position;
                 updateTabSelection(position);
+                updateTransferUi(); // 🔑 修复：滑动切换时也更新转账 UI 状态
 
                 // ⭐ 编辑模式下切换类型时保持分类选择
-                // 如果原账单是该类型，自动选中原分类
                 if (isEditMode && position == getIntent().getIntExtra("bill_type", 0)) {
-                    // 恢复原分类
                     String originalCategoryId = getIntent().getStringExtra("category_id");
-                    String originalCategoryName = getIntent().getStringExtra("category_name");
-                    String originalCategoryIcon = getIntent().getStringExtra("category_icon");
-
-                    selectedCategoryCloudId = originalCategoryId;
-                    selectedCategoryName = originalCategoryName;
-                    selectedCategoryImageUrl = originalCategoryIcon;
-
                     if (pagerAdapter != null && originalCategoryId != null) {
                         pagerAdapter.setSelectedCategory(position, originalCategoryId);
                     }
-                } else if (!isEditMode) {
-                    // 新增模式下切换类型重置分类
-                    selectedCategoryName = null;
-                    selectedCategoryCloudId = null;
-                    selectedCategoryImageUrl = null;
                 }
             }
         });
@@ -462,13 +617,23 @@ public class AddBillActivity extends AppCompatActivity {
      * 设置Tab
      */
     private void setupTabs() {
-        binding.tabExpense.setOnClickListener(v ->
-                binding.viewpagerCategory.setCurrentItem(0, true)
-        );
+        binding.tabExpense.setOnClickListener(v -> {
+            binding.viewpagerCategory.setVisibility(View.VISIBLE);
+            binding.viewpagerCategory.setCurrentItem(0, true);
+            billType = 0;
+            updateTransferUi();
+        });
 
-        binding.tabIncome.setOnClickListener(v ->
-                binding.viewpagerCategory.setCurrentItem(1, true)
-        );
+        binding.tabIncome.setOnClickListener(v -> {
+            binding.viewpagerCategory.setVisibility(View.VISIBLE);
+            binding.viewpagerCategory.setCurrentItem(1, true);
+            billType = 1;
+            updateTransferUi();
+        });
+
+        binding.tabTransfer.setOnClickListener(v -> {
+            switchToTransferTab(2);
+        });
 
         updateTabSelection(billType);
     }
@@ -491,7 +656,8 @@ public class AddBillActivity extends AppCompatActivity {
         });
 
         // 区域3的按钮
-        binding.cardAccount.setOnClickListener(v -> selectAccount());
+        binding.cardAccount.setOnClickListener(v -> selectAccount(false));
+        binding.cardTargetAccount.setOnClickListener(v -> selectAccount(true)); // 🔑 选择转入账户
         binding.cardCalendar.setOnClickListener(v -> selectCalendar());
         binding.cardLabel.setOnClickListener(v -> selectLabel());
         binding.cardRecord.setOnClickListener(v -> selectLocation());
@@ -691,6 +857,24 @@ public class AddBillActivity extends AppCompatActivity {
                 return false;
             }
 
+            // 🔑 验证账户
+            if (selectedAccount == null) {
+                showSnackbar(billType == 2 || billType == 3 ? "请选择转出账户" : "请选择账户", SnackbarUtils.Type.WARNING);
+                return false;
+            }
+
+            if ((billType == 2 || billType == 3) && selectedTargetAccount == null) {
+                showSnackbar("请选择转入账户", SnackbarUtils.Type.WARNING);
+                return false;
+            }
+
+            if (selectedAccount != null && selectedTargetAccount != null && 
+                selectedAccount.getObjectId() != null && 
+                selectedAccount.getObjectId().equals(selectedTargetAccount.getObjectId())) {
+                showSnackbar("转出账户和转入账户不能相同", SnackbarUtils.Type.WARNING);
+                return false;
+            }
+
             currentAmount = finalAmount;
             isRepeatMode = isRepeat;
             return true;
@@ -869,37 +1053,6 @@ public class AddBillActivity extends AppCompatActivity {
     }
 
     /**
-     * ⭐ 辅助方法：更新Bill对象的数据
-     */
-    private void updateBillData(Bill bill, List<String> imageObjectKeys) {
-        bill.setUserId(currentUserId);
-        bill.setAmount(currentAmount);
-        bill.setType(billType);
-        bill.setCategoryId(selectedCategoryCloudId);
-        bill.setCategoryName(selectedCategoryName);
-        bill.setCategoryIconUrl(selectedCategoryImageUrl);
-        bill.setBillTime(selectedBillTime);
-        bill.setRemark(billRemark);
-        bill.setExcludeBudget(excludeBudget);
-
-        // 设置图片URL
-        if (imageObjectKeys != null && !imageObjectKeys.isEmpty()) {
-            bill.setImageUrls(imageObjectKeys);
-        }
-
-        // 账户（可选）
-        if (selectedAccount != null) {
-            bill.setAccountId(selectedAccount.getObjectId());
-            bill.setLocalAccountId(selectedAccount.getId());
-        }
-
-        // 地点（可选）
-        if (selectedLocationName != null) {
-            bill.setLocation(selectedLocationName);
-        }
-    }
-
-    /**
      * ⭐ 处理账单保存成功（支持编辑模式）
      */
     private void handleBillSaveSuccess() {
@@ -1010,18 +1163,28 @@ public class AddBillActivity extends AppCompatActivity {
 
     // ==================== 区域3功能 ====================
 
-    private void selectAccount() {
+    private void selectAccount(boolean isTarget) {
         BillChooseAccountFragment fragment = new BillChooseAccountFragment();
 
         fragment.setOnAccountChooseListener((account, iconUrl, accountName) -> {
-            selectedAccount = account;
-            binding.tvAccount.setText(accountName);
-
-            if (iconUrl != null) {
-                ImageLoaderUtils.load(getApplication(), iconUrl, binding.ivAccount);
+            if (isTarget) {
+                selectedTargetAccount = account;
+                binding.tvTargetAccount.setText(accountName);
+                if (iconUrl != null) {
+                    ImageLoaderUtils.load(getApplication(), iconUrl, binding.ivTargetAccount);
+                } else {
+                    binding.tvTargetAccount.setText("转入账户");
+                    binding.ivTargetAccount.setImageResource(R.drawable.ic_wallet_change);
+                }
             } else {
-                binding.tvAccount.setText("无账户");
-                binding.ivAccount.setImageResource(R.drawable.ic_unselect_account);
+                selectedAccount = account;
+                binding.tvAccount.setText(accountName);
+                if (iconUrl != null) {
+                    ImageLoaderUtils.load(getApplication(), iconUrl, binding.ivAccount);
+                } else {
+                    binding.tvAccount.setText("无账户");
+                    binding.ivAccount.setImageResource(R.drawable.ic_unselect_account);
+                }
             }
         });
 
@@ -1074,6 +1237,52 @@ public class AddBillActivity extends AppCompatActivity {
         fragment.show(getSupportFragmentManager(), "remark_bottom_sheet");
     }
 
+    /**
+     * ⭐ 辅助方法：更新Bill对象的数据
+     */
+    private void updateBillData(Bill bill, List<String> imageObjectKeys) {
+        bill.setUserId(currentUserId);
+        bill.setAmount(currentAmount);
+        bill.setType(billType);
+        bill.setCategoryId(selectedCategoryCloudId);
+        bill.setCategoryName(selectedCategoryName);
+        bill.setCategoryIconUrl(selectedCategoryImageUrl);
+        bill.setBillTime(selectedBillTime);
+        bill.setRemark(billRemark);
+        bill.setExcludeBudget(excludeBudget);
+
+        // 设置图片URL
+        if (imageObjectKeys != null && !imageObjectKeys.isEmpty()) {
+            bill.setImageUrls(imageObjectKeys);
+        }
+
+        // 账户（可选）
+        if (selectedAccount != null) {
+            bill.setAccountId(selectedAccount.getObjectId());
+            bill.setLocalAccountId(selectedAccount.getId());
+        }
+
+        // 🔑 转入账户 (用于转账/还款)
+        if ((billType == 2 || billType == 3) && selectedTargetAccount != null) {
+            bill.setToAccountId(selectedTargetAccount.getObjectId());
+            bill.setToLocalAccountId(selectedTargetAccount.getId());
+            
+            // 转账默认名称和图标 (如果没有选分类)
+            if (bill.getCategoryName() == null) {
+                bill.setCategoryName(billType == 3 ? "还款" : "转账");
+                bill.setCategoryId("system_transfer");
+                Uri uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.ic_transference);
+                uriStr = uri.toString();
+                bill.setCategoryIconUrl(uriStr);
+            }
+        }
+
+        // 地点（可选）
+        if (selectedLocationName != null) {
+            bill.setLocation(selectedLocationName);
+        }
+    }
+
     private void openSettings() {
         Intent intent = new Intent(this, CategoryActivity.class);
         startActivity(intent);
@@ -1111,16 +1320,23 @@ public class AddBillActivity extends AppCompatActivity {
     // ==================== UI工具方法 ====================
 
     private void updateTabSelection(int position) {
+        // 重置样式
+        binding.tabExpense.setBackgroundColor(Color.TRANSPARENT);
+        binding.tabExpense.setTextColor(Color.parseColor("#666666"));
+        binding.tabIncome.setBackgroundColor(Color.TRANSPARENT);
+        binding.tabIncome.setTextColor(Color.parseColor("#666666"));
+        binding.tabTransfer.setBackgroundColor(Color.TRANSPARENT);
+        binding.tabTransfer.setTextColor(Color.parseColor("#666666"));
+
         if (position == 0) {
             binding.tabExpense.setBackgroundResource(R.drawable.tab_selected_bg);
             binding.tabExpense.setTextColor(Color.WHITE);
-            binding.tabIncome.setBackgroundColor(Color.TRANSPARENT);
-            binding.tabIncome.setTextColor(Color.parseColor("#666666"));
-        } else {
+        } else if (position == 1) {
             binding.tabIncome.setBackgroundResource(R.drawable.tab_selected_bg);
             binding.tabIncome.setTextColor(Color.WHITE);
-            binding.tabExpense.setBackgroundColor(Color.TRANSPARENT);
-            binding.tabExpense.setTextColor(Color.parseColor("#666666"));
+        } else if (position == 2 || position == 3) {
+            binding.tabTransfer.setBackgroundResource(R.drawable.tab_selected_bg);
+            binding.tabTransfer.setTextColor(Color.WHITE);
         }
     }
 

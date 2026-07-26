@@ -106,6 +106,7 @@ public class Budget {
     public static final int PERIOD_MONTH = 2;
     public static final int PERIOD_YEAR  = 3;
 
+    public static final String TYPE_WEEK  = "WEEK";
     public static final String TYPE_MONTH = "MONTH";
     public static final String TYPE_YEAR  = "YEAR";
 

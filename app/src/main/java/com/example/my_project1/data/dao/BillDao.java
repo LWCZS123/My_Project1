@@ -72,7 +72,10 @@ public interface BillDao {
     LiveData<List<Bill>> getBillsByBook(String userId, String bookId);
 
     /** 🔥 按账户和用户查询账单 - 排除已删除的账单 */
-    @Query("SELECT * FROM bills WHERE user_id = :userId AND (account_id = :accountId OR local_account_id = :localAccountId) AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
+    @Query("SELECT * FROM bills WHERE user_id = :userId " +
+            "AND (account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
+            "AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsByAccount(String userId, String accountId, long localAccountId);
 
     /** 🔥 按分类ID和用户查询账单(支持一级/二级) - 排除已删除的账单 */
@@ -156,7 +159,8 @@ public interface BillDao {
     /**
      * 同步查询某个账户下的所有账单（用于后台任务）
      */
-    @Query("SELECT * FROM bills WHERE account_id = :accountId OR local_account_id = :localAccountId ORDER BY billTime DESC")
+    @Query("SELECT * FROM bills WHERE account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId ORDER BY billTime DESC")
     List<Bill> getBillsByAccountSync(String accountId, long localAccountId);
 
     /**
@@ -197,6 +201,14 @@ public interface BillDao {
                  "AND billTime >= :startMs AND billTime <= :endMs " +
                  "AND sync_state != 'TO_DELETE'")
      List<Bill> getExpenseBillsInRange(String userId, long startMs, long endMs);
+
+     @Query("SELECT * FROM bills " +
+                 "WHERE user_id = :userId " +
+                 "AND type = 1 " +
+                 "AND excludeBudget = 0 " +
+                 "AND billTime >= :startMs AND billTime <= :endMs " +
+                 "AND sync_state != 'TO_DELETE'")
+     List<Bill> getIncomeBillsInRange(String userId, long startMs, long endMs);
 
 
 

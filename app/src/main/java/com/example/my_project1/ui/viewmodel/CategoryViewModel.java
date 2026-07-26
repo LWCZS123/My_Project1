@@ -59,6 +59,41 @@ public class CategoryViewModel extends AndroidViewModel {
         return incomeCategories;
     }
 
+    public LiveData<List<CategoryWithSubCategories>> getTransferCategories(String userId) {
+        androidx.lifecycle.MediatorLiveData<List<CategoryWithSubCategories>> result = new androidx.lifecycle.MediatorLiveData<>();
+        result.addSource(repository.getCategoriesWithSubs(userId, "transfer"), categories -> {
+            if (categories == null || categories.isEmpty()) {
+                // 🔑 兜底逻辑：如果数据库没数据，返回预设的转账分类
+                List<CategoryWithSubCategories> presets = new java.util.ArrayList<>();
+                
+                Category c1 = new Category();
+                c1.setName("转账");
+                c1.setIconUri("ic_qiehuan");
+                c1.setType("transfer");
+                c1.setCloudId("system_transfer_1");
+                
+                CategoryWithSubCategories item = new CategoryWithSubCategories();
+                item.category = c1;
+                presets.add(item);
+                
+                Category c2 = new Category();
+                c2.setName("还款");
+                c2.setIconUri("ic_card");
+                c2.setType("transfer");
+                c2.setCloudId("system_transfer_2");
+                
+                CategoryWithSubCategories item2 = new CategoryWithSubCategories();
+                item2.category = c2;
+                presets.add(item2);
+
+                result.setValue(presets);
+            } else {
+                result.setValue(categories);
+            }
+        });
+        return result;
+    }
+
     /** 操作方法 */
     public void insert(Category category) { repository.insert(category); }
 

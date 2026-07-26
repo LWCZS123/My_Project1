@@ -179,7 +179,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                 updateAccountInfo(account);
                 
                 if (!filteredBills.isEmpty() && billAdapter != null) {
-                    billAdapter.setData(filteredBills, currentAccount.getBalance(), currentAccount.isCredit());
+                    billAdapter.setData(filteredBills, currentAccount);
                 }
             } else {
                 if (currentAccount == null) {
@@ -457,7 +457,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                 // 🔑 核心修复：只有在 currentAccount 已经加载的情况下才调用 setData
                 // 如果还没加载，loadAccountData 结束后会补刷。
                 if (currentAccount != null) {
-                    billAdapter.setData(filteredBills, currentAccount.getBalance(), currentAccount.isCredit());
+                    billAdapter.setData(filteredBills, currentAccount);
                 }
 
                 updateChart();
@@ -854,7 +854,7 @@ public class AccountDetailActivity extends AppCompatActivity {
         }
 
         if (currentAccount != null) {
-            billAdapter.setData(filteredBills, currentAccount.getBalance(), currentAccount.isCredit());
+            billAdapter.setData(filteredBills, currentAccount);
         }
         calculateStatistics(filteredBills);
     }

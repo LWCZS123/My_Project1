@@ -137,11 +137,18 @@ public class CategoryGridFragment extends Fragment {
                     Log.d(TAG, "✅ 支出分类数据已更新: " + categories.size() + " 条");
                 }
             });
-        } else {
+        } else if ("income".equals(categoryType)) {
             viewModel.getIncomeCategories(userId).observe(getViewLifecycleOwner(), categories -> {
                 if (categories != null) {
                     adapter.updateData(categories);
                     Log.d(TAG, "✅ 收入分类数据已更新: " + categories.size() + " 条");
+                }
+            });
+        } else if ("transfer".equals(categoryType)) {
+            // 🔑 转账分类 (可以从 ViewModel 获取，或者使用硬编码的默认分类)
+            viewModel.getTransferCategories(userId).observe(getViewLifecycleOwner(), categories -> {
+                if (categories != null) {
+                    adapter.updateData(categories);
                 }
             });
         }

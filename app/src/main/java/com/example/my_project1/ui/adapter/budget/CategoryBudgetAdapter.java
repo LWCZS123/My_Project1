@@ -142,71 +142,47 @@ public class CategoryBudgetAdapter
         Category           category = item.category;
         Context            ctx      = h.b.getRoot().getContext();
 
-        // ── 分类名称 & 图标（带完整性检测与兜底）─────────────
-        if (category != null
-                && category.getName() != null
-                && !category.getName().isEmpty()
-                && !"未知分类".equals(category.getName())) {
-            // 分类信息完整
+        // ── 分类名称 & 图标 ─────────────
+        if (category != null && category.getName() != null && !category.getName().isEmpty()) {
             h.b.tvCategoryName.setText(category.getName());
             loadIcon(ctx, category.getIconUri(), h.b.ivCategoryIcon);
         } else {
-            // 信息不完整：先用占位显示，并请求宿主补充
             h.b.tvCategoryName.setText("加载中…");
             h.b.ivCategoryIcon.setImageResource(R.drawable.ic_category_default);
-
-            String targetId = budget.getTargetId();
-            if (listener != null && targetId != null && !targetId.isEmpty()) {
-                // 通知宿主按 targetId 查找分类信息，完成后宿主调用 notifyItemChanged(pos)
-                h.b.getRoot().post(() -> listener.onRequestCategoryInfo(targetId, h.getAdapterPosition()));
+            if (listener != null && budget.getTargetId() != null) {
+                h.b.getRoot().post(() -> listener.onRequestCategoryInfo(budget.getTargetId(), h.getAdapterPosition()));
             }
         }
 
-        // ── 周期标签 ────────────────────────────────────────
-        h.b.tvPeriod.setText("/" + Budget.getPeriodLabel(budget.getPeriod()));
-
         // ── 金额计算 ─────────────────────────────────────────
-        double  budgetAmt  = budget.getAmount();
-        double  spent      = item.spentAmount;
-        double  available  = budgetAmt - spent;
-        boolean overBudget = available < 0;
-
-        h.b.tvBudgetAmount.setText(
-                String.format(Locale.getDefault(), "预算 ¥%.2f", budgetAmt));
-        h.b.tvSpent.setText(
-                String.format(Locale.getDefault(), "已用 ¥%.2f", spent));
-
-        if (!overBudget) {
-            h.b.tvAvailable.setText(
-                    String.format(Locale.getDefault(), "可用 ¥%.2f", available));
-            h.b.tvAvailable.setTextColor(0xFF4CAF50);
-        } else {
-            h.b.tvAvailable.setText(
-                    String.format(Locale.getDefault(), "超支 ¥%.2f", Math.abs(available)));
-            h.b.tvAvailable.setTextColor(0xFFFF5252);
-        }
-
-        // ── 进度条（与 BudgetActivity 完全一致）──────────────
+        double budgetAmt = budget.getAmount();
+        double spent = item.spentAmount;
         int progress = (budgetAmt > 0) ? (int) Math.min(spent / budgetAmt * 100, 100) : 0;
-        ProgressBar progressBar = h.b.progressBar;
-        progressBar.setProgress(progress);
+        boolean overBudget = spent > budgetAmt;
 
-        if (progress < 100 && !overBudget) {
-            progressBar.setProgressDrawable(
-                    ctx.getResources().getDrawable(R.drawable.bg_progress_budget_blue));
+        h.b.tvSpent.setText(String.format(Locale.getDefault(), "%.0f", spent));
+        h.b.tvBudgetHint.setText(String.format(Locale.getDefault(), "%d%% | %.2f", (int)(spent/budgetAmt*100), budgetAmt));
+
+        // ── 风格重构：背景进度条 (参照截图) ────────────────────────
+        h.b.pbBgProgress.setProgress(progress);
+        if (overBudget) {
+            h.b.pbBgProgress.setProgressDrawable(ctx.getDrawable(R.drawable.bg_progress_fill_light));
+            h.b.tvSpent.setTextColor(0xFFEB5757);
         } else {
-            progressBar.setProgressDrawable(
-                    ctx.getResources().getDrawable(R.drawable.progress_budget_red));
+            h.b.pbBgProgress.setProgressDrawable(ctx.getDrawable(R.drawable.bg_progress_fill_blue_light));
+            h.b.tvSpent.setTextColor(0xFF333333);
         }
+
+        // ── 分割线逻辑 ──────────────────────────────────────────
+        h.b.itemDivider.setVisibility(pos == getItemCount() - 1 ? android.view.View.GONE : android.view.View.VISIBLE);
 
         // ── 点击事件 ─────────────────────────────────────────
         if (listener != null) {
-            // 整体 item 点击 → 跳转详情页
             h.b.getRoot().setOnClickListener(v -> listener.onItemClick(item));
-            // 编辑按钮
-            h.b.btnEdit.setOnClickListener(v   -> listener.onEdit(item));
-            // 删除按钮
-            h.b.btnDelete.setOnClickListener(v -> listener.onDelete(budget.getId()));
+            h.b.getRoot().setOnLongClickListener(v -> {
+                listener.onEdit(item); // 长按编辑
+                return true;
+            });
         }
     }
 

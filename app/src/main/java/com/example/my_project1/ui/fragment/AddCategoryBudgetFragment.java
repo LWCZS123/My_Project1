@@ -462,6 +462,12 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
             Toast.makeText(requireContext(), "预算金额须大于 0", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (amount > 999999999.99) {
+            Toast.makeText(requireContext(), "预算金额过大，最大限制 999,999,999.99", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        final double finalAmount = Math.round(amount * 100.0) / 100.0;
         if (selectedPeriod > maxPeriod) {
             showPeriodConstraintHint();
             return;
@@ -472,7 +478,7 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
                 List<Budget> all = budgetVm.getCategoryBudgetsSyncForCurrentType();
                 for (Budget b : all) {
                     if (b.getId() == editBudgetId) {
-                        budgetVm.updateCategoryBudget(b, amount, selectedPeriod);
+                        budgetVm.updateCategoryBudget(b, finalAmount, selectedPeriod);
                         break;
                     }
                 }
@@ -486,7 +492,7 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
             });
         } else {
             boolean ok = budgetVm.addCategoryBudget(selectedCatCloudId,
-                    amount,
+                    finalAmount,
                     selectedPeriod,
                     selectedCatName,
                     selectedCatIconUri);

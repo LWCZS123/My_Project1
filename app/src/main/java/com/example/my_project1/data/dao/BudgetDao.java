@@ -47,6 +47,11 @@ public interface BudgetDao {
             "AND budget_type = 'MONTH' AND year = :year AND month = :month LIMIT 1")
     Budget getMonthBudgetSync(String userId, int year, int month);
 
+    /** 同步查询：指定年月的周预算 */
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND budget_type = 'WEEK' AND year = :year AND month = :month LIMIT 1")
+    Budget getWeekBudgetSync(String userId, int year, int month);
+
     /** 同步查询：指定年份的年预算 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
             "AND budget_type = 'YEAR' AND year = :year LIMIT 1")
@@ -56,6 +61,11 @@ public interface BudgetDao {
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
             "AND budget_type = 'MONTH' AND year = :year AND month = :month LIMIT 1")
     LiveData<Budget> getMonthBudgetLive(String userId, int year, int month);
+
+    /** LiveData：监听指定年月的周预算变化 */
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND budget_type = 'WEEK' AND year = :year AND month = :month LIMIT 1")
+    LiveData<Budget> getWeekBudgetLive(String userId, int year, int month);
 
     /** LiveData：监听指定年份的年预算变化 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +

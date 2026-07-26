@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.AsyncListDiffer;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,9 +23,26 @@ import io.reactivex.annotations.NonNull;
 public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
 
     private final Context context;
-    private final List<BillUiModel> bills = new ArrayList<>();
+    private static final String TAG = "BillRowAdapter";
+
     private final BillAdapter.OnBillClickListener listener;
     private final RecyclerView.RecycledViewPool photoPool;
+
+    private static final DiffUtil.ItemCallback<BillUiModel> DIFF_CALLBACK =
+            new DiffUtil.ItemCallback<BillUiModel>() {
+                @Override
+                public boolean areItemsTheSame(@NonNull BillUiModel oldItem, @NonNull BillUiModel newItem) {
+                    return oldItem.localId == newItem.localId || 
+                           (oldItem.objectId != null && oldItem.objectId.equals(newItem.objectId));
+                }
+
+                @Override
+                public boolean areContentsTheSame(@NonNull BillUiModel oldItem, @NonNull BillUiModel newItem) {
+                    return oldItem.equals(newItem);
+                }
+            };
+
+    private final AsyncListDiffer<BillUiModel> differ = new AsyncListDiffer<>(this, DIFF_CALLBACK);
 
     public BillRowAdapter(Context context, BillAdapter.OnBillClickListener listener, RecyclerView.RecycledViewPool photoPool) {
         this.context = context;
@@ -32,9 +51,7 @@ public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
     }
 
     public void setBills(List<BillUiModel> newBills) {
-        this.bills.clear();
-        if (newBills != null) this.bills.addAll(newBills);
-        notifyDataSetChanged();
+        differ.submitList(newBills);
     }
 
     @NonNull
@@ -45,12 +62,12 @@ public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
 
     @Override
     public void onBindViewHolder(@NonNull RowVH holder, int position) {
-        holder.bind(bills.get(position), position == bills.size() - 1);
+        holder.bind(differ.getCurrentList().get(position), position == differ.getCurrentList().size() - 1);
     }
 
     @Override
     public int getItemCount() {
-        return bills.size();
+        return differ.getCurrentList().size();
     }
 
     class RowVH extends RecyclerView.ViewHolder {
@@ -73,21 +90,36 @@ public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
             b.tvSubInfo.setText(subInfo);
             b.tvAccount.setText(bill.accountName);
 
+            // 🔑 处理转账显示
+            if (bill.billType == 2 || bill.billType == 3) {
+                b.ivTransferArrow.setVisibility(View.VISIBLE);
+                b.tvToAccount.setVisibility(View.VISIBLE);
+                b.tvToAccount.setText(bill.toAccountName);
+            } else {
+                b.ivTransferArrow.setVisibility(View.GONE);
+                b.tvToAccount.setVisibility(View.GONE);
+            }
+
             ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, b.ivCategoryIcon);
 
             if (bill.imageUrls != null && !bill.imageUrls.isEmpty()) {
                 b.ivBillImage.setVisibility(View.VISIBLE);
-                b.ivBillImage.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
+                if (b.ivBillImage.getLayoutManager() == null) {
+                    b.ivBillImage.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
+                }
                 if (photoPool != null) b.ivBillImage.setRecycledViewPool(photoPool);
                 
-                PhotoAdapter photoAdapter = new PhotoAdapter(context, new ArrayList<>(), false,
-                        new PhotoAdapter.OnPhotoClickListener() {
-                            @Override public void onPhotoClick(String url, int pos) {
-                                if (listener != null) listener.onPhotoClick(url, pos);
-                            }
-                            @Override public void onDeleteClick(int pos) { }
-                        });
-                b.ivBillImage.setAdapter(photoAdapter);
+                PhotoAdapter photoAdapter = (PhotoAdapter) b.ivBillImage.getAdapter();
+                if (photoAdapter == null) {
+                    photoAdapter = new PhotoAdapter(context, new ArrayList<>(), false,
+                            new PhotoAdapter.OnPhotoClickListener() {
+                                @Override public void onPhotoClick(String url, int pos) {
+                                    if (listener != null) listener.onPhotoClick(url, pos);
+                                }
+                                @Override public void onDeleteClick(int pos) { }
+                            });
+                    b.ivBillImage.setAdapter(photoAdapter);
+                }
                 photoAdapter.setPhotos(bill.imageUrls);
             } else {
                 b.ivBillImage.setVisibility(View.GONE);
@@ -114,3 +146,4 @@ public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
         }
     }
 }
+

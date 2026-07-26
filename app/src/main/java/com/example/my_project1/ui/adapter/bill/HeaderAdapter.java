@@ -10,6 +10,8 @@ import com.example.my_project1.R;
 import com.example.my_project1.databinding.ItemHomeHeaderBinding;
 import com.example.my_project1.ui.viewmodel.billvm.HeaderUiModel;
 
+import java.util.List;
+
 import io.reactivex.annotations.NonNull;
 
 /**
@@ -21,6 +23,10 @@ import io.reactivex.annotations.NonNull;
 public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> {
 
     private OnRefreshClickListener refreshClickListener;
+    
+    // Payload 常量
+    private static final String PAYLOAD_MODE = "payload_mode";
+    private static final String PAYLOAD_DATA = "payload_data";
 
     private HeaderUiModel data = new HeaderUiModel(
             "¥0.00",
@@ -48,7 +54,7 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
     /** 更新数据并局部刷新 */
     public void setHeader(HeaderUiModel model) {
         this.data = model;
-        notifyItemChanged(0);
+        notifyItemChanged(0, PAYLOAD_DATA);
     }
 
     @Override
@@ -69,6 +75,22 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
         holder.bind(data);
     }
 
+    @Override
+    public void onBindViewHolder(@NonNull HeaderVH holder, int position, @NonNull List<Object> payloads) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads);
+        } else {
+            // 局部刷新，防止闪烁
+            for (Object payload : payloads) {
+                if (PAYLOAD_MODE.equals(payload)) {
+                    holder.updateMode(data);
+                } else if (PAYLOAD_DATA.equals(payload)) {
+                    holder.updateData(data);
+                }
+            }
+        }
+    }
+
     class HeaderVH extends RecyclerView.ViewHolder {
         private final ItemHomeHeaderBinding b;
 
@@ -78,11 +100,22 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             
             b.llHeaderTitle.setOnClickListener(v -> {
                 currentMode = (currentMode + 1) % 4;
-                bind(data);
+                notifyItemChanged(getBindingAdapterPosition(), PAYLOAD_MODE);
             });
+            
+            // 初始播放动画
+            if (!b.lottieAnimation.isAnimating()) {
+                b.lottieAnimation.playAnimation();
+            }
         }
 
         void bind(HeaderUiModel model) {
+            updateMode(model);
+            updateData(model);
+        }
+
+        /** 仅更新切换模式相关的 UI */
+        void updateMode(HeaderUiModel model) {
             switch (currentMode) {
                 case 0:
                     b.tvTitle.setText("我的净资产");
@@ -101,7 +134,13 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
                     b.tvTotalAmount.setText(model.weeklyBalance);
                     break;
             }
-            
+        }
+
+        /** 仅更新数值相关的 UI */
+        void updateData(HeaderUiModel model) {
+            // 如果模式没变，也要更新主金额（因为 model 可能变了）
+            updateMode(model);
+
             // 设置今日变化颜色：收入>支出为绿色，支出>收入为红色
             String changeText = model.todayChange;
             b.tvTodayChange.setText(changeText);
@@ -109,10 +148,7 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             // 解析数值判断正负（根据前缀 + 或 -）
             if (changeText != null && !changeText.isEmpty()) {
                 try {
-                    // 检查是否包含负号前缀
                     boolean isNegative = changeText.trim().startsWith("-");
-                    
-                    // 移除货币符号、空格和逗号，提取纯数值
                     String numericValue = changeText.replace("¥", "")
                             .replace("$", "")
                             .replace("+", "")
@@ -121,27 +157,19 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
                             .trim();
                     
                     double value = Double.parseDouble(numericValue);
-                    
-                    // 如果是负数前缀，将值设为负
-                    if (isNegative) {
-                        value = -value;
-                    }
+                    if (isNegative) value = -value;
                     
                     if (value > 0) {
-                        // 正数（收入>支出）显示绿色
                         b.tvTodayChange.setTextColor(ContextCompat.getColor(
                                 b.getRoot().getContext(), R.color.green));
                     } else if (value < 0) {
-                        // 负数（支出>收入）显示红色
                         b.tvTodayChange.setTextColor(ContextCompat.getColor(
                                 b.getRoot().getContext(), R.color.red));
                     } else {
-                        // 零值使用默认灰色
                         b.tvTodayChange.setTextColor(ContextCompat.getColor(
                                 b.getRoot().getContext(), R.color.icon_tint));
                     }
                 } catch (NumberFormatException e) {
-                    // 解析失败时使用默认颜色（灰色）
                     b.tvTodayChange.setTextColor(ContextCompat.getColor(
                             b.getRoot().getContext(), R.color.icon_tint));
                 }
@@ -150,9 +178,12 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             b.tvAssetsValue.setText(model.assets);
             b.tvLiabilitiesValue.setText(model.liabilities);
             b.tvMonthlyIncome.setText("月收入: " + model.monthlyIncome);
-//            b.tvTotalIncome.setText("总收入: " + model.totalIncome);
             b.tvMonthlyExpense.setText("月支出: " + model.monthlyExpense);
-//            b.tvTotalExpense.setText("总支出: " + model.totalExpense);
+            
+            // 💡 优化：避免重复触发 Lottie 动画重置
+            if (!b.lottieAnimation.isAnimating()) {
+                b.lottieAnimation.playAnimation();
+            }
         }
     }
 }

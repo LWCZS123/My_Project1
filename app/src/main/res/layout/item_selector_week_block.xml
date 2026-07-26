@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tv_week_range"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="2026年3月15日 - 2026年3月21日"
+        android:textColor="#333333"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp"/>
+
+    <LinearLayout
+        android:id="@+id/ll_days_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+        <!-- We will dynamically add 7 day views here or use a grid if preferred.
+             For simplicity in this layout, let's just use 7 slots if possible,
+             or a nested RecyclerView for consistent style. -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_days"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false"/>
+    </LinearLayout>
+</LinearLayout>

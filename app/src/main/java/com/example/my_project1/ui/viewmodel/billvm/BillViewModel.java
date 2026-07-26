@@ -1,6 +1,7 @@
 package com.example.my_project1.ui.viewmodel.billvm;
 
 import android.app.Application;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -310,7 +311,7 @@ public class BillViewModel extends AndroidViewModel {
 
             // 统计
             if (bill.getType() == 0) dayExpense += bill.getAmount();
-            else                     dayIncome  += bill.getAmount();
+            else if (bill.getType() == 1) dayIncome  += bill.getAmount();
 
             // 构建 Header (首次或日期改变时)
             if (currentDayBills.isEmpty()) {
@@ -322,20 +323,42 @@ public class BillViewModel extends AndroidViewModel {
             }
 
             // 构建 BillUiModel
-            String amountText = (bill.getType() == 0 ? "- ¥" : "+ ¥") + amtFmt.format(bill.getAmount());
-            int amountColor = getApplication().getColor(bill.getType() == 0 ? R.color.red : R.color.green);
+            int billType = bill.getType();
+            String prefix = "";
+            int amountColor;
+            String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
+            
+            if (billType == 0) {
+                prefix = "- ¥";
+                amountColor = getApplication().getColor(R.color.red);
+            } else if (billType == 1) {
+                prefix = "+ ¥";
+                amountColor = getApplication().getColor(R.color.green);
+            } else {
+                // 转账 或 还款
+                prefix = "¥";
+                amountColor = getApplication().getColor(R.color.orange_500); 
+                // 🔑 强制使用转账图标
+                Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
+                categoryIcon =uri.toString();
+            }
+            
+            String amountText = prefix + amtFmt.format(bill.getAmount());
 
             Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
+            Account toAccount = (accountMap != null && (billType == 2 || billType == 3)) ? accountMap.get(bill.getToAccountId()) : null;
 
             currentDayBills.add(BillUiModel.builder()
                     .localId(bill.getId())
                     .objectId(bill.getObjectId())
                     .timeText(timeFmt.format(bill.getBillTime()))
                     .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
-                    .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
+                    .categoryIconUrl(categoryIcon)
                     .amountText(amountText)
                     .amountColor(amountColor)
                     .accountName(account != null ? account.getName() : "")
+                    .toAccountName(toAccount != null ? toAccount.getName() : "")
+                    .billType(billType)
                     .remarkText(bill.getRemark())
                     .imageUrls(bill.getImageUrls())
                     .build());
@@ -370,12 +393,12 @@ public class BillViewModel extends AndroidViewModel {
         if (monthBills != null) {
             for (Bill b : monthBills) {
                 if (b.getType() == 0) monthlyExpense += b.getAmount();
-                else monthlyIncome += b.getAmount();
+                else if (b.getType() == 1) monthlyIncome += b.getAmount();
                 
                 // 计算今日变化
                 if (b.getBillTime() != null && todayKey.equals(fmt.format(b.getBillTime()))) {
                     if (b.getType() == 0) todayChange -= b.getAmount();
-                    else todayChange += b.getAmount();
+                    else if (b.getType() == 1) todayChange += b.getAmount();
                 }
             }
         }
@@ -410,7 +433,7 @@ public class BillViewModel extends AndroidViewModel {
                     if (b.getBillTime() != null && b.getBillTime().after(weekRange[0]) && b.getBillTime().before(weekRange[1])) {
                         weeklyExpense += amt;
                     }
-                } else {
+                } else if (b.getType() == 1) {
                     totalIncome += amt;
                     if (b.getBillTime() != null && b.getBillTime().after(weekRange[0]) && b.getBillTime().before(weekRange[1])) {
                         weeklyIncome += amt;
@@ -727,20 +750,17 @@ public class BillViewModel extends AndroidViewModel {
                     _toastMessage.setValue("同步成功");
 
                     // ✅ 关键：同步成功后，触发本地数据库重新查询
-                    mainHandler.post(() -> {
-                        // 强制触发 LiveData 通知，确保 UI 收到数据变更
-                        _refreshTrigger.setValue(System.currentTimeMillis());
-                        // 额外调用一次 computeStats 确保 Header 统计准确
-                        refreshData();
-                    });
+                    mainHandler.post(this::refreshData);
                 } else {
+
                     _syncState.setValue(ApiResponse.error(r.message));
                     _toastMessage.setValue("同步失败: " + r.message);
-                    _refreshTrigger.setValue(System.currentTimeMillis());
+                    mainHandler.post(this::refreshData);
                 }
             });
         });
     }
+
 
     // ── 用户切换 ──────────────────────────────────────
     public void checkUserSwitch() {

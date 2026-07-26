@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tv_week_range"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:gravity="center"
+    android:textSize="14sp"
+    android:textColor="#333333"
+    android:background="?attr/selectableItemBackground"
+    android:text="2026年3月15日 - 2026年3月21日"/>

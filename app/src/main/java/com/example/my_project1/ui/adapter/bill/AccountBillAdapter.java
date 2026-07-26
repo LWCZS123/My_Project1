@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ItemAccountTransactionBinding;
 import com.example.my_project1.databinding.ItemDayHeaderBinding;
@@ -46,6 +47,8 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private final Map<Long, Double> billBalanceMap = new HashMap<>();
     
     private boolean isCredit = false;
+    private String currentAccountId;
+    private long currentLocalAccountId;
     private OnBillClickListener listener;
 
     public interface OnBillClickListener {
@@ -73,8 +76,12 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     /**
      * 设置数据并根据月份、日期进行分组，同时计算每笔交易后的余额
      */
-    public void setData(List<Bill> bills, double accountBalance, boolean isCredit) {
-        this.isCredit = isCredit;
+    public void setData(List<Bill> bills, Account currentAccount) {
+        if (currentAccount != null) {
+            this.currentAccountId = currentAccount.getObjectId();
+            this.currentLocalAccountId = currentAccount.getId();
+            this.isCredit = currentAccount.isCredit();
+        }
         
         monthGroupsMap.clear();
         billBalanceMap.clear();
@@ -86,10 +93,11 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         }
 
         // 1. 计算每笔交易发生后的余额 (从当前余额倒推)
-        double runningBalance = accountBalance;
+        double runningBalance = currentAccount != null ? currentAccount.getBalance() : 0;
         for (Bill bill : bills) {
             billBalanceMap.put(bill.getId(), runningBalance);
-            double impact = (bill.getType() == 1) ? bill.getAmount() : -bill.getAmount();
+            boolean isPositive = isPositiveImpact(bill);
+            double impact = isPositive ? bill.getAmount() : -bill.getAmount();
             runningBalance -= impact;
         }
 
@@ -103,7 +111,7 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
             MonthGroup mGroup = monthGroupsMap.get(monthKey);
             if (mGroup == null) {
-                mGroup = new MonthGroup(monthKey, bill.getBillTime());
+                mGroup = new MonthGroup(monthKey, bill.getBillTime(), this);
                 monthGroupsMap.put(monthKey, mGroup);
             }
             
@@ -112,6 +120,22 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
         // 3. 构建显示列表
         updateDisplayItems();
+    }
+
+    private boolean isPositiveImpact(Bill bill) {
+        if (bill.getType() == 1) return true;
+        if (bill.getType() == 2 || bill.getType() == 3) {
+            // 转账或还款：判断当前账户是转入还是转出
+            return isCurrentAccountTarget(bill);
+        }
+        return false;
+    }
+
+    private boolean isCurrentAccountTarget(Bill bill) {
+        if (currentAccountId != null && !currentAccountId.isEmpty() && currentAccountId.equals(bill.getToAccountId())) {
+            return true;
+        }
+        return currentLocalAccountId > 0 && currentLocalAccountId == bill.getToLocalAccountId();
     }
 
     /**
@@ -296,9 +320,10 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
             // 金额
             DecimalFormat df = new DecimalFormat("#,##0.00");
-            String prefix = (bill.getType() == 1) ? "+" : "-";
+            boolean isIncome = isPositiveImpact(bill);
+            String prefix = isIncome ? "+" : "-";
             binding.tvAmount.setText(prefix + "¥" + df.format(bill.getAmount()));
-            binding.tvAmount.setTextColor((bill.getType() == 1) ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B"));
+            binding.tvAmount.setTextColor(isIncome ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B"));
 
             // 交易后余额/欠款
             Double balanceAfter = billBalanceMap.get(bill.getId());
@@ -338,19 +363,21 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         double totalInflow = 0;
         double totalOutflow = 0;
         Map<String, DayGroup> dayGroups = new LinkedHashMap<>();
+        private final AccountBillAdapter adapter;
 
-        MonthGroup(String key, Date date) {
+        MonthGroup(String key, Date date, AccountBillAdapter adapter) {
             this.key = key;
             this.date = date;
+            this.adapter = adapter;
         }
 
         void addBill(Bill bill, String dayKey) {
-            if (bill.getType() == 1) totalInflow += bill.getAmount();
+            if (adapter.isPositiveImpact(bill)) totalInflow += bill.getAmount();
             else totalOutflow += bill.getAmount();
 
             DayGroup dGroup = dayGroups.get(dayKey);
             if (dGroup == null) {
-                dGroup = new DayGroup(dayKey, bill.getBillTime());
+                dGroup = new DayGroup(dayKey, bill.getBillTime(), adapter);
                 dayGroups.put(dayKey, dGroup);
             }
             dGroup.addBill(bill);
@@ -363,14 +390,16 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         double totalInflow = 0;
         double totalOutflow = 0;
         List<Bill> bills = new ArrayList<>();
+        private final AccountBillAdapter adapter;
 
-        DayGroup(String key, Date date) {
+        DayGroup(String key, Date date, AccountBillAdapter adapter) {
             this.key = key;
             this.date = date;
+            this.adapter = adapter;
         }
 
         void addBill(Bill bill) {
-            if (bill.getType() == 1) totalInflow += bill.getAmount();
+            if (adapter.isPositiveImpact(bill)) totalInflow += bill.getAmount();
             else totalOutflow += bill.getAmount();
             bills.add(bill);
         }

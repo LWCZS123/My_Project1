@@ -27,10 +27,16 @@ public class Bill implements Serializable {
     private String bookId;        // 归属账本
 
     @ColumnInfo(name = "account_id")
-    private String accountId;     // 使用账户
+    private String accountId;     // 使用账户 (转出账户)
 
     @ColumnInfo(name = "local_account_id", defaultValue = "-1")
     private long localAccountId = -1; // 使用账户本地ID
+
+    @ColumnInfo(name = "to_account_id")
+    private String toAccountId;     // 转入账户
+
+    @ColumnInfo(name = "to_local_account_id", defaultValue = "-1")
+    private long toLocalAccountId = -1; // 转入账户本地ID
 
     @ColumnInfo(name = "category_id")
     private String categoryId;    // 分类ID（可一级/二级）
@@ -115,6 +121,12 @@ public class Bill implements Serializable {
 
     public long getLocalAccountId() { return localAccountId; }
     public void setLocalAccountId(long localAccountId) { this.localAccountId = localAccountId; }
+
+    public String getToAccountId() { return toAccountId; }
+    public void setToAccountId(String toAccountId) { this.toAccountId = toAccountId; }
+
+    public long getToLocalAccountId() { return toLocalAccountId; }
+    public void setToLocalAccountId(long toLocalAccountId) { this.toLocalAccountId = toLocalAccountId; }
 
     public String getCategoryId() { return categoryId; }
     public void setCategoryId(String categoryId) { this.categoryId = categoryId; }

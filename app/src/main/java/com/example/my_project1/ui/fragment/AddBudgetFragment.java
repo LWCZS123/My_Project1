@@ -199,10 +199,17 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
             Toast.makeText(requireContext(), "预算金额须大于 0", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (amount > 999999999.99) {
+            Toast.makeText(requireContext(), "预算金额过大，最大限制 999,999,999.99", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 格式化金额，最多保留2位小数
+        final double finalAmount = Math.round(amount * 100.0) / 100.0;
 
         if (isEditMode) {
             // 编辑模式：直接保存，跳过重复校验
-            doSave(amount);
+            doSave(finalAmount);
         } else {
             // 新增模式：先做重复性校验
             vm.checkDuplicate(selectedBudgetType, duplicateMsg -> {
@@ -210,7 +217,7 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
                     // 已存在同年/月预算 → 提示，不写库
                     Toast.makeText(requireContext(), duplicateMsg, Toast.LENGTH_LONG).show();
                 } else {
-                    doSave(amount);
+                    doSave(finalAmount);
                 }
             });
         }

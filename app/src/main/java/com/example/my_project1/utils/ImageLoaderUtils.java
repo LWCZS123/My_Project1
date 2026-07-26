@@ -64,21 +64,41 @@ public class ImageLoaderUtils {
      * 优化：先加载10%大小的缩略图，再加载完整图
      */
     public static void loadThumbnail(Context context, String url, ImageView imageView) {
+
         if (context == null || imageView == null) return;
+        RequestOptions options = new RequestOptions ()
 
-        RequestOptions options = new RequestOptions()
-                .placeholder(R.drawable.ic_placeholder)
-                .error(R.drawable.ic_load_error)
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .skipMemoryCache(false)
-                .priority(Priority.HIGH)  // 高优先级
-                .centerCrop();
+                .placeholder (R.drawable.ic_placeholder)
 
-        Glide.with(context.getApplicationContext())
-                .load(url)
-                .apply(options)
-                .thumbnail(0.1f)  // 🔑 先加载10%大小的缩略图
-                .into(imageView);
+                .error (R.drawable.ic_load_error)
+
+                .diskCacheStrategy (DiskCacheStrategy.ALL)
+
+                .skipMemoryCache (false)
+
+                .priority (Priority.HIGH)  // 高优先级
+
+                .centerCrop ();
+
+        Glide.with (context.getApplicationContext ())
+
+                .load (url)
+
+                .apply (options)
+
+                .thumbnail (0.1f)  // 🔑 先加载 10% 大小的缩略图
+
+                .into (imageView);
+
+    }
+
+    /**
+     * 判断字符串是否为Uri格式（resource/content/file等）
+     */
+    private static boolean isUriString(String str) {
+        return str.startsWith("android.resource://")
+                || str.startsWith("content://")
+                || str.startsWith("file://");
     }
 
     /**

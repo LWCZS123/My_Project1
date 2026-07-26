@@ -316,7 +316,7 @@ public class SearchActivity extends AppCompatActivity {
             }
 
             if (bill.getType() == 0) dayExpense += bill.getAmount();
-            else                     dayIncome  += bill.getAmount();
+            else if (bill.getType() == 1) dayIncome  += bill.getAmount();
 
             if (currentDayBills.isEmpty()) {
                 Calendar cal = Calendar.getInstance();
@@ -326,8 +326,19 @@ public class SearchActivity extends AppCompatActivity {
                 currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
             }
 
-            String amountText = (bill.getType() == 0 ? "- ¥" : "+ ¥") + amtFmt.format(bill.getAmount());
-            int amountColor = ContextCompat.getColor(this, bill.getType() == 0 ? R.color.red : R.color.green);
+            String amountText;
+            int amountColor;
+            
+            if (bill.getType() == 0) {
+                amountText = "- ¥" + amtFmt.format(bill.getAmount());
+                amountColor = ContextCompat.getColor(this, R.color.red);
+            } else if (bill.getType() == 1) {
+                amountText = "+ ¥" + amtFmt.format(bill.getAmount());
+                amountColor = ContextCompat.getColor(this, R.color.green);
+            } else {
+                amountText = "¥" + amtFmt.format(bill.getAmount());
+                amountColor = ContextCompat.getColor(this, R.color.orange_500);
+            }
 
             com.example.my_project1.data.model.account.Account account =
                     accountMap != null ? accountMap.get(bill.getAccountId()) : null;

@@ -51,23 +51,32 @@
 
             <TextView
                 android:id="@+id/tab_expense"
-                android:layout_width="100dp"
+                android:layout_width="80dp"
                 android:layout_height="36dp"
                 android:background="@drawable/tab_selected_bg"
                 android:gravity="center"
                 android:text="支出"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tab_income"
-                android:layout_width="100dp"
+                android:layout_width="80dp"
                 android:layout_height="36dp"
                 android:gravity="center"
                 android:text="收入"
                 android:textColor="#666666"
-                android:textSize="15sp" />
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tab_transfer"
+                android:layout_width="80dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="转账"
+                android:textColor="#666666"
+                android:textSize="14sp" />
 
         </LinearLayout>
 
@@ -130,6 +139,54 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="5dp"
                         android:text="账户选择"
+                        android:textColor="#666666"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 转账箭头 (默认隐藏) -->
+            <ImageView
+                android:id="@+id/iv_transfer_arrow"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="8dp"
+                android:src="@drawable/ic_arrow_right"
+                android:visibility="gone" />
+
+            <!-- 目标账户 (默认隐藏) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_target_account"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFFFF"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp">
+
+                    <ImageView
+                        android:id="@+id/iv_target_account"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_wallet_change" />
+
+                    <TextView
+                        android:id="@+id/tv_target_account"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="5dp"
+                        android:text="转入账户"
                         android:textColor="#666666"
                         android:textSize="12sp" />
                 </LinearLayout>

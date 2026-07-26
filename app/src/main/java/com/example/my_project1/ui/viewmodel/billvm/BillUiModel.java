@@ -24,7 +24,9 @@ public class BillUiModel {
     public final String amountText;        // "-¥21.00" / "+¥500.00"
     public final int    amountColor;       // 红/绿颜色 int（已 resolve）
     public final String accountName;       // 账户名称，如 "微信支付"
+    public final String toAccountName;     // 目标账户名称 (用于转账/还款)
     public final String accountIconUrl;    // 账户图标 URL
+    public final int    billType;          // 账单类型
     public final String remarkText;        // 备注，空串则隐藏
     public final String locationText;      // 位置，空串则隐藏
     public final java.util.List<String> imageUrls; // 图片 URL 列表
@@ -48,7 +50,9 @@ public class BillUiModel {
         this.amountText     = b.amountText;
         this.amountColor    = b.amountColor;
         this.accountName    = b.accountName;
+        this.toAccountName  = b.toAccountName;
         this.accountIconUrl = b.accountIconUrl;
+        this.billType       = b.billType;
         this.remarkText     = b.remarkText;
         this.locationText   = b.locationText;
         this.imageUrls      = b.imageUrls;
@@ -67,12 +71,14 @@ public class BillUiModel {
                 amountColor == that.amountColor &&
                 isFirstOfDay == that.isFirstOfDay &&
                 isLastOfDay == that.isLastOfDay &&
+                billType == that.billType &&
                 java.util.Objects.equals(objectId, that.objectId) &&
                 java.util.Objects.equals(timeText, that.timeText) &&
                 java.util.Objects.equals(categoryName, that.categoryName) &&
                 java.util.Objects.equals(categoryIconUrl, that.categoryIconUrl) &&
                 java.util.Objects.equals(amountText, that.amountText) &&
                 java.util.Objects.equals(accountName, that.accountName) &&
+                java.util.Objects.equals(toAccountName, that.toAccountName) &&
                 java.util.Objects.equals(accountIconUrl, that.accountIconUrl) &&
                 java.util.Objects.equals(remarkText, that.remarkText) &&
                 java.util.Objects.equals(locationText, that.locationText) &&
@@ -82,8 +88,8 @@ public class BillUiModel {
     @Override
     public int hashCode() {
         return java.util.Objects.hash(localId, objectId, timeText, categoryName, categoryIconUrl,
-                amountText, amountColor, accountName, accountIconUrl, remarkText, locationText,
-                imageUrls, isFirstOfDay, isLastOfDay);
+                amountText, amountColor, accountName, toAccountName, accountIconUrl, billType,
+                remarkText, locationText, imageUrls, isFirstOfDay, isLastOfDay);
     }
 
     public static Builder builder() { return new Builder(); }
@@ -97,7 +103,9 @@ public class BillUiModel {
         String amountText     = "";
         int    amountColor;
         String accountName    = "";
+        String toAccountName   = "";
         String accountIconUrl = "";
+        int    billType;
         String remarkText     = "";
         String locationText   = "";
         java.util.List<String> imageUrls = new java.util.ArrayList<>();
@@ -112,7 +120,9 @@ public class BillUiModel {
         public Builder amountText(String v)   { amountText = v; return this; }
         public Builder amountColor(int v)     { amountColor = v; return this; }
         public Builder accountName(String v)  { accountName = v != null ? v : ""; return this; }
+        public Builder toAccountName(String v) { toAccountName = v != null ? v : ""; return this; }
         public Builder accountIconUrl(String v){ accountIconUrl = v != null ? v : ""; return this; }
+        public Builder billType(int v)        { billType = v; return this; }
         public Builder remarkText(String v)   { remarkText = v != null ? v : ""; return this; }
         public Builder locationText(String v) { locationText = v != null ? v : ""; return this; }
         public Builder imageUrls(java.util.List<String> v){ imageUrls = v != null ? v : new java.util.ArrayList<>(); return this; }
