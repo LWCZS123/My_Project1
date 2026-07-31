@@ -3,8 +3,9 @@ package com.example.my_project1.ui.adapter.budget;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
-import android.widget.ProgressBar;
+import android.widget.ImageView;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -15,20 +16,20 @@ import com.example.my_project1.data.model.budget.Budget;
 import com.example.my_project1.databinding.ItemCategoryBudgetBinding;
 import com.example.my_project1.utils.GlideImageLoader;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
-
-import io.reactivex.annotations.NonNull;
+import java.util.Set;
 
 /**
  * CategoryBudgetAdapter
  *
- * 修复：
- *  1. 分类图标 / 名称缺失问题：
- *     - 使用 {@link OnItemClickListener#onRequestCategoryInfo} 回调按需查询，
- *       当 item 绑定时若 category 信息不完整则通知 Activity 补充后重绑。
- *     - 图标加载前添加 null / empty 防护，默认图标兜底。
- *  2. item 整体点击跳转分类预算详情页（通过 onItemClick 回调）。
- *  3. 进度条样式与 BudgetActivity 保持完全一致。
+ * 修复点：
+ *  1. 新增 updateCategoryInfo() 方法，通过创建新对象 + submitList 触发 DiffUtil 刷新。
+ *  2. 将 safeEquals 从 DIFF 匿名类中提取为静态方法，供外部复用。
+ *  3. 增加 pendingRequestIds 防抖集合，避免滚动复用时重复触发分类信息请求。
+ *  4. 补全缺失的 import 和类型声明。
  */
 public class CategoryBudgetAdapter
         extends ListAdapter<CategoryBudgetAdapter.CategoryBudgetItem,
@@ -39,13 +40,13 @@ public class CategoryBudgetAdapter
     // ════════════════════════════════════════════════════════
 
     public static class CategoryBudgetItem {
-        public Budget   budget;
-        public Category category;
-        public double   spentAmount;
+        public final Budget budget;
+        public final Category category;
+        public final double spentAmount;
 
         public CategoryBudgetItem(Budget budget, Category category, double spentAmount) {
-            this.budget      = budget;
-            this.category    = category;
+            this.budget = budget;
+            this.category = category;
             this.spentAmount = spentAmount;
         }
 
@@ -63,16 +64,9 @@ public class CategoryBudgetAdapter
     // ════════════════════════════════════════════════════════
 
     public interface OnItemClickListener {
-        /** 编辑按钮点击 */
         void onEdit(CategoryBudgetItem item);
-        /** 删除按钮点击 */
         void onDelete(int budgetId);
-        /** item 整体点击（跳转详情页） */
         void onItemClick(CategoryBudgetItem item);
-        /**
-         * 当某个 item 的分类信息不完整时，Adapter 通过此回调请求宿主（Activity）
-         * 根据 targetId 补充分类名称 & 图标，宿主完成后调用 notifyItemChanged。
-         */
         void onRequestCategoryInfo(String targetId, int adapterPosition);
     }
 
@@ -81,6 +75,9 @@ public class CategoryBudgetAdapter
     public void setOnItemClickListener(OnItemClickListener l) {
         this.listener = l;
     }
+
+    // ✅ 防抖集合：记录已发起过请求的 targetId，避免滚动时重复触发
+    private final Set<String> pendingRequestIds = new HashSet<>();
 
     // ════════════════════════════════════════════════════════
     //  DiffUtil
@@ -100,14 +97,10 @@ public class CategoryBudgetAdapter
                     return Double.compare(o.budget.getAmount(), n.budget.getAmount()) == 0
                             && o.budget.getPeriod() == n.budget.getPeriod()
                             && Double.compare(o.spentAmount, n.spentAmount) == 0
-                            // 分类信息也纳入比对，保证补全后能触发刷新
                             && o.isCategoryInfoComplete() == n.isCategoryInfoComplete()
+                            // ✅ 现在调用的是外部静态方法
                             && safeEquals(getCatName(o), getCatName(n))
                             && safeEquals(getCatIcon(o), getCatIcon(n));
-                }
-
-                private boolean safeEquals(String a, String b) {
-                    return (a == null && b == null) || (a != null && a.equals(b));
                 }
 
                 private String getCatName(CategoryBudgetItem item) {
@@ -124,6 +117,52 @@ public class CategoryBudgetAdapter
     }
 
     // ════════════════════════════════════════════════════════
+    //  ✅ 按需更新分类信息（ListAdapter 安全写法）
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * 按需更新指定位置的分类名称和图标。
+     * ListAdapter 的列表不可变，必须创建新对象并重新提交才能触发 DiffUtil 刷新。
+     */
+    public void updateCategoryInfo(int position, String name, String iconUri) {
+        if (position < 0 || position >= getCurrentList().size()) return;
+
+        CategoryBudgetItem oldItem = getCurrentList().get(position);
+
+        // 如果信息已经完整且一致，跳过避免无效刷新
+        if (oldItem.isCategoryInfoComplete()
+                && safeEquals(oldItem.category.getName(), name)
+                && safeEquals(oldItem.category.getIconUri(), iconUri)) {
+            return;
+        }
+
+        // 创建新的 Category 对象
+        Category newCategory = new Category();
+        newCategory.setCloudId(oldItem.category != null ? oldItem.category.getCloudId() : null);
+        newCategory.setName(name);
+        newCategory.setIconUri(iconUri);
+
+        // 创建新的 Item 对象以触发 areContentsTheSame 返回 false
+        CategoryBudgetItem newItem = new CategoryBudgetItem(
+                oldItem.budget, newCategory, oldItem.spentAmount);
+
+        // 复制当前列表 → 替换指定位置 → 重新提交
+        List<CategoryBudgetItem> newList = new ArrayList<>(getCurrentList());
+        newList.set(position, newItem);
+        submitList(newList);
+
+        // 信息已补全，移除防抖标记以便后续可再次更新
+        if (oldItem.budget.getTargetId() != null) {
+            pendingRequestIds.remove(oldItem.budget.getTargetId());
+        }
+    }
+
+    // ✅ 提取为静态方法，供 DIFF 和 updateCategoryInfo 共同复用
+    private static boolean safeEquals(String a, String b) {
+        return (a == null && b == null) || (a != null && a.equals(b));
+    }
+
+    // ════════════════════════════════════════════════════════
     //  ViewHolder 创建 & 绑定
     // ════════════════════════════════════════════════════════
 
@@ -137,20 +176,32 @@ public class CategoryBudgetAdapter
 
     @Override
     public void onBindViewHolder(@NonNull VH h, int pos) {
-        CategoryBudgetItem item     = getItem(pos);
-        Budget             budget   = item.budget;
-        Category           category = item.category;
-        Context            ctx      = h.b.getRoot().getContext();
+        CategoryBudgetItem item = getItem(pos);
+        Budget budget = item.budget;
+        Category category = item.category;
+        Context ctx = h.b.getRoot().getContext();
 
-        // ── 分类名称 & 图标 ─────────────
+        // ── 分类名称 & 图标 ─────────────────────────────────
         if (category != null && category.getName() != null && !category.getName().isEmpty()) {
             h.b.tvCategoryName.setText(category.getName());
             loadIcon(ctx, category.getIconUri(), h.b.ivCategoryIcon);
+            // ✅ 信息已完整，移除待请求标记
+            if (budget.getTargetId() != null) {
+                pendingRequestIds.remove(budget.getTargetId());
+            }
         } else {
             h.b.tvCategoryName.setText("加载中…");
             h.b.ivCategoryIcon.setImageResource(R.drawable.ic_category_default);
-            if (listener != null && budget.getTargetId() != null) {
-                h.b.getRoot().post(() -> listener.onRequestCategoryInfo(budget.getTargetId(), h.getAdapterPosition()));
+            // ✅ 防抖：同一个 targetId 只请求一次，避免滚动复用时重复触发
+            String targetId = budget.getTargetId();
+            if (listener != null && targetId != null && !pendingRequestIds.contains(targetId)) {
+                pendingRequestIds.add(targetId);
+                h.b.getRoot().post(() -> {
+                    int adapterPos = h.getAdapterPosition();
+                    if (adapterPos != RecyclerView.NO_POSITION) {
+                        listener.onRequestCategoryInfo(targetId, adapterPos);
+                    }
+                });
             }
         }
 
@@ -161,9 +212,10 @@ public class CategoryBudgetAdapter
         boolean overBudget = spent > budgetAmt;
 
         h.b.tvSpent.setText(String.format(Locale.getDefault(), "%.0f", spent));
-        h.b.tvBudgetHint.setText(String.format(Locale.getDefault(), "%d%% | %.2f", (int)(spent/budgetAmt*100), budgetAmt));
+        h.b.tvBudgetHint.setText(String.format(Locale.getDefault(), "%d%% | %.2f",
+                (int) (spent / budgetAmt * 100), budgetAmt));
 
-        // ── 风格重构：背景进度条 (参照截图) ────────────────────────
+        // ── 背景进度条样式 ────────────────────────────────────
         h.b.pbBgProgress.setProgress(progress);
         if (overBudget) {
             h.b.pbBgProgress.setProgressDrawable(ctx.getDrawable(R.drawable.bg_progress_fill_light));
@@ -173,14 +225,15 @@ public class CategoryBudgetAdapter
             h.b.tvSpent.setTextColor(0xFF333333);
         }
 
-        // ── 分割线逻辑 ──────────────────────────────────────────
-        h.b.itemDivider.setVisibility(pos == getItemCount() - 1 ? android.view.View.GONE : android.view.View.VISIBLE);
+        // ── 分割线逻辑 ──────────────────────────────────────
+        h.b.itemDivider.setVisibility(pos == getItemCount() - 1
+                ? android.view.View.GONE : android.view.View.VISIBLE);
 
         // ── 点击事件 ─────────────────────────────────────────
         if (listener != null) {
             h.b.getRoot().setOnClickListener(v -> listener.onItemClick(item));
             h.b.getRoot().setOnLongClickListener(v -> {
-                listener.onEdit(item); // 长按编辑
+                listener.onEdit(item);
                 return true;
             });
         }
@@ -196,7 +249,7 @@ public class CategoryBudgetAdapter
      *  - iconUri 为纯数字 → 当作资源 id 加载
      *  - 否则当作 URL / 文件路径加载
      */
-    private void loadIcon(Context ctx, String iconUri, android.widget.ImageView iv) {
+    private void loadIcon(Context ctx, String iconUri, ImageView iv) {
         if (iconUri == null || iconUri.isEmpty()) {
             iv.setImageResource(R.drawable.ic_category_default);
             return;

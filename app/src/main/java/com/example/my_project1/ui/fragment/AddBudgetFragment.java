@@ -7,7 +7,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
@@ -21,17 +20,14 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
+import java.util.Calendar;
+import java.util.Locale;
+
 import io.reactivex.annotations.NonNull;
 import io.reactivex.annotations.Nullable;
 
 /**
- * AddBudgetFragment — BottomSheetDialogFragment
- *
- * 模式：
- *  - 新增（existingBudget = null）：先做重复校验，已存在则 Toast 提示，不写库。
- *  - 编辑（existingBudget != null）：跳过重复校验，直接更新。
- *
- * Tab 切换：月预算 / 年预算，与 BudgetViewModel.getBudgetType() 保持同步。
+ * AddBudgetFragment — Elegant BottomSheet
  */
 public class AddBudgetFragment extends BottomSheetDialogFragment {
 
@@ -44,18 +40,11 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
     private FragmentAddBudgetBinding binding;
     private BudgetViewModel          vm;
 
-    /** 当前选中周期类型，默认跟随 ViewModel 当前 Tab */
     private String selectedBudgetType = Budget.TYPE_MONTH;
-    /** 是否编辑模式 */
     private boolean isEditMode = false;
+    
+    private int targetYear, targetMonth;
 
-    // ════════════════════════════════════════════════════════
-    //  工厂方法
-    // ════════════════════════════════════════════════════════
-
-    /**
-     * @param existingBudget 已有总预算对象（编辑），null 表示新增
-     */
     public static AddBudgetFragment newInstance(@Nullable Budget existingBudget) {
         AddBudgetFragment f = new AddBudgetFragment();
         Bundle args = new Bundle();
@@ -73,10 +62,6 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         return f;
     }
 
-    // ════════════════════════════════════════════════════════
-    //  生命周期
-    // ════════════════════════════════════════════════════════
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -91,12 +76,9 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
         vm = new ViewModelProvider(requireActivity()).get(BudgetViewModel.class);
 
-        // 新增模式默认 Tab 与 Activity 当前卡片 Tab 保持一致
-        selectedBudgetType = vm.getBudgetType();
-
         restoreArgs();
-        initTabs();
-        initConfirmBtn();
+        initUI();
+        loadSuggestion();
     }
 
     @Override
@@ -105,23 +87,13 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         binding = null;
     }
 
-    // ════════════════════════════════════════════════════════
-    //  BottomSheet 展开配置
-    // ════════════════════════════════════════════════════════
-
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
         dialog.setOnShowListener(d -> {
-            FrameLayout sheet = dialog.findViewById(
-                    com.google.android.material.R.id.design_bottom_sheet);
+            FrameLayout sheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (sheet != null) {
-                sheet.setBackground(
-                        ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1));
-                ViewGroup.LayoutParams lp = sheet.getLayoutParams();
-                lp.height = (int) (requireContext().getResources()
-                        .getDisplayMetrics().heightPixels * 0.85);
-                sheet.setLayoutParams(lp);
+                sheet.setBackground(ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1));
                 BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(sheet);
                 behavior.setSkipCollapsed(true);
                 behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
@@ -130,60 +102,116 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         return dialog;
     }
 
-    // ════════════════════════════════════════════════════════
-    //  初始化
-    // ════════════════════════════════════════════════════════
-
     private void restoreArgs() {
         Bundle args = getArguments();
+        Calendar cal = Calendar.getInstance();
+        targetYear = cal.get(Calendar.YEAR);
+        targetMonth = cal.get(Calendar.MONTH) + 1;
+
         if (args == null) return;
         isEditMode = args.getBoolean(ARG_IS_EDIT, false);
         if (isEditMode) {
             double amount = args.getDouble(ARG_AMOUNT, 0);
-            if (amount > 0) binding.etAmount.setText(String.valueOf(amount));
+            if (amount > 0) binding.etAmount.setText(String.format(Locale.getDefault(), "%.2f", amount));
             selectedBudgetType = args.getString(ARG_BUDGET_TYPE, Budget.TYPE_MONTH);
-        }
-    }
-
-    private void initTabs() {
-        refreshTabStyle();
-        binding.tabMonth.setOnClickListener(v -> {
-            selectedBudgetType = Budget.TYPE_MONTH;
-            refreshTabStyle();
-        });
-        binding.tabYear.setOnClickListener(v -> {
-            selectedBudgetType = Budget.TYPE_YEAR;
-            refreshTabStyle();
-        });
-    }
-
-    private void refreshTabStyle() {
-        boolean isMonth = Budget.TYPE_MONTH.equals(selectedBudgetType);
-        applyTab(binding.tabMonth, isMonth);
-        applyTab(binding.tabYear, !isMonth);
-    }
-
-    private void applyTab(TextView tab, boolean selected) {
-        if (selected) {
-            tab.setBackgroundResource(R.drawable.bg_tab_selected1);
-            tab.setTextColor(getResources().getColor(R.color.black, null));
         } else {
-            tab.setBackground(null);
-            tab.setTextColor(0xFF888888);
+            selectedBudgetType = vm.getBudgetType();
+            targetYear = vm.getCurrentYear();
+            targetMonth = vm.getCurrentMonth();
         }
     }
 
-    private void initConfirmBtn() {
+    private void initUI() {
+        // Period Selection
+        if (Budget.TYPE_YEAR.equals(selectedBudgetType)) {
+            binding.rbYear.setChecked(true);
+        } else if (Budget.TYPE_WEEK.equals(selectedBudgetType)) {
+            binding.rbWeek.setChecked(true);
+        } else {
+            binding.rbMonth.setChecked(true);
+        }
+
+        binding.rgPeriod.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rb_week) {
+                selectedBudgetType = Budget.TYPE_WEEK;
+            } else if (checkedId == R.id.rb_month) {
+                selectedBudgetType = Budget.TYPE_MONTH;
+            } else if (checkedId == R.id.rb_year) {
+                selectedBudgetType = Budget.TYPE_YEAR;
+            }
+            updateDateDisplayText();
+            binding.switchCarryOver.setChecked(false); // Reset switch when type changes
+        });
+
+        // Date Selector
+        updateDateDisplayText();
+        binding.llDateSelector.setOnClickListener(v -> showDateSelector());
+
+        // Carry Over Switch
+        binding.switchCarryOver.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                vm.getPreviousPeriodBudget(selectedBudgetType, targetYear, targetMonth, prev -> {
+                    if (prev != null) {
+                        setAmount(String.format(Locale.getDefault(), "%.2f", prev.getAmount()));
+                        Toast.makeText(requireContext(), "已沿用上期预算 ¥" + prev.getAmount(), Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(requireContext(), "未找到上期预算记录", Toast.LENGTH_SHORT).show();
+                        binding.switchCarryOver.setChecked(false);
+                    }
+                });
+            }
+        });
+
+        // Quick Amount Buttons
+        binding.btn3000.setOnClickListener(v -> setAmount("3000"));
+        binding.btn5000.setOnClickListener(v -> setAmount("5000"));
+        binding.btn8000.setOnClickListener(v -> setAmount("8000"));
+        binding.btn10000.setOnClickListener(v -> setAmount("10000"));
+
+        // Confirm Button
         binding.btnConfirm.setOnClickListener(v -> onConfirm());
     }
 
-    // ════════════════════════════════════════════════════════
-    //  确认逻辑
-    // ════════════════════════════════════════════════════════
+    private void updateDateDisplayText() {
+        if (Budget.TYPE_YEAR.equals(selectedBudgetType)) {
+            binding.tvSelectedDate.setText(String.format(Locale.getDefault(), "%d年", targetYear));
+        } else {
+            binding.tvSelectedDate.setText(String.format(Locale.getDefault(), "%d年%d月", targetYear, targetMonth));
+        }
+    }
+
+    private void showDateSelector() {
+        BudgetDateSelectorFragment selector = BudgetDateSelectorFragment.newInstance(
+                selectedBudgetType, targetYear, targetMonth, (type, year, month) -> {
+                    this.targetYear = year;
+                    this.targetMonth = month;
+                    updateDateDisplayText();
+                    binding.switchCarryOver.setChecked(false);
+                }
+        );
+        selector.show(getChildFragmentManager(), "DateSelector");
+    }
+
+    private void setAmount(String amount) {
+        binding.etAmount.setText(amount);
+        binding.etAmount.setSelection(amount.length());
+    }
+
+    private void loadSuggestion() {
+        vm.getMonthlyStats().observe(getViewLifecycleOwner(), stats -> {
+            if (stats != null && stats.totalExpense > 0) {
+                double lastMonthExp = stats.totalExpense;
+                double suggestMin = Math.floor(lastMonthExp / 100) * 100;
+                double suggestMax = Math.ceil(lastMonthExp * 1.1 / 100) * 100;
+                binding.tvSuggestionContent.setText(String.format(Locale.getDefault(),
+                        "根据近期支出 ¥%.2f，建议预算 ¥%.0f ~ ¥%.0f", 
+                        lastMonthExp, suggestMin, suggestMax));
+            }
+        });
+    }
 
     private void onConfirm() {
         String amtStr = binding.etAmount.getText().toString().trim();
-
         if (TextUtils.isEmpty(amtStr)) {
             Toast.makeText(requireContext(), "请输入预算金额", Toast.LENGTH_SHORT).show();
             return;
@@ -199,22 +227,14 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
             Toast.makeText(requireContext(), "预算金额须大于 0", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (amount > 999999999.99) {
-            Toast.makeText(requireContext(), "预算金额过大，最大限制 999,999,999.99", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
-        // 格式化金额，最多保留2位小数
         final double finalAmount = Math.round(amount * 100.0) / 100.0;
 
         if (isEditMode) {
-            // 编辑模式：直接保存，跳过重复校验
             doSave(finalAmount);
         } else {
-            // 新增模式：先做重复性校验
-            vm.checkDuplicate(selectedBudgetType, duplicateMsg -> {
+            vm.checkDuplicate(selectedBudgetType, targetYear, targetMonth, duplicateMsg -> {
                 if (duplicateMsg != null) {
-                    // 已存在同年/月预算 → 提示，不写库
                     Toast.makeText(requireContext(), duplicateMsg, Toast.LENGTH_LONG).show();
                 } else {
                     doSave(finalAmount);
@@ -223,9 +243,8 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         }
     }
 
-    /** 实际写入 ViewModel */
     private void doSave(double amount) {
-        vm.saveTotalBudget(amount, selectedBudgetType);
+        vm.saveTotalBudget(amount, selectedBudgetType, targetYear, targetMonth);
         Toast.makeText(requireContext(), "总预算已保存", Toast.LENGTH_SHORT).show();
         dismiss();
     }

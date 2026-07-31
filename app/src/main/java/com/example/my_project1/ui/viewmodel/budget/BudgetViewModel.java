@@ -88,23 +88,28 @@ public class BudgetViewModel extends AndroidViewModel {
             if (Budget.TYPE_WEEK.equals(type)) period = Budget.PERIOD_WEEK;
             else if (Budget.TYPE_YEAR.equals(type)) period = Budget.PERIOD_YEAR;
 
-            long[] range = BudgetPeriodHelper.getPeriodRange(period, 1);
+            Calendar base = Calendar.getInstance();
+            base.set(Calendar.YEAR, year);
+            base.set(Calendar.MONTH, month - 1);
+            base.set(Calendar.DAY_OF_MONTH, 1);
+            
+            long[] range = BudgetPeriodHelper.getPeriodRange(period, 1, base);
             double inc = repo.getTotalIncomeInPeriod(userId, range[0], range[1]);
             double exp = repo.getTotalSpentInPeriod(userId, range[0], range[1]);
             
             Budget bud;
             if (Budget.TYPE_YEAR.equals(type)) bud = repo.getYearBudgetSync(userId, year);
+            else if (Budget.TYPE_WEEK.equals(type)) bud = repo.getWeekBudgetSync(userId, year, month);
             else bud = repo.getMonthBudgetSync(userId, year, month);
 
             BudgetStats stats = new BudgetStats();
             stats.totalIncome = inc;
             stats.totalExpense = exp;
             stats.expenseBudget = (bud != null) ? bud.getAmount() : 0;
-            // 假设收入预算暂无独立记录，可根据需要扩展；此处暂设为 0 或某个基准值
-            stats.incomeBudget = 0;
             
-            Calendar cal = Calendar.getInstance();
-            int days = (period == Budget.PERIOD_YEAR) ? (cal.getActualMaximum(Calendar.DAY_OF_YEAR)) : cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+            Calendar cal = (Calendar) base.clone();
+            int days = (period == Budget.PERIOD_YEAR) ? (cal.getActualMaximum(Calendar.DAY_OF_YEAR)) : 
+                      (period == Budget.PERIOD_WEEK ? 7 : cal.getActualMaximum(Calendar.DAY_OF_MONTH));
             stats.dailyAvgIncome = inc / days;
             stats.dailyAvgExpense = exp / days;
             
@@ -168,6 +173,12 @@ public class BudgetViewModel extends AndroidViewModel {
             int m = Budget.TYPE_YEAR.equals(p.type) ? 0 : p.month;
             return repo.getCategoryBudgetsLive(userId, p.type, p.year, m);
         });
+
+        // 自动触发统计加载，解决 Semantic Conflict 与重复调用
+        Transformations.switchMap(triggers, p -> {
+            loadStats();
+            return new MutableLiveData<>(null);
+        }).observeForever(o -> {});
     }
 
     public void setYear(int year) { 
@@ -278,10 +289,14 @@ public class BudgetViewModel extends AndroidViewModel {
     // ────────────────────────────────────────────────────────────────────
 
     public void saveTotalBudget(double amount, String budgetType) {
+        saveTotalBudget(amount, budgetType, getCurrentYear(), getCurrentMonth());
+    }
+
+    public void saveTotalBudget(double amount, String budgetType, int year, int month) {
         AppExecutors.get().diskIO().execute(() -> {
             boolean isYear = Budget.TYPE_YEAR.equals(budgetType);
             boolean isWeek = Budget.TYPE_WEEK.equals(budgetType);
-            int     month  = isYear ? 0 : getCurrentMonth();
+            int     finalMonth = isYear ? 0 : month;
             
             int period;
             if (isYear) period = Budget.PERIOD_YEAR;
@@ -289,9 +304,9 @@ public class BudgetViewModel extends AndroidViewModel {
             else period = Budget.PERIOD_MONTH;
 
             Budget existing;
-            if (isYear) existing = repo.getYearBudgetSync(userId, getCurrentYear());
-            else if (isWeek) existing = repo.getWeekBudgetSync(userId, getCurrentYear(), month);
-            else existing = repo.getMonthBudgetSync(userId, getCurrentYear(), month);
+            if (isYear) existing = repo.getYearBudgetSync(userId, year);
+            else if (isWeek) existing = repo.getWeekBudgetSync(userId, year, finalMonth);
+            else existing = repo.getMonthBudgetSync(userId, year, finalMonth);
 
             if (existing != null) {
                 existing.setAmount(amount);
@@ -301,29 +316,34 @@ public class BudgetViewModel extends AndroidViewModel {
                 existing.setEndTime(range[1]);
                 repo.update(existing);
             } else {
-                Budget b = buildTotalBudget(amount, period, budgetType, getCurrentYear(), month);
+                Budget b = buildTotalBudget(amount, period, budgetType, year, finalMonth);
                 repo.insert(b, null);
             }
 
-            refreshRemainingAllocation(amount, budgetType, month);
+            refreshRemainingAllocation(amount, budgetType, finalMonth);
+            loadStats();
         });
     }
 
     public void checkDuplicate(String budgetType, Consumer<String> callback) {
+        checkDuplicate(budgetType, getCurrentYear(), getCurrentMonth(), callback);
+    }
+
+    public void checkDuplicate(String budgetType, int year, int month, Consumer<String> callback) {
         AppExecutors.get().diskIO().execute(() -> {
             boolean isYear = Budget.TYPE_YEAR.equals(budgetType);
             boolean isWeek = Budget.TYPE_WEEK.equals(budgetType);
             
             Budget existing;
-            if (isYear) existing = repo.getYearBudgetSync(userId, getCurrentYear());
-            else if (isWeek) existing = repo.getWeekBudgetSync(userId, getCurrentYear(), getCurrentMonth());
-            else existing = repo.getMonthBudgetSync(userId, getCurrentYear(), getCurrentMonth());
+            if (isYear) existing = repo.getYearBudgetSync(userId, year);
+            else if (isWeek) existing = repo.getWeekBudgetSync(userId, year, month);
+            else existing = repo.getMonthBudgetSync(userId, year, month);
 
             String msg = null;
             if (existing != null) {
-                if (isYear) msg = getCurrentYear() + "年预算已添加，如需修改请点击编辑";
-                else if (isWeek) msg = getCurrentYear() + "年" + getCurrentMonth() + "月某周预算已添加，如需修改请点击编辑";
-                else msg = getCurrentYear() + "年" + getCurrentMonth() + "月预算已添加，如需修改请点击编辑";
+                if (isYear) msg = year + "年预算已添加，如需修改请点击编辑";
+                else if (isWeek) msg = year + "年" + month + "月某周预算已添加，如需修改请点击编辑";
+                else msg = year + "年" + month + "月预算已添加，如需修改请点击编辑";
             }
             final String result = msg;
             AppExecutors.get().mainThread().execute(() -> {
@@ -564,6 +584,39 @@ public class BudgetViewModel extends AndroidViewModel {
     // ────────────────────────────────────────────────────────────────────
     //  支出统计
     // ────────────────────────────────────────────────────────────────────
+
+    public void getPreviousPeriodBudget(String type, int year, int month, Consumer<Budget> callback) {
+        AppExecutors.get().diskIO().execute(() -> {
+            int prevYear = year;
+            int prevMonth = month;
+            
+            if (Budget.TYPE_YEAR.equals(type)) {
+                prevYear = year - 1;
+            } else {
+                prevMonth = month - 1;
+                if (prevMonth < 1) {
+                    prevMonth = 12;
+                    prevYear = year - 1;
+                }
+            }
+            
+            Budget b;
+            if (Budget.TYPE_YEAR.equals(type)) {
+                b = repo.getYearBudgetSync(userId, prevYear);
+            } else if (Budget.TYPE_WEEK.equals(type)) {
+                b = repo.getWeekBudgetSync(userId, prevYear, prevMonth);
+            } else {
+                b = repo.getMonthBudgetSync(userId, prevYear, prevMonth);
+            }
+            
+            final Budget result = b;
+            AppExecutors.get().mainThread().execute(() -> {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    callback.accept(result);
+                }
+            });
+        });
+    }
 
     public double getSpentByCategorySync(String catCloudId) {
         Budget total = totalBudgetLive.getValue();

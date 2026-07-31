@@ -199,14 +199,16 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="bottom">
+
                         <TextView
                             android:id="@+id/tv_budget_amount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="¥1650.00"
+                            android:textColor="#333333"
                             android:textSize="32sp"
-                            android:textStyle="bold"
-                            android:textColor="#333333"/>
+                            android:textStyle="bold" />
+
                         <ImageView
                             android:id="@+id/iv_edit_main_budget"
                             android:layout_width="20dp"

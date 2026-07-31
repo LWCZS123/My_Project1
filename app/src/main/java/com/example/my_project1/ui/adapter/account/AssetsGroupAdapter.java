@@ -1,7 +1,5 @@
 package com.example.my_project1.ui.adapter.account;
 
-import android.transition.AutoTransition;
-import android.transition.TransitionManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,12 +39,11 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
         super(new DiffUtil.ItemCallback<AccountGroupUiModel>() {
             @Override
             public boolean areItemsTheSame(@NonNull AccountGroupUiModel oldItem, @NonNull AccountGroupUiModel newItem) {
-                return oldItem.id == newItem.id || Objects.equals(oldItem.objectId, newItem.objectId);
+                return Objects.equals(oldItem.objectId, newItem.objectId);
             }
 
             @Override
             public boolean areContentsTheSame(@NonNull AccountGroupUiModel oldItem, @NonNull AccountGroupUiModel newItem) {
-                // 必须进行深度比较，以便检测子列表和金额的变化
                 return oldItem.equals(newItem);
             }
         });
@@ -93,10 +90,6 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
         return total;
     }
 
-    /**
-     * 核心逻辑：将原始数据转换为驱动界面的 UiModel 列表
-     * 同时修复了隐藏/归档账户导致的占位符 Bug
-     */
     private void rebuildUiModels() {
         List<AccountGroupUiModel> uiModels = new ArrayList<>();
         DecimalFormat df = new DecimalFormat("#,##0.00");
@@ -110,7 +103,6 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
             
             if (accounts != null) {
                 for (Account acc : accounts) {
-                    // 🔑 修复点 1：仅当计入总资产时才加入子列表（解决占位符 Bug）
                     if (acc.isIncludeInTotal()) {
                         if (acc.getBalance() > 0) pos += acc.getBalance();
                         else neg += Math.abs(acc.getBalance());
@@ -126,7 +118,7 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
                                 acc.isCredit(),
                                 acc.getIconUrl(),
                                 isAmountHidden,
-                                true, // 支持侧滑
+                                true,
                                 acc
                         ));
                     }
@@ -137,7 +129,7 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
                     group.getId(),
                     groupId,
                     group.getName(),
-                    "(" + subUiModels.size() + ")", // 使用过滤后的准确数量
+                    "(" + subUiModels.size() + ")",
                     "¥" + df.format(pos),
                     "¥" + df.format(neg),
                     neg > 0,
@@ -211,7 +203,6 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
                 if (pos == RecyclerView.NO_POSITION) return;
                 String groupId = getItem(pos).objectId;
 
-                // 切换展开状态
                 if (expandedGroupIds.contains(groupId)) expandedGroupIds.remove(groupId);
                 else expandedGroupIds.add(groupId);
 
@@ -221,12 +212,6 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
         }
 
         void bind(AccountGroupUiModel uiModel) {
-            // 🚀 优化点 2：使用 TransitionManager 实现高性能平滑动画
-            // 它能自动处理高度变化，且不会在快速点击时产生卡顿
-            AutoTransition transition = new AutoTransition();
-            transition.setDuration(250);
-            TransitionManager.beginDelayedTransition((ViewGroup) binding.getRoot(), transition);
-
             binding.tvGroupName.setText(uiModel.name);
             binding.tvCount.setText(uiModel.countText);
 
@@ -242,11 +227,10 @@ public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsG
                 binding.tvGroupDebt.setText(uiModel.negativeBalanceText);
             }
 
-            int debtVisibility = uiModel.isDebtVisible ? View.VISIBLE : View.GONE;
-            binding.tvDebtLabel.setVisibility(debtVisibility);
-            binding.tvGroupDebt.setVisibility(debtVisibility);
+            binding.tvDebtLabel.setVisibility(uiModel.isDebtVisible ? View.VISIBLE : View.GONE);
+            binding.tvGroupDebt.setVisibility(uiModel.isDebtVisible ? View.VISIBLE : View.GONE);
 
-            // 更新子账户列表
+            // 更新子列表内容
             subAdapter.submitList(uiModel.accounts);
         }
     }

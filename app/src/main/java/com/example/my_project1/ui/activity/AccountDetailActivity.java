@@ -478,6 +478,7 @@ public class AccountDetailActivity extends AppCompatActivity {
     private void refreshBillList() {
         if (currentAccount != null) {
             List<AccountBillUiModel> uiModels = accountViewModel.mapAccountBillsToUiModels(filteredBills, currentAccount, collapsedMonths);
+            // 🚀 移除动画：立即刷新
             billAdapter.submitList(uiModels);
         }
     }

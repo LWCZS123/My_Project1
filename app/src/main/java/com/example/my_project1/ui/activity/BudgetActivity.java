@@ -30,6 +30,7 @@ import com.example.my_project1.utils.BudgetConfig;
 import com.example.my_project1.utils.BudgetPeriodHelper;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -37,14 +38,12 @@ import java.util.Map;
 
 public class BudgetActivity extends AppCompatActivity {
 
-    private ActivityBudgetBinding  binding;
-    private BudgetViewModel        vm;
-    private CategoryViewModel      categoryVm;
-    private CategoryBudgetAdapter  adapter;
-    private MonthAdapter           monthAdapter;
-    private boolean                isInitialRender = true;
+    private ActivityBudgetBinding binding;
+    private BudgetViewModel vm;
+    private CategoryViewModel categoryVm;
+    private CategoryBudgetAdapter adapter;
+    private MonthAdapter monthAdapter;
 
-    private boolean isAmountVisible = true;
     private long lastSyncTimeMs = 0;
     private static final long SYNC_DEBOUNCE_MS = 30_000L;
 
@@ -68,7 +67,7 @@ public class BudgetActivity extends AppCompatActivity {
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
 
-        vm         = new ViewModelProvider(this).get(BudgetViewModel.class);
+        vm = new ViewModelProvider(this).get(BudgetViewModel.class);
         categoryVm = new ViewModelProvider(this).get(CategoryViewModel.class);
 
         initRecyclerView();
@@ -76,8 +75,6 @@ public class BudgetActivity extends AppCompatActivity {
         initButtons();
         observeCategoryData();
         observeViewModel();
-
-        triggerCloudSync();
     }
 
     private void initRecyclerView() {
@@ -106,61 +103,49 @@ public class BudgetActivity extends AppCompatActivity {
             @Override
             public void onItemClick(CategoryBudgetAdapter.CategoryBudgetItem item) {
                 String catCloudId = item.budget.getTargetId();
-                CategoryBudgetDetailActivity.start(BudgetActivity.this, item.budget, 
+                CategoryBudgetDetailActivity.start(BudgetActivity.this, item.budget,
                         categoryNameCache.get(catCloudId), categoryIconCache.get(catCloudId), catCloudId);
                 overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
             }
 
             @Override
             public void onRequestCategoryInfo(String targetId, int adapterPosition) {
-                // ... same as before ...
+                // 按需从缓存或网络获取分类信息后回调 adapter.notifyItemChanged(adapterPosition)
+                String name = categoryNameCache.get(targetId);
+                String icon = categoryIconCache.get(targetId);
+                if (name != null && adapter != null) {
+                    adapter.updateCategoryInfo(adapterPosition, name, icon);
+                }
             }
         });
     }
 
     private void initMonthList() {
         monthAdapter = new MonthAdapter(index -> {
-            clearBudgetDisplay();
             String type = vm.getBudgetType();
             if (Budget.TYPE_YEAR.equals(type)) {
-                int curYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
+                int curYear = Calendar.getInstance().get(Calendar.YEAR);
                 int selectedYear = (curYear - 2) + (index - 1);
                 vm.setYear(selectedYear);
             } else if (Budget.TYPE_WEEK.equals(type)) {
-                // 周逻辑：index 是 1-5，对应 -2 到 +2
-                java.util.Calendar cal = java.util.Calendar.getInstance();
-                cal.add(java.util.Calendar.WEEK_OF_YEAR, index - 3);
-                vm.setYear(cal.get(java.util.Calendar.YEAR));
-                vm.setMonth(cal.get(java.util.Calendar.MONTH) + 1);
-                // 强制更新日期显示以反映周变化
-                updateTopDateText(); 
+                Calendar cal = Calendar.getInstance();
+                cal.add(Calendar.WEEK_OF_YEAR, index - 3);
+                vm.setYear(cal.get(Calendar.YEAR));
+                vm.setMonth(cal.get(Calendar.MONTH) + 1);
             } else {
                 vm.setMonth(index);
-                vm.switchToMonth();
             }
         });
         binding.rvMonths.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.rvMonths.setAdapter(monthAdapter);
-        // 初始化时根据当前类型刷新列表
         refreshHorizontalList(vm.getBudgetType());
-    }
-
-    private void clearBudgetDisplay() {
-        binding.tvBudgetAmount.setText("¥0.00");
-        binding.progressBudget.setProgress(0);
-        binding.tvUsed.setText("已用 ¥0.00");
-        binding.tvTotalAmountHint.setText("¥0.00");
-        binding.tvDateRange.setText("加载中...");
-        binding.tvIncomeActual.setText("0.00");
-        binding.tvExpenseActual.setText("0.00");
-        binding.pbIncomeProgress.setProgress(0);
-        binding.pbExpenseProgress.setProgress(0);
     }
 
     private void initButtons() {
         binding.ivBack.setOnClickListener(v -> finish());
-        binding.ivAddBudget.setOnClickListener(v -> AddBudgetFragment.newInstance(null).show(getSupportFragmentManager(), AddBudgetFragment.TAG));
-        
+        binding.ivAddBudget.setOnClickListener(v ->
+                AddBudgetFragment.newInstance(null).show(getSupportFragmentManager(), AddBudgetFragment.TAG));
+
         binding.llTitleDate.setOnClickListener(v -> {
             BudgetDateSelectorFragment selector = BudgetDateSelectorFragment.newInstance(
                     vm.getBudgetType(), vm.getCurrentYear(), vm.getCurrentMonth(),
@@ -175,11 +160,12 @@ public class BudgetActivity extends AppCompatActivity {
         binding.ivEditMainBudget.setOnClickListener(v -> {
             Budget current = vm.getTotalBudget().getValue();
             if (current == null) return;
-            
-            com.example.my_project1.data.model.account.Account tempAccount = new com.example.my_project1.data.model.account.Account();
+
+            com.example.my_project1.data.model.account.Account tempAccount =
+                    new com.example.my_project1.data.model.account.Account();
             tempAccount.setBalance(current.getAmount());
-            
-            com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment fragment = 
+
+            com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment fragment =
                     com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment.newInstance(tempAccount);
             fragment.setOnBalanceAdjustedListener((newAmount, recordAsTransaction) -> {
                 vm.saveTotalBudget(newAmount, vm.getBudgetType());
@@ -187,25 +173,20 @@ public class BudgetActivity extends AppCompatActivity {
             });
             fragment.show(getSupportFragmentManager(), "EditMainBudget");
         });
-        
+
         binding.tvDateSelectorTop.setOnClickListener(v -> vm.switchToYear());
 
-        // Top Period Tabs
+        // ✅ Top Period Tabs：点击时切换类型，不再强制清空以防闪烁
         binding.tabWeek.setOnClickListener(v -> {
-            if (vm.getBudgetType().equals(Budget.TYPE_WEEK)) return; // 避免重复点击
-            isInitialRender = true;
+            if (Budget.TYPE_WEEK.equals(vm.getBudgetType())) return;
             vm.switchToWeek();
         });
         binding.tabMonth.setOnClickListener(v -> {
-            if (vm.getBudgetType().equals(Budget.TYPE_MONTH)) return;
-            isInitialRender = true;
-            binding.tvBudgetAmount.setText("¥--");
+            if (Budget.TYPE_MONTH.equals(vm.getBudgetType())) return;
             vm.switchToMonth();
         });
         binding.tabYear.setOnClickListener(v -> {
-            if (vm.getBudgetType().equals(Budget.TYPE_YEAR)) return;
-            isInitialRender = true;
-            binding.tvBudgetAmount.setText("¥--");
+            if (Budget.TYPE_YEAR.equals(vm.getBudgetType())) return;
             vm.switchToYear();
         });
 
@@ -219,15 +200,7 @@ public class BudgetActivity extends AppCompatActivity {
         });
     }
 
-    private void refreshAmountDisplay() {
-        Budget b = vm.getTotalBudget().getValue();
-        if (b == null) return;
-        if (isAmountVisible) {
-            binding.tvBudgetAmount.setText(String.format(Locale.getDefault(), "¥%.2f", b.getAmount()));
-        } else {
-            binding.tvBudgetAmount.setText("¥****");
-        }
-    }
+    // ✅ 已移除 refreshAmountDisplay()，tvBudgetAmount 不再由此方法写入
 
     private void observeCategoryData() {
         categoryVm.getExpenseCategories(vm.getUserId()).observe(this, categories -> {
@@ -252,30 +225,30 @@ public class BudgetActivity extends AppCompatActivity {
         vm.getSelectedMonth().observe(this, month -> {
             updateTopDateText();
             monthAdapter.setSelectedMonth(month);
-            // 只要日期变了就重新加载统计数据，不依赖总预算是否存在
-            vm.loadStats(); 
         });
+
         vm.getSelectedYear().observe(this, year -> {
             updateTopDateText();
-            vm.loadStats();
+            binding.tvDateSelectorTop.setText(year + " ▼");
         });
 
         vm.getCurrentBudgetType().observe(this, type -> {
             refreshTopTabStyle(type);
-            updateTopDateText(); // 更新顶部日期显示和水平列表
-            vm.loadStats();
+            updateTopDateText();
         });
 
+        // ✅ getTotalBudget 仅更新日期范围和提示文字，不再写入 tvBudgetAmount 以防闪烁冲突
         vm.getTotalBudget().observe(this, budget -> {
             if (budget != null) {
                 refreshMainBudgetCard(budget);
             } else {
-                // 如果当前选中的年/月还没设预算，也要清空显示，防止显示上个月/年的旧数据
-                binding.tvBudgetAmount.setText("¥0.00");
-                binding.progressBudget.setProgress(0);
-                binding.tvUsed.setText("已用 ¥0.00");
-                binding.tvTotalAmountHint.setText("¥0.00");
-                binding.tvDateRange.setText("未设置预算周期");
+                animateTextUpdate(binding.tvTotalAmountHint, "¥0.00");
+                animateTextUpdate(binding.tvDateRange, "未设置预算周期");
+                
+                String label = "月预算剩余";
+                if (Budget.TYPE_YEAR.equals(vm.getBudgetType())) label = "年预算剩余";
+                else if (Budget.TYPE_WEEK.equals(vm.getBudgetType())) label = "周预算剩余";
+                animateTextUpdate(binding.tvRemainingLabel, label);
             }
         });
 
@@ -284,23 +257,21 @@ public class BudgetActivity extends AppCompatActivity {
             else adapter.submitList(new ArrayList<>());
         });
 
+        // ✅ Stats 回调是 tvBudgetAmount 的唯一数据源
         vm.getMonthlyStats().observe(this, stats -> {
-            if (vm.getBudgetType().equals(Budget.TYPE_MONTH)) {
+            if (Budget.TYPE_MONTH.equals(vm.getBudgetType())) {
                 updateDetailStats(stats);
-                isInitialRender = false; // 数据已就绪
             }
         });
 
         vm.getYearlyStats().observe(this, stats -> {
             updateYearlyOverview(stats);
-            if (vm.getBudgetType().equals(Budget.TYPE_YEAR)) {
+            if (Budget.TYPE_YEAR.equals(vm.getBudgetType())) {
                 updateDetailStats(stats);
-                isInitialRender = false;
             }
         });
 
-        vm.getSelectedMonth().observe(this, month -> monthAdapter.setSelectedMonth(month));
-        vm.getSelectedYear().observe(this, year -> binding.tvDateSelectorTop.setText(year + " ▼"));
+        // ✅ 已删除重复的 getSelectedMonth / getSelectedYear observe
     }
 
     public void updateCategoryCache(String cloudId, String name, String iconUri) {
@@ -318,21 +289,21 @@ public class BudgetActivity extends AppCompatActivity {
         if (Budget.TYPE_YEAR.equals(type)) {
             dateStr = year + "年";
         } else if (Budget.TYPE_WEEK.equals(type)) {
-            // 根据当前选中的年、月、周（基于 selectedMonth 的第一天或当前日期）计算
-            java.util.Calendar cal = java.util.Calendar.getInstance();
-            cal.set(java.util.Calendar.YEAR, year);
-            cal.set(java.util.Calendar.MONTH, month - 1);
-            long[] range = com.example.my_project1.utils.BudgetPeriodHelper.getPeriodRange(Budget.PERIOD_WEEK, BudgetConfig.getStartDay(this), cal);
-            java.util.Calendar s = java.util.Calendar.getInstance(); s.setTimeInMillis(range[0]);
-            java.util.Calendar e = java.util.Calendar.getInstance(); e.setTimeInMillis(range[1]);
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.YEAR, year);
+            cal.set(Calendar.MONTH, month - 1);
+            long[] range = BudgetPeriodHelper.getPeriodRange(Budget.PERIOD_WEEK, BudgetConfig.getStartDay(this), cal);
+            Calendar s = Calendar.getInstance();
+            s.setTimeInMillis(range[0]);
+            Calendar e = Calendar.getInstance();
+            e.setTimeInMillis(range[1]);
             dateStr = String.format(Locale.getDefault(), "%d年%d月%d日至%d日",
-                    s.get(java.util.Calendar.YEAR), s.get(java.util.Calendar.MONTH) + 1, s.get(java.util.Calendar.DAY_OF_MONTH),
-                    e.get(java.util.Calendar.DAY_OF_MONTH));
+                    s.get(Calendar.YEAR), s.get(Calendar.MONTH) + 1, s.get(Calendar.DAY_OF_MONTH),
+                    e.get(Calendar.DAY_OF_MONTH));
         } else {
             dateStr = year + "年" + month + "月";
         }
         binding.tvDateDisplay.setText(dateStr);
-        
         refreshHorizontalList(type);
     }
 
@@ -340,46 +311,54 @@ public class BudgetActivity extends AppCompatActivity {
         if (monthAdapter == null) return;
         List<String> items = new ArrayList<>();
         if (Budget.TYPE_YEAR.equals(type)) {
-            int curYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
+            int curYear = Calendar.getInstance().get(Calendar.YEAR);
             for (int i = curYear - 2; i <= curYear + 2; i++) items.add(i + "年");
             monthAdapter.setItems(items, vm.getCurrentYear() - (curYear - 2));
         } else if (Budget.TYPE_WEEK.equals(type)) {
-            // 简单展示最近几周
             for (int i = -2; i <= 2; i++) {
-                java.util.Calendar cal = java.util.Calendar.getInstance();
-                cal.add(java.util.Calendar.WEEK_OF_YEAR, i);
-                items.add("第" + cal.get(java.util.Calendar.WEEK_OF_YEAR) + "周");
+                Calendar cal = Calendar.getInstance();
+                cal.add(Calendar.WEEK_OF_YEAR, i);
+                items.add("第" + cal.get(Calendar.WEEK_OF_YEAR) + "周");
             }
-            monthAdapter.setItems(items, 2); // 选中中间（当前周）
+            monthAdapter.setItems(items, 2);
         } else {
             for (int i = 1; i <= 12; i++) items.add(i + "月");
             monthAdapter.setItems(items, vm.getCurrentMonth() - 1);
         }
     }
 
+    // ✅ 不再调用 refreshAmountDisplay，仅更新日期范围和标签
     private void refreshMainBudgetCard(Budget budget) {
-        refreshAmountDisplay();
         int startDay = BudgetConfig.getStartDay(this);
-        binding.tvDateRange.setText(BudgetPeriodHelper.getPeriodDateRange(budget.getPeriod(), startDay));
-        binding.tvTotalAmountHint.setText(String.format(Locale.getDefault(), "¥%.2f", budget.getAmount()));
-        binding.tvRemainingLabel.setText(budget.isYearType() ? "年预算剩余" : "月预算剩余");
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.YEAR, budget.getYear());
+        if (budget.getMonth() > 0) {
+            cal.set(Calendar.MONTH, budget.getMonth() - 1);
+        } else {
+            cal.set(Calendar.MONTH, 0);
+        }
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+
+        animateTextUpdate(binding.tvDateRange, BudgetPeriodHelper.getPeriodDateRange(budget.getPeriod(), startDay, cal));
+        animateTextUpdate(binding.tvTotalAmountHint, String.format(Locale.getDefault(), "¥%.2f", budget.getAmount()));
+        
+        String label = "月预算剩余";
+        if (Budget.TYPE_YEAR.equals(budget.getBudgetType())) label = "年预算剩余";
+        else if (Budget.TYPE_WEEK.equals(budget.getBudgetType())) label = "周预算剩余";
+        animateTextUpdate(binding.tvRemainingLabel, label);
     }
 
     private void updateYearlyOverview(BudgetViewModel.BudgetStats stats) {
-        binding.pbYearlyIncome.setProgress((int) (stats.totalIncome / 200000.0 * 100)); // Dummy max
-        binding.tvYearlyIncomeText.setText(String.format(Locale.getDefault(), "%.0f / %.0f", stats.totalIncome, 200000.0));
+        binding.pbYearlyIncome.setProgress((int) (stats.totalIncome / 200000.0 * 100));
+        animateTextUpdate(binding.tvYearlyIncomeText, String.format(Locale.getDefault(), "%.0f / %.0f", stats.totalIncome, 200000.0));
         binding.pbYearlyExpense.setProgress((int) (stats.totalExpense / stats.expenseBudget * 100));
-        binding.tvYearlyExpenseText.setText(String.format(Locale.getDefault(), "%.0f / %.0f", stats.totalExpense, stats.expenseBudget));
+        animateTextUpdate(binding.tvYearlyExpenseText, String.format(Locale.getDefault(), "%.0f / %.0f", stats.totalExpense, stats.expenseBudget));
     }
 
     private void refreshTopTabStyle(String type) {
-        boolean isWeek = Budget.TYPE_WEEK.equals(type);
-        boolean isMonth = Budget.TYPE_MONTH.equals(type);
-        boolean isYear = Budget.TYPE_YEAR.equals(type);
-
-        applyTopTab(binding.tabWeek, isWeek);
-        applyTopTab(binding.tabMonth, isMonth);
-        applyTopTab(binding.tabYear, isYear);
+        applyTopTab(binding.tabWeek, Budget.TYPE_WEEK.equals(type));
+        applyTopTab(binding.tabMonth, Budget.TYPE_MONTH.equals(type));
+        applyTopTab(binding.tabYear, Budget.TYPE_YEAR.equals(type));
     }
 
     private void applyTopTab(android.widget.TextView tab, boolean selected) {
@@ -392,43 +371,76 @@ public class BudgetActivity extends AppCompatActivity {
         }
     }
 
+    // ✅ tvBudgetAmount 的唯一写入入口，增加超支状态处理
     private void updateDetailStats(BudgetViewModel.BudgetStats stats) {
         animateTextUpdate(binding.tvIncomeActual, String.format(Locale.getDefault(), "%.2f", stats.totalIncome));
         animateTextUpdate(binding.tvExpenseActual, String.format(Locale.getDefault(), "%.2f", stats.totalExpense));
         animateTextUpdate(binding.tvExpenseBudget, String.format(Locale.getDefault(), "预算 %.2f", stats.expenseBudget));
-        
+
+        if (stats.expenseBudget <= 0) {
+            animateTextUpdate(binding.tvBudgetAmount, "¥--");
+            updateProgressValue(binding.progressBudget, 0);
+            animateTextUpdate(binding.tvProgressPercent, "0%");
+            animateTextUpdate(binding.tvUsed, String.format(Locale.getDefault(), "已用 ¥%.2f", stats.totalExpense));
+            binding.tvBudgetAmount.setTextColor(0xFF333333);
+            binding.tvRemainingLabel.setTextColor(0xFF5B8DEF);
+            updateProgressDrawable(binding.progressBudget, R.drawable.bg_progress_thin);
+            return;
+        }
+
         double remaining = stats.expenseBudget - stats.totalExpense;
-        animateTextUpdate(binding.tvBudgetAmount, String.format(Locale.getDefault(), "¥%.2f", Math.max(0, remaining)));
-        
         int progress = stats.expenseBudget > 0 ? (int) (stats.totalExpense / stats.expenseBudget * 100) : 0;
-        binding.progressBudget.setProgress(progress);
+
+        if (remaining < 0 && stats.expenseBudget > 0) {
+            binding.tvBudgetAmount.setTextColor(0xFFEB5757); // 红色
+            animateTextUpdate(binding.tvRemainingLabel, "预算已超支");
+            binding.tvRemainingLabel.setTextColor(0xFFEB5757);
+            animateTextUpdate(binding.tvBudgetAmount, String.format(Locale.getDefault(), "¥%.2f", Math.abs(remaining)));
+            updateProgressDrawable(binding.progressBudget, R.drawable.progress_budget_red);
+        } else {
+            binding.tvBudgetAmount.setTextColor(0xFF333333);
+            String label = "月预算剩余";
+            if (Budget.TYPE_YEAR.equals(vm.getBudgetType())) label = "年预算剩余";
+            else if (Budget.TYPE_WEEK.equals(vm.getBudgetType())) label = "周预算剩余";
+            animateTextUpdate(binding.tvRemainingLabel, label);
+            binding.tvRemainingLabel.setTextColor(0xFF5B8DEF); // 蓝色
+            animateTextUpdate(binding.tvBudgetAmount, String.format(Locale.getDefault(), "¥%.2f", Math.max(0, remaining)));
+            updateProgressDrawable(binding.progressBudget, R.drawable.bg_progress_thin);
+        }
+
+        updateProgressValue(binding.progressBudget, Math.min(progress, 100));
         animateTextUpdate(binding.tvProgressPercent, progress + "%");
         animateTextUpdate(binding.tvUsed, String.format(Locale.getDefault(), "已用 ¥%.2f", stats.totalExpense));
 
-        // 动态样式：垂直进度背景条 (绿色收入 / 红色支出)
-        binding.pbIncomeProgress.setProgress(10000); 
-        binding.pbExpenseProgress.setProgress(Math.min(progress * 100, 10000));
-        binding.pbIncomeProgress.setProgressDrawable(getDrawable(R.drawable.bg_vertical_progress_income));
+        updateProgressValue(binding.pbIncomeProgress, 10000);
+        updateProgressValue(binding.pbExpenseProgress, Math.min(progress * 100, 10000));
+        updateProgressDrawable(binding.pbIncomeProgress, R.drawable.bg_vertical_progress_income);
 
         if (stats.totalExpense > stats.expenseBudget && stats.expenseBudget > 0) {
-            binding.pbExpenseProgress.setProgressDrawable(getDrawable(R.drawable.bg_vertical_progress_expense));
+            updateProgressDrawable(binding.pbExpenseProgress, R.drawable.bg_vertical_progress_expense);
             binding.tvExpenseActual.setTextColor(0xFFEB5757);
         } else {
-            binding.pbExpenseProgress.setProgressDrawable(getDrawable(R.drawable.bg_vertical_progress_expense));
+            updateProgressDrawable(binding.pbExpenseProgress, R.drawable.bg_vertical_progress_expense);
             binding.tvExpenseActual.setTextColor(0xFF333333);
         }
     }
 
+    private void updateProgressValue(android.widget.ProgressBar bar, int value) {
+        if (bar.getProgress() == value) return;
+        bar.setProgress(value);
+    }
+
+    private void updateProgressDrawable(android.widget.ProgressBar bar, int resId) {
+        Object tag = bar.getTag(R.id.bar_drawable_tag);
+        if (tag instanceof Integer && (Integer) tag == resId) return;
+        bar.setProgressDrawable(getDrawable(resId));
+        bar.setTag(R.id.bar_drawable_tag, resId);
+    }
+
+    // ✅ 统一的数据更新，移除所有动画以修复闪烁
     private void animateTextUpdate(android.widget.TextView view, String newText) {
         if (view.getText().toString().equals(newText)) return;
-        if (isInitialRender) {
-            view.setText(newText);
-            return;
-        }
-        view.animate().alpha(0f).setDuration(150).withEndAction(() -> {
-            view.setText(newText);
-            view.animate().alpha(1f).setDuration(150).start();
-        }).start();
+        view.setText(newText);
     }
 
     private void rebuildCategoryBudgetItems() {
@@ -452,7 +464,7 @@ public class BudgetActivity extends AppCompatActivity {
             final double finalAllocated = totalAllocated;
             runOnUiThread(() -> {
                 adapter.submitList(items);
-                binding.tvClassifiedBudget.setText(String.format(Locale.getDefault(), "已分类预算 ¥%.2f", finalAllocated));
+                animateTextUpdate(binding.tvClassifiedBudget, String.format(Locale.getDefault(), "已分类预算 ¥%.2f", finalAllocated));
             });
         });
     }
