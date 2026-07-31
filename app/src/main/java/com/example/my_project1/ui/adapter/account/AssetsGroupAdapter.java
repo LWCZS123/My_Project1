@@ -1,19 +1,22 @@
 package com.example.my_project1.ui.adapter.account;
 
-import android.animation.ValueAnimator;
-import android.util.Log;
+import android.transition.AutoTransition;
+import android.transition.TransitionManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
-import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.ItemAssetGroupBinding;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountGroupUiModel;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountUiModel;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -21,28 +24,131 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
-import io.reactivex.annotations.NonNull;
+public class AssetsGroupAdapter extends ListAdapter<AccountGroupUiModel, AssetsGroupAdapter.GroupViewHolder> {
 
-public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.GroupViewHolder> {
-
-    private static final String TAG = "AssetsGroupAdapter";
-
-    private boolean isAmountHidden = false;
-
-    private final List<AccountGroup> groupList = new ArrayList<>();
-    private final Set<String> expandedGroupIds = new HashSet<>();
     private OnGroupActionClickListener groupActionClickListener;
 
-    // 🔴 存储所有账户组的账户数据（无论是否展开）
-    private final Map<String, List<Account>> groupAccounts = new HashMap<>();
+    // ── 内部状态存储，维持与旧 Fragment 的兼容性 ──────────────────
+    private boolean isAmountHidden = false;
+    private List<AccountGroup> rawGroups = new ArrayList<>();
+    private final Map<String, List<Account>> groupAccountsMap = new HashMap<>();
+    private final Set<String> expandedGroupIds = new HashSet<>();
 
-    // 🔴 存储每个账户组的总金额缓存
-    private final Map<String, Double> groupTotalAmounts = new HashMap<>();
+    public AssetsGroupAdapter() {
+        super(new DiffUtil.ItemCallback<AccountGroupUiModel>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull AccountGroupUiModel oldItem, @NonNull AccountGroupUiModel newItem) {
+                return oldItem.id == newItem.id || Objects.equals(oldItem.objectId, newItem.objectId);
+            }
 
-    // 🔴 新增：存储动画状态，避免重复触发
-    private final Set<String> animatingGroups = new HashSet<>();
+            @Override
+            public boolean areContentsTheSame(@NonNull AccountGroupUiModel oldItem, @NonNull AccountGroupUiModel newItem) {
+                // 必须进行深度比较，以便检测子列表和金额的变化
+                return oldItem.equals(newItem);
+            }
+        });
+    }
+
+    // ==================== 维持兼容性方法 ====================
+
+    public void setGroups(List<AccountGroup> groups) {
+        this.rawGroups = groups != null ? new ArrayList<>(groups) : new ArrayList<>();
+        rebuildUiModels();
+    }
+
+    public void setAmountHidden(boolean hidden) {
+        this.isAmountHidden = hidden;
+        rebuildUiModels();
+    }
+
+    public void updateAccountsForExpandedGroup(String groupId, List<Account> accounts) {
+        groupAccountsMap.put(groupId, accounts != null ? new ArrayList<>(accounts) : new ArrayList<>());
+        rebuildUiModels();
+    }
+
+    public double getTotalPositiveAssets() {
+        double total = 0;
+        for (List<Account> accounts : groupAccountsMap.values()) {
+            for (Account acc : accounts) {
+                if (acc.isIncludeInTotal() && acc.getBalance() > 0) {
+                    total += acc.getBalance();
+                }
+            }
+        }
+        return total;
+    }
+
+    public double getTotalNegativeAssets() {
+        double total = 0;
+        for (List<Account> accounts : groupAccountsMap.values()) {
+            for (Account acc : accounts) {
+                if (acc.isIncludeInTotal() && acc.getBalance() < 0) {
+                    total += Math.abs(acc.getBalance());
+                }
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 核心逻辑：将原始数据转换为驱动界面的 UiModel 列表
+     * 同时修复了隐藏/归档账户导致的占位符 Bug
+     */
+    private void rebuildUiModels() {
+        List<AccountGroupUiModel> uiModels = new ArrayList<>();
+        DecimalFormat df = new DecimalFormat("#,##0.00");
+
+        for (AccountGroup group : rawGroups) {
+            String groupId = group.getObjectId();
+            List<Account> accounts = groupAccountsMap.get(groupId);
+            
+            double pos = 0, neg = 0;
+            List<AccountUiModel> subUiModels = new ArrayList<>();
+            
+            if (accounts != null) {
+                for (Account acc : accounts) {
+                    // 🔑 修复点 1：仅当计入总资产时才加入子列表（解决占位符 Bug）
+                    if (acc.isIncludeInTotal()) {
+                        if (acc.getBalance() > 0) pos += acc.getBalance();
+                        else neg += Math.abs(acc.getBalance());
+                        
+                        subUiModels.add(new AccountUiModel(
+                                acc.getId(),
+                                acc.getObjectId(),
+                                acc.getName(),
+                                acc.getAccountType() != null ? acc.getAccountType() : acc.getRemark(),
+                                "¥" + df.format(acc.getBalance()),
+                                acc.getBalance() < 0 ? 0xFFFF6B6B : 0xFF333333,
+                                "可用额度 ¥" + df.format(acc.getCreditLimit() + acc.getBalance()),
+                                acc.isCredit(),
+                                acc.getIconUrl(),
+                                isAmountHidden,
+                                true, // 支持侧滑
+                                acc
+                        ));
+                    }
+                }
+            }
+
+            uiModels.add(new AccountGroupUiModel(
+                    group.getId(),
+                    groupId,
+                    group.getName(),
+                    "(" + subUiModels.size() + ")", // 使用过滤后的准确数量
+                    "¥" + df.format(pos),
+                    "¥" + df.format(neg),
+                    neg > 0,
+                    expandedGroupIds.contains(groupId),
+                    subUiModels,
+                    isAmountHidden,
+                    group
+            ));
+        }
+        submitList(uiModels);
+    }
 
     public interface OnGroupActionClickListener {
         void onEditGroup(AccountGroup group);
@@ -58,457 +164,90 @@ public class AssetsGroupAdapter extends RecyclerView.Adapter<AssetsGroupAdapter.
         this.groupActionClickListener = listener;
     }
 
-    /**
-     * 🔴 改进：过滤掉账户数量为0的账户组
-     */
-    public void setGroups(List<AccountGroup> groups) {
-        groupList.clear();
-        if (groups != null) {
-            for (AccountGroup group : groups) {
-                // 只添加账户数量大于0的组
-                if (group.getAccountCount() > 0) {
-                    groupList.add(group);
-                }
-            }
-        }
-        Log.d(TAG, "📋 过滤后的账户组数量: " + groupList.size() + " (原始: " + (groups != null ? groups.size() : 0) + ")");
-        notifyDataSetChanged();
-    }
-
-    public void setAmountHidden(boolean hidden) {
-        this.isAmountHidden = hidden;
-        notifyDataSetChanged();
-    }
-
-    /**
-     * 🔴 更新账户数据并自动计算总金额
-     */
-    public void updateAccountsForExpandedGroup(String groupId, List<Account> accounts) {
-        List<Account> copy = accounts != null ? new ArrayList<>(accounts) : new ArrayList<>();
-        groupAccounts.put(groupId, copy);
-
-        // 🔴 关键：立即计算并缓存总金额
-        double totalAmount = calculateTotalAmount(copy);
-        groupTotalAmounts.put(groupId, totalAmount);
-
-        Log.d(TAG, "✅ 更新组 " + groupId + " 的账户数据: " +
-                copy.size() + " 个账户, 总金额: ¥" + totalAmount);
-
-        // 🔴 关键：查找并更新对应的 ViewHolder
-        for (int i = 0; i < groupList.size(); i++) {
-            if (groupList.get(i).getObjectId().equals(groupId)) {
-                notifyItemChanged(i);
-                return;
-            }
-        }
-    }
-
-    /**
-     * 计算账户列表的总金额（正资产）
-     */
-    private double calculatePositiveAmount(List<Account> accounts) {
-        if (accounts == null || accounts.isEmpty()) {
-            return 0.0;
-        }
-        double total = 0.0;
-        for (Account account : accounts) {
-            // 🔴 仅当计入总资产时才参与统计
-            if (account.isIncludeInTotal() && account.getBalance() > 0) {
-                total += account.getBalance();
-            }
-        }
-        return total;
-    }
-
-    /**
-     * 计算账户列表的总欠款（负债）
-     */
-    private double calculateNegativeAmount(List<Account> accounts) {
-        if (accounts == null || accounts.isEmpty()) {
-            return 0.0;
-        }
-        double total = 0.0;
-        for (Account account : accounts) {
-            // 🔴 仅当计入总资产时才参与统计
-            if (account.isIncludeInTotal() && account.getBalance() < 0) {
-                total += Math.abs(account.getBalance());
-            }
-        }
-        return total;
-    }
-
-    /**
-     * 计算账户列表的总金额（原有方法，用于兼容）
-     */
-    private double calculateTotalAmount(List<Account> accounts) {
-        if (accounts == null || accounts.isEmpty()) {
-            return 0.0;
-        }
-        double total = 0.0;
-        for (Account account : accounts) {
-            // 🔴 仅当计入总资产时才参与统计
-            if (account.isIncludeInTotal()) {
-                total += account.getBalance();
-            }
-        }
-        return total;
-    }
-
-    /**
-     * 🔴 获取账户组的总金额（优先使用缓存）
-     */
-    public double getGroupTotalAmount(String groupId) {
-        // 优先返回缓存的总金额
-        if (groupTotalAmounts.containsKey(groupId)) {
-            return groupTotalAmounts.get(groupId);
-        }
-
-        // 如果没有缓存，从账户数据计算
-        List<Account> accounts = groupAccounts.get(groupId);
-        if (accounts != null) {
-            double total = calculateTotalAmount(accounts);
-            groupTotalAmounts.put(groupId, total);
-            return total;
-        }
-
-        return 0.0;
-    }
-
-    /**
-     * 🔴 新增：获取所有正数账户余额总和（总资产）
-     */
-    public double getTotalPositiveAssets() {
-        double total = 0.0;
-        for (List<Account> accounts : groupAccounts.values()) {
-            if (accounts != null) {
-                for (Account account : accounts) {
-                    // 🔴 增加计入总资产判断
-                    if (account.isIncludeInTotal() && account.getBalance() > 0) {
-                        total += account.getBalance();
-                    }
-                }
-            }
-        }
-        return total;
-    }
-
-    /**
-     * 🔴 新增：获取所有负数账户余额总和的绝对值（总负债）
-     */
-    public double getTotalNegativeAssets() {
-        double total = 0.0;
-        for (List<Account> accounts : groupAccounts.values()) {
-            if (accounts != null) {
-                for (Account account : accounts) {
-                    // 🔴 增加计入总资产判断
-                    if (account.isIncludeInTotal() && account.getBalance() < 0) {
-                        total += Math.abs(account.getBalance());
-                    }
-                }
-            }
-        }
-        return total;
-    }
-
-    /**
-     * 🔴 新增：获取净资产（总资产 - 总负债）
-     */
-    public double getNetAssets() {
-        double positiveAssets = getTotalPositiveAssets();
-        double negativeAssets = getTotalNegativeAssets();
-        return positiveAssets - negativeAssets;
-    }
-
-    /**
-     * 🔴 原有方法：获取所有账户组的总金额（包含正负）
-     */
-    public double getTotalAssets() {
-        double total = 0.0;
-        for (AccountGroup group : groupList) {
-            total += getGroupTotalAmount(group.getObjectId());
-        }
-        return total;
-    }
-
     @NonNull
     @Override
     public GroupViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        ItemAssetGroupBinding binding =
-                ItemAssetGroupBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
-        return new GroupViewHolder(binding);
+        return new GroupViewHolder(ItemAssetGroupBinding.inflate(
+                LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
     public void onBindViewHolder(@NonNull GroupViewHolder holder, int position) {
-        holder.bind(groupList.get(position));
-    }
-
-    @Override
-    public int getItemCount() {
-        Log.d(TAG, "getItemCount: "+groupList.size());
-        return groupList.size();
+        holder.bind(getItem(position));
     }
 
     class GroupViewHolder extends RecyclerView.ViewHolder {
         private final ItemAssetGroupBinding binding;
         private final AccountSubAdapter subAdapter;
-        private ValueAnimator currentAnimator; // 🔴 保存当前动画引用
 
         GroupViewHolder(ItemAssetGroupBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
             this.subAdapter = new AccountSubAdapter();
 
-            // 🔴 性能优化：使用 LinearLayoutManager 的性能优化
-            LinearLayoutManager layoutManager = new LinearLayoutManager(binding.getRoot().getContext());
-            layoutManager.setInitialPrefetchItemCount(4); // 预加载4个item
-            binding.rvSubAccounts.setLayoutManager(layoutManager);
+            binding.rvSubAccounts.setLayoutManager(new LinearLayoutManager(binding.getRoot().getContext()));
             binding.rvSubAccounts.setAdapter(subAdapter);
-
-            //增加缓存池大小
-            binding.rvSubAccounts.setItemViewCacheSize(10);
-            binding.rvSubAccounts.setHasFixedSize(true);
-
-            //
             binding.rvSubAccounts.setNestedScrollingEnabled(false);
 
             subAdapter.setOnAccountClickListener(new AccountSubAdapter.OnAccountClickListener() {
-                @Override
-                public void onAccountClick(Account account) {
-                    if (groupActionClickListener != null)
-                        groupActionClickListener.onAccount(account);
-                }
-
-                @Override
-                public void onAccountDelete(Account account) {
-                    if (groupActionClickListener != null)
-                        groupActionClickListener.onAccountDelete(account);
-                }
-
-                @Override
-                public void onAccountHide(Account account) {
-                    if (groupActionClickListener != null)
-                        groupActionClickListener.onAccountHide(account);
-                }
-
-                @Override
-                public void onAccountArchive(Account account) {
-                    if (groupActionClickListener != null)
-                        groupActionClickListener.onAccountArchive(account);
-                }
-
-                @Override
-                public void onAccountEdit(Account account) {
-                    if (groupActionClickListener != null)
-                        groupActionClickListener.onAccountEdit(account);
-                }
+                @Override public void onAccountClick(Account acc) { if (groupActionClickListener != null) groupActionClickListener.onAccount(acc); }
+                @Override public void onAccountDelete(Account acc) { if (groupActionClickListener != null) groupActionClickListener.onAccountDelete(acc); }
+                @Override public void onAccountHide(Account acc) { if (groupActionClickListener != null) groupActionClickListener.onAccountHide(acc); }
+                @Override public void onAccountArchive(Account acc) { if (groupActionClickListener != null) groupActionClickListener.onAccountArchive(acc); }
+                @Override public void onAccountEdit(Account acc) { if (groupActionClickListener != null) groupActionClickListener.onAccountEdit(acc); }
             });
 
-            // 编辑组
             binding.layoutGroupActions.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
+                int pos = getBindingAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && groupActionClickListener != null) {
-                    AccountGroup group = groupList.get(pos);
-                    // 🔴 虚拟分组不支持编辑
-                    if (group.getObjectId() != null && group.getObjectId().startsWith("CATEGORY_")) {
-                        return;
-                    }
-                    groupActionClickListener.onEditGroup(group);
+                    AccountGroupUiModel uiModel = getItem(pos);
+                    if (uiModel.objectId != null && uiModel.objectId.startsWith("CATEGORY_")) return;
+                    groupActionClickListener.onEditGroup(uiModel.originalGroup);
                 }
             });
 
-            // 展开/折叠
-            binding.layoutHeader.setOnClickListener(v -> toggleExpand());
+            binding.layoutHeader.setOnClickListener(v -> {
+                int pos = getBindingAdapterPosition();
+                if (pos == RecyclerView.NO_POSITION) return;
+                String groupId = getItem(pos).objectId;
+
+                // 切换展开状态
+                if (expandedGroupIds.contains(groupId)) expandedGroupIds.remove(groupId);
+                else expandedGroupIds.add(groupId);
+
+                if (groupActionClickListener != null) groupActionClickListener.onGroupExpand(groupId);
+                rebuildUiModels();
+            });
         }
 
-        void toggleExpand() {
-            int pos = getAdapterPosition();
-            if (pos == RecyclerView.NO_POSITION) return;
+        void bind(AccountGroupUiModel uiModel) {
+            // 🚀 优化点 2：使用 TransitionManager 实现高性能平滑动画
+            // 它能自动处理高度变化，且不会在快速点击时产生卡顿
+            AutoTransition transition = new AutoTransition();
+            transition.setDuration(250);
+            TransitionManager.beginDelayedTransition((ViewGroup) binding.getRoot(), transition);
 
-            AccountGroup group = groupList.get(pos);
-            String groupId = group.getObjectId();
+            binding.tvGroupName.setText(uiModel.name);
+            binding.tvCount.setText(uiModel.countText);
 
-            //防止动画期间重复点击
-            if (animatingGroups.contains(groupId)) {
-                Log.d(TAG, "⚠️ 动画进行中，忽略点击");
-                return;
-            }
-
-            boolean expanded = expandedGroupIds.contains(groupId);
-
-            if (expanded) {
-                // 折叠
-                expandedGroupIds.remove(groupId);
-                collapseSection(binding.layoutAccountsContainer, groupId);
-                binding.ivArrow.animate().rotation(0f).setDuration(200).start();
-            } else {
-                // 展开
-                expandedGroupIds.add(groupId);
-
-                // 🔴 关键：通知Fragment加载该组的账户数据
-                if (groupActionClickListener != null) {
-                    groupActionClickListener.onGroupExpand(groupId);
-                }
-
-                // 🔴 改进：立即显示已缓存的账户数据
-                List<Account> cached = groupAccounts.get(groupId);
-                subAdapter.setAccounts(cached != null ? cached : new ArrayList<>());
-
-                expandSection(binding.layoutAccountsContainer, groupId);
-                binding.ivArrow.animate().rotation(90f).setDuration(200).start();
-            }
-        }
-
-        void bind(AccountGroup group) {
-            String groupId = group.getObjectId();
-
-            binding.tvGroupName.setText(group.getName());
-            binding.tvCount.setText("(" + group.getAccountCount() + ")");
-
-            // 展开/折叠状态
-            boolean expanded = expandedGroupIds.contains(groupId);
+            boolean expanded = uiModel.isExpanded;
             binding.layoutAccountsContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
-            binding.ivArrow.setRotation(expanded ? 180f : 0f); // 配合新的箭头图标
+            binding.ivArrow.setRotation(expanded ? 90f : 0f);
 
-            // 计算该组的总资产和总负债
-            List<Account> accounts = groupAccounts.get(groupId);
-            double positiveBalance = calculatePositiveAmount(accounts);
-            double negativeBalance = calculateNegativeAmount(accounts);
-
-            if (isAmountHidden) {
+            if (uiModel.isAmountHidden) {
                 binding.tvGroupBalance.setText("****");
                 binding.tvGroupDebt.setText("****");
             } else {
-                binding.tvGroupBalance.setText(formatMoney(positiveBalance));
-                binding.tvGroupDebt.setText(formatMoney(negativeBalance));
+                binding.tvGroupBalance.setText(uiModel.positiveBalanceText);
+                binding.tvGroupDebt.setText(uiModel.negativeBalanceText);
             }
 
-            // 如果没有负债，隐藏负债标签和金额
-            int debtVisibility = negativeBalance > 0 ? View.VISIBLE : View.GONE;
+            int debtVisibility = uiModel.isDebtVisible ? View.VISIBLE : View.GONE;
             binding.tvDebtLabel.setVisibility(debtVisibility);
             binding.tvGroupDebt.setVisibility(debtVisibility);
 
-            subAdapter.setAmountHidden(isAmountHidden);
-
-            // 如果已展开，更新子账户列表
-            if (expanded) {
-                subAdapter.setAccounts(accounts != null ? accounts : new ArrayList<>());
-            }
+            // 更新子账户列表
+            subAdapter.submitList(uiModel.accounts);
         }
-
-        private String formatMoney(double amount) {
-            DecimalFormat formatter = new DecimalFormat("#,##0.00");
-            return "¥" + formatter.format(amount);
-        }
-
-        /**
-         * 🔴 优化版展开动画
-         */
-        private void expandSection(View section, String groupId) {
-            // 🔴 取消之前的动画
-            if (currentAnimator != null && currentAnimator.isRunning()) {
-                currentAnimator.cancel();
-            }
-
-            animatingGroups.add(groupId);
-
-            // 🔴 优化：先设置为可见再测量
-            section.setVisibility(View.VISIBLE);
-            section.getLayoutParams().height = 0;
-
-            // 🔴 强制立即布局，获取准确高度
-            section.post(() -> {
-                section.measure(
-                        View.MeasureSpec.makeMeasureSpec(section.getWidth(), View.MeasureSpec.EXACTLY),
-                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-                );
-
-                int targetHeight = section.getMeasuredHeight();
-                if (targetHeight == 0) targetHeight = 300; // 默认高度
-
-                currentAnimator = ValueAnimator.ofInt(0, targetHeight);
-                currentAnimator.setDuration(250); // 缩短动画时间
-                currentAnimator.setInterpolator(new android.view.animation.DecelerateInterpolator()); // 使用更流畅的插值器
-
-                currentAnimator.addUpdateListener(animation -> {
-                    section.getLayoutParams().height = (int) animation.getAnimatedValue();
-                    section.requestLayout();
-                });
-
-                currentAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(android.animation.Animator animation) {
-                        section.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                        section.requestLayout();
-                        animatingGroups.remove(groupId);
-                        currentAnimator = null;
-                    }
-
-                    @Override
-                    public void onAnimationCancel(android.animation.Animator animation) {
-                        animatingGroups.remove(groupId);
-                        currentAnimator = null;
-                    }
-                });
-
-                currentAnimator.start();
-            });
-        }
-
-        /**
-         * 🔴 优化版折叠动画
-         */
-        private void collapseSection(View section, String groupId) {
-            // 🔴 取消之前的动画
-            if (currentAnimator != null && currentAnimator.isRunning()) {
-                currentAnimator.cancel();
-            }
-
-            animatingGroups.add(groupId);
-
-            int startHeight = section.getHeight();
-            if (startHeight == 0) {
-                section.setVisibility(View.GONE);
-                animatingGroups.remove(groupId);
-                return;
-            }
-
-            currentAnimator = ValueAnimator.ofInt(startHeight, 0);
-            currentAnimator.setDuration(250);
-            currentAnimator.setInterpolator(new android.view.animation.AccelerateInterpolator()); // 使用加速插值器
-
-            currentAnimator.addUpdateListener(animation -> {
-                section.getLayoutParams().height = (int) animation.getAnimatedValue();
-                section.requestLayout();
-            });
-
-            currentAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(android.animation.Animator animation) {
-                    section.setVisibility(View.GONE);
-                    section.getLayoutParams().height = 0;
-                    animatingGroups.remove(groupId);
-                    currentAnimator = null;
-                }
-
-                @Override
-                public void onAnimationCancel(android.animation.Animator animation) {
-                    animatingGroups.remove(groupId);
-                    currentAnimator = null;
-                }
-            });
-
-            currentAnimator.start();
-        }
-    }
-
-    /**
-     * 🔴 清理缓存数据
-     */
-    public void clearCache() {
-        groupAccounts.clear();
-        groupTotalAmounts.clear();
-        expandedGroupIds.clear();
-        animatingGroups.clear();
     }
 }

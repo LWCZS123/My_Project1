@@ -16,13 +16,17 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.budget.Budget;
 import com.example.my_project1.databinding.ActivityCategoryBudgetDetailBinding;
+import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
+import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.budget.CategoryBudgetDetailViewModel;
 import com.example.my_project1.utils.GlideImageLoader;
 import com.github.mikephil.charting.charts.LineChart;
@@ -65,6 +69,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
 
     private ActivityCategoryBudgetDetailBinding binding;
     private CategoryBudgetDetailViewModel vm;
+    private BillViewModel billViewModel;
     private BillListAdapter billAdapter;
 
     // ── 便捷启动 ─────────────────────────────────────────────
@@ -110,6 +115,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
 
 
         vm = new ViewModelProvider(this).get(CategoryBudgetDetailViewModel.class);
+        billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
 
         // 从 Intent 还原参数
         Intent intent    = getIntent();
@@ -256,7 +262,8 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
             // 账单列表由 ViewModel 根据 effectiveStartTime/endTime 查询
             // 与列表页进度条使用相同的时间范围，数据一致
             binding.tvBillCount.setText("共 " + (bills != null ? bills.size() : 0) + " 笔消费");
-            billAdapter.submitList(bills != null ? bills : new ArrayList<>());
+            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
+            billAdapter.submitList(uiModels);
             binding.tvEmptyBills.setVisibility(
                     (bills == null || bills.isEmpty()) ? View.VISIBLE : View.GONE);
         });
@@ -338,15 +345,20 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
     // ==============================
     // 适配器：已完成 太阳/月亮 + 点击跳转详情
     // ==============================
-    static class BillListAdapter extends RecyclerView.Adapter<BillListAdapter.VH> {
+    static class BillListAdapter extends ListAdapter<BillUiModel, BillListAdapter.VH> {
 
-        private List<Bill> list = new ArrayList<>();
-        private static final SimpleDateFormat SDF_TIME =
-                new SimpleDateFormat("HH:mm", Locale.getDefault());
+        public BillListAdapter() {
+            super(new DiffUtil.ItemCallback<BillUiModel>() {
+                @Override
+                public boolean areItemsTheSame(@androidx.annotation.NonNull BillUiModel oldItem, @androidx.annotation.NonNull BillUiModel newItem) {
+                    return oldItem.localId == newItem.localId;
+                }
 
-        void submitList(List<Bill> newList) {
-            list = newList;
-            notifyDataSetChanged();
+                @Override
+                public boolean areContentsTheSame(@androidx.annotation.NonNull BillUiModel oldItem, @androidx.annotation.NonNull BillUiModel newItem) {
+                    return oldItem.equals(newItem);
+                }
+            });
         }
 
         @Override
@@ -358,42 +370,31 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
 
         @Override
         public void onBindViewHolder(VH h, int pos) {
-            Bill b = list.get(pos);
+            BillUiModel b = getItem(pos);
 
-            // 1. 时间显示
-            if (b.getBillTime() != null) {
-                h.tvTime.setText(SDF_TIME.format(b.getBillTime()));
-
-                Calendar calendar = Calendar.getInstance();
-                calendar.setTime(b.getBillTime());
-                int hour = calendar.get(Calendar.HOUR_OF_DAY);
-
-                if (hour >= 6 && hour < 18) {
-                    h.ivTimeIcon.setImageResource(R.drawable.ic_sun);
-                } else {
-                    h.ivTimeIcon.setImageResource(R.drawable.ic_moon);
-                }
-
-            } else {
-                h.tvTime.setText("--:--");
+            // 1. 时间显示 - 零计算，从 UiModel 直接获取
+            h.tvTime.setText(b.timeText);
+            
+            // 处理太阳/月亮图标逻辑 (虽然 UiModel 没有显式包含这个资源 ID，但可以根据 timeText 判断或者在 ViewModel 中预处理)
+            // 为了保持“适配器零计算”，理想情况下应该把这个图标也放入 UiModel。
+            // 但现在我们直接根据 timeText 的小时判断。
+            try {
+                int hour = Integer.parseInt(b.timeText.split(":")[0]);
+                h.ivTimeIcon.setImageResource(hour >= 6 && hour < 18 ? R.drawable.ic_sun : R.drawable.ic_moon);
+            } catch (Exception e) {
                 h.ivTimeIcon.setImageResource(R.drawable.ic_sun);
             }
 
             // 2. 分类名称
-            h.tvCategoryName.setText(b.getCategoryName() != null ? b.getCategoryName() : "未知分类");
+            h.tvCategoryName.setText(b.categoryName);
 
             // 3. 金额
-            h.tvAmount.setText(String.format(Locale.getDefault(), "¥%.2f", b.getAmount()));
-            h.tvAmount.setTextColor(0xFFFF5252);
+            h.tvAmount.setText(b.amountText);
+            h.tvAmount.setTextColor(b.amountColor);
 
             // 4. 分类图标
-            if (b.getCategoryIconUrl() != null && !b.getCategoryIconUrl().isEmpty()) {
-                try {
-                    int resId = Integer.parseInt(b.getCategoryIconUrl());
-                    GlideImageLoader.load1(h.itemView.getContext(), h.ivCategoryIcon, resId);
-                } catch (Exception e) {
-                    GlideImageLoader.load(h.itemView.getContext(), b.getCategoryIconUrl(), h.ivCategoryIcon);
-                }
+            if (b.categoryIconUrl != null && !b.categoryIconUrl.isEmpty()) {
+                GlideImageLoader.load(h.itemView.getContext(), b.categoryIconUrl, h.ivCategoryIcon);
             } else {
                 h.ivCategoryIcon.setImageResource(R.drawable.ic_category_default);
             }
@@ -403,19 +404,16 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
             // ======================
             h.itemView.setOnClickListener(v -> {
                 Intent intent = new Intent(v.getContext(), BillDetailActivity.class);
-                intent.putExtra(BillDetailActivity.EXTRA_BILL_ID, b.getObjectId());
-                intent.putExtra(BillDetailActivity.EXTRA_BILL_LOCAL_ID, b.getId());
+                intent.putExtra(BillDetailActivity.EXTRA_BILL_ID, b.objectId);
+                intent.putExtra(BillDetailActivity.EXTRA_BILL_LOCAL_ID, b.localId);
                 v.getContext().startActivity(intent);
-                ((CategoryBudgetDetailActivity) v.getContext()).overridePendingTransition(
-                        R.anim.slide_in_right,
-                        R.anim.slide_out_left
-                );
+                if (v.getContext() instanceof AppCompatActivity) {
+                    ((AppCompatActivity) v.getContext()).overridePendingTransition(
+                            R.anim.slide_in_right,
+                            R.anim.slide_out_left
+                    );
+                }
             });
-        }
-
-        @Override
-        public int getItemCount() {
-            return list == null ? 0 : list.size();
         }
 
         static class VH extends RecyclerView.ViewHolder {

@@ -16,14 +16,21 @@ import com.example.my_project1.data.model.bill.SearchFilter;
 import com.example.my_project1.data.model.bill.SearchHistory;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.SearchRepository;
+import com.example.my_project1.ui.adapter.bill.BillAdapter;
 import com.example.my_project1.utils.AppExecutors;
+import com.example.my_project1.R;
 
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import cn.bmob.v3.BmobUser;
+import android.net.Uri;
 import io.reactivex.annotations.NonNull;
 
 /**
@@ -99,6 +106,108 @@ public class SearchViewModel extends AndroidViewModel {
     }
 
     // ==================== 公开方法 ====================
+
+    /**
+     * ✅ UiModel 映射 (聚合版)
+     */
+    public List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills) {
+        List<BillAdapter.BillGroup> groups = new ArrayList<>();
+        if (bills == null || bills.isEmpty()) return groups;
+
+        Map<String, Account> accountMap = _accountMap.getValue();
+        SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        SimpleDateFormat dateDispFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
+        SimpleDateFormat timeFmt     = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        DecimalFormat    amtFmt      = new DecimalFormat("#,##0.00");
+        String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+
+        String  prevDateKey = null;
+        double  dayExpense  = 0;
+        double  dayIncome   = 0;
+        List<BillUiModel> currentDayBills = new ArrayList<>();
+        BillAdapter.DateHeader currentHeader = null;
+
+        for (int i = 0; i < bills.size(); i++) {
+            Bill   bill    = bills.get(i);
+            if (bill.getBillTime() == null) continue;
+            
+            String dateKey = dateKeyFmt.format(bill.getBillTime());
+
+            if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
+                groups.add(new BillAdapter.BillGroup(
+                        new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                                String.format(Locale.getDefault(), "支 %.2f", dayExpense),
+                                String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
+                        new ArrayList<>(currentDayBills)
+                ));
+                dayExpense = 0;
+                dayIncome  = 0;
+                currentDayBills.clear();
+            }
+
+            if (bill.getType() == 0) dayExpense += bill.getAmount();
+            else if (bill.getType() == 1) dayIncome  += bill.getAmount();
+
+            if (currentDayBills.isEmpty()) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(bill.getBillTime());
+                String weekDay  = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1];
+                String dateDisp = dateDispFmt.format(bill.getBillTime()) + "（" + weekDay + "）";
+                currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
+            }
+
+            int billType = bill.getType();
+            String prefix = "";
+            int amountColor;
+            String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
+            
+            if (billType == 0) {
+                prefix = "- ¥";
+                amountColor = getApplication().getColor(R.color.red);
+            } else if (billType == 1) {
+                prefix = "+ ¥";
+                amountColor = getApplication().getColor(R.color.green);
+            } else {
+                prefix = "¥";
+                amountColor = getApplication().getColor(R.color.orange_500);
+                Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
+                categoryIcon = uri.toString();
+            }
+            
+            String amountText = prefix + amtFmt.format(bill.getAmount());
+
+            Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
+            Account toAccount = (accountMap != null && (billType == 2 || billType == 3)) ? accountMap.get(bill.getToAccountId()) : null;
+
+            currentDayBills.add(BillUiModel.builder()
+                    .localId(bill.getId())
+                    .objectId(bill.getObjectId())
+                    .timeText(timeFmt.format(bill.getBillTime()))
+                    .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
+                    .categoryIconUrl(categoryIcon)
+                    .amountText(amountText)
+                    .amountColor(amountColor)
+                    .accountName(account != null ? account.getName() : "")
+                    .toAccountName(toAccount != null ? toAccount.getName() : "")
+                    .billType(billType)
+                    .remarkText(bill.getRemark())
+                    .imageUrls(bill.getImageUrls())
+                    .build());
+
+            prevDateKey = dateKey;
+        }
+
+        if (!currentDayBills.isEmpty() && currentHeader != null) {
+            groups.add(new BillAdapter.BillGroup(
+                    new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                            String.format(Locale.getDefault(), "支 %.2f", dayExpense),
+                            String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
+                    currentDayBills
+            ));
+        }
+
+        return groups;
+    }
 
     /**
      * 获取搜索历史

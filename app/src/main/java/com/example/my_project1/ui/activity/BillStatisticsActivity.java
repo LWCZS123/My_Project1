@@ -355,7 +355,7 @@ public class BillStatisticsActivity extends AppCompatActivity {
         });
 
         viewModel.categoryItems.observe(this, items -> {
-            if (items != null) categoryAdapter.setItems(items);
+            if (items != null) categoryAdapter.submitList(items);
         });
     }
 

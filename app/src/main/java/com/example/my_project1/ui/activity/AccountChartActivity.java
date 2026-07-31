@@ -741,8 +741,8 @@ public class AccountChartActivity extends AppCompatActivity {
         RecyclerView rvAccountGroups = dialog.findViewById(R.id.rvAccountGroups);
         rvAccountGroups.setLayoutManager(new LinearLayoutManager(this));
 
-        AccountGroupPickerAdapter adapter = new AccountGroupPickerAdapter(
-                this, allGroups, currentGroupId);
+        AccountGroupPickerAdapter adapter = new AccountGroupPickerAdapter(this, currentGroupId);
+        adapter.submitList(allGroups);
 
         adapter.setOnGroupClickListener(group -> {
             currentGroupId = group.getObjectId();

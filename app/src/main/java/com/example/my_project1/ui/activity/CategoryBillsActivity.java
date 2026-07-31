@@ -16,6 +16,8 @@ import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ActivityCategoryBillsBinding;
 import com.example.my_project1.ui.adapter.bill.BillListAdapter;
+import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
+import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.GlideImageLoader;
 
@@ -29,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import cn.bmob.v3.BmobUser;
+import androidx.lifecycle.ViewModelProvider;
 
 /**
  * 分类账单明细页
@@ -52,6 +55,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
 
     private ActivityCategoryBillsBinding binding;
     private BillListAdapter              adapter;
+    private BillViewModel                billViewModel;
 
     // ================================================================
     //  生命周期
@@ -59,12 +63,11 @@ public class CategoryBillsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
-
-
         super.onCreate(savedInstanceState);
         binding = ActivityCategoryBillsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
+        billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
@@ -206,8 +209,11 @@ public class CategoryBillsActivity extends AppCompatActivity {
         for (Map.Entry<String, List<Bill>> entry : grouped.entrySet()) {
             List<Bill> dayBills = entry.getValue();
             items.add(new BillListAdapter.ListItem(keyDisplay.get(entry.getKey()), dayBills.size()));
-            for (Bill b : dayBills) {
-                items.add(new BillListAdapter.ListItem(b));
+            
+            // Map dayBills to UiModels
+            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(dayBills);
+            for (BillUiModel uiModel : uiModels) {
+                items.add(new BillListAdapter.ListItem(uiModel));
             }
         }
         return items;

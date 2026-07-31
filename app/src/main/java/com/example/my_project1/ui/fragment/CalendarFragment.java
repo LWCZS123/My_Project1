@@ -24,6 +24,7 @@ import com.example.my_project1.ui.activity.AddBillActivity;
 import com.example.my_project1.ui.activity.BillDetailActivity;
 import com.example.my_project1.ui.adapter.bill.BillListAdapter;
 import com.example.my_project1.ui.adapter.calendar.CalendarInfoAdapter;
+import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.HolidayUtil;
 import com.haibin.calendarview.Calendar;
@@ -92,8 +93,8 @@ public class CalendarFragment extends Fragment implements
         billAdapter.setOnBillClickListener(bill -> {
             if (bill == null || !isAdded()) return;
             Intent intent = new Intent(requireContext(), BillDetailActivity.class);
-            intent.putExtra("bill_id", bill.getObjectId());
-            intent.putExtra("bill_local_id", bill.getId());
+            intent.putExtra("bill_id", bill.objectId);
+            intent.putExtra("bill_local_id", bill.localId);
             startActivity(intent);
         });
 
@@ -238,9 +239,12 @@ public class CalendarFragment extends Fragment implements
                 }
             }
 
+            // Map to UiModels
+            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(filtered);
+
             final List<BillListAdapter.ListItem> listItems = new ArrayList<>();
-            if (!filtered.isEmpty()) {
-                listItems.add(new BillListAdapter.ListItem(filtered));
+            if (!uiModels.isEmpty()) {
+                listItems.add(new BillListAdapter.ListItem(uiModels));
             }
 
             mMainHandler.post(() -> {

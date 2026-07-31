@@ -4,6 +4,8 @@ import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -16,9 +18,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class HiddenAccountAdapter extends RecyclerView.Adapter<HiddenAccountAdapter.ViewHolder> {
+public class HiddenAccountAdapter extends ListAdapter<Account, HiddenAccountAdapter.ViewHolder> {
 
-    private final List<Account> accounts = new ArrayList<>();
     private final Set<Integer> selectedPositions = new HashSet<>();
     private boolean isMultiSelectMode = false;
     private OnSelectionChangeListener selectionChangeListener;
@@ -27,15 +28,28 @@ public class HiddenAccountAdapter extends RecyclerView.Adapter<HiddenAccountAdap
         void onSelectionChanged(int selectedCount, boolean isMultiSelectMode);
     }
 
+    public HiddenAccountAdapter() {
+        super(new DiffUtil.ItemCallback<Account>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull Account oldItem, @NonNull Account newItem) {
+                return oldItem.getId() == newItem.getId();
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull Account oldItem, @NonNull Account newItem) {
+                return oldItem.getName().equals(newItem.getName()) && 
+                       oldItem.getBalance() == newItem.getBalance();
+            }
+        });
+    }
+
     public void setOnSelectionChangeListener(OnSelectionChangeListener listener) {
         this.selectionChangeListener = listener;
     }
 
     public void setAccounts(List<Account> newAccounts) {
-        accounts.clear();
-        if (newAccounts != null) accounts.addAll(newAccounts);
         selectedPositions.clear();
-        notifyDataSetChanged();
+        submitList(newAccounts);
     }
 
     public void setMultiSelectMode(boolean enabled) {
@@ -50,7 +64,7 @@ public class HiddenAccountAdapter extends RecyclerView.Adapter<HiddenAccountAdap
     public void selectAll(boolean select) {
         selectedPositions.clear();
         if (select) {
-            for (int i = 0; i < accounts.size(); i++) selectedPositions.add(i);
+            for (int i = 0; i < getItemCount(); i++) selectedPositions.add(i);
         }
         notifyDataSetChanged();
         if (selectionChangeListener != null) {
@@ -61,7 +75,7 @@ public class HiddenAccountAdapter extends RecyclerView.Adapter<HiddenAccountAdap
     public List<Account> getSelectedAccounts() {
         List<Account> selected = new ArrayList<>();
         for (int pos : selectedPositions) {
-            selected.add(accounts.get(pos));
+            selected.add(getItem(pos));
         }
         return selected;
     }
@@ -79,12 +93,7 @@ public class HiddenAccountAdapter extends RecyclerView.Adapter<HiddenAccountAdap
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.bind(accounts.get(position), position);
-    }
-
-    @Override
-    public int getItemCount() {
-        return accounts.size();
+        holder.bind(getItem(position), position);
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {

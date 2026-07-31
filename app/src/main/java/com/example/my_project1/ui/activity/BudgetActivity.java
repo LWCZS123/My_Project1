@@ -42,6 +42,7 @@ public class BudgetActivity extends AppCompatActivity {
     private CategoryViewModel      categoryVm;
     private CategoryBudgetAdapter  adapter;
     private MonthAdapter           monthAdapter;
+    private boolean                isInitialRender = true;
 
     private boolean isAmountVisible = true;
     private long lastSyncTimeMs = 0;
@@ -190,9 +191,23 @@ public class BudgetActivity extends AppCompatActivity {
         binding.tvDateSelectorTop.setOnClickListener(v -> vm.switchToYear());
 
         // Top Period Tabs
-        binding.tabWeek.setOnClickListener(v -> vm.switchToWeek());
-        binding.tabMonth.setOnClickListener(v -> vm.switchToMonth());
-        binding.tabYear.setOnClickListener(v -> vm.switchToYear());
+        binding.tabWeek.setOnClickListener(v -> {
+            if (vm.getBudgetType().equals(Budget.TYPE_WEEK)) return; // 避免重复点击
+            isInitialRender = true;
+            vm.switchToWeek();
+        });
+        binding.tabMonth.setOnClickListener(v -> {
+            if (vm.getBudgetType().equals(Budget.TYPE_MONTH)) return;
+            isInitialRender = true;
+            binding.tvBudgetAmount.setText("¥--");
+            vm.switchToMonth();
+        });
+        binding.tabYear.setOnClickListener(v -> {
+            if (vm.getBudgetType().equals(Budget.TYPE_YEAR)) return;
+            isInitialRender = true;
+            binding.tvBudgetAmount.setText("¥--");
+            vm.switchToYear();
+        });
 
         binding.btnAddCategoryBudget.setOnClickListener(v -> {
             if (vm.getTotalBudget().getValue() == null) {
@@ -270,14 +285,20 @@ public class BudgetActivity extends AppCompatActivity {
         });
 
         vm.getMonthlyStats().observe(this, stats -> {
-            if (vm.getBudgetType().equals(Budget.TYPE_MONTH)) updateDetailStats(stats);
+            if (vm.getBudgetType().equals(Budget.TYPE_MONTH)) {
+                updateDetailStats(stats);
+                isInitialRender = false; // 数据已就绪
+            }
         });
 
         vm.getYearlyStats().observe(this, stats -> {
             updateYearlyOverview(stats);
-            if (vm.getBudgetType().equals(Budget.TYPE_YEAR)) updateDetailStats(stats);
+            if (vm.getBudgetType().equals(Budget.TYPE_YEAR)) {
+                updateDetailStats(stats);
+                isInitialRender = false;
+            }
         });
-        
+
         vm.getSelectedMonth().observe(this, month -> monthAdapter.setSelectedMonth(month));
         vm.getSelectedYear().observe(this, year -> binding.tvDateSelectorTop.setText(year + " ▼"));
     }
@@ -400,6 +421,10 @@ public class BudgetActivity extends AppCompatActivity {
 
     private void animateTextUpdate(android.widget.TextView view, String newText) {
         if (view.getText().toString().equals(newText)) return;
+        if (isInitialRender) {
+            view.setText(newText);
+            return;
+        }
         view.animate().alpha(0f).setDuration(150).withEndAction(() -> {
             view.setText(newText);
             view.animate().alpha(1f).setDuration(150).start();

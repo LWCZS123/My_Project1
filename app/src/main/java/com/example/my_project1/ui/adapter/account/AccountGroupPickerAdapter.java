@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.data.model.account.AccountGroup;
@@ -12,13 +14,13 @@ import com.example.my_project1.databinding.ItemAccountGroupPickerBinding;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.util.List;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
-public class AccountGroupPickerAdapter extends RecyclerView.Adapter<AccountGroupPickerAdapter.ViewHolder> {
+public class AccountGroupPickerAdapter extends ListAdapter<AccountGroup, AccountGroupPickerAdapter.ViewHolder> {
 
     private final Context context;
-    private List<AccountGroup> groups;
     private String selectedGroupId;
     private OnGroupClickListener listener;
 
@@ -30,10 +32,26 @@ public class AccountGroupPickerAdapter extends RecyclerView.Adapter<AccountGroup
         this.listener = listener;
     }
 
-    public AccountGroupPickerAdapter(Context context, List<AccountGroup> groups, String selectedGroupId) {
+    public AccountGroupPickerAdapter(Context context, String selectedGroupId) {
+        super(new DiffUtil.ItemCallback<AccountGroup>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull AccountGroup oldItem, @NonNull AccountGroup newItem) {
+                return Objects.equals(oldItem.getObjectId(), newItem.getObjectId());
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull AccountGroup oldItem, @NonNull AccountGroup newItem) {
+                return Objects.equals(oldItem.getName(), newItem.getName()) &&
+                        oldItem.getAccountCount() == newItem.getAccountCount();
+            }
+        });
         this.context = context;
-        this.groups = groups;
         this.selectedGroupId = selectedGroupId;
+    }
+
+    public void setSelectedGroupId(String selectedGroupId) {
+        this.selectedGroupId = selectedGroupId;
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -47,13 +65,7 @@ public class AccountGroupPickerAdapter extends RecyclerView.Adapter<AccountGroup
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        AccountGroup group = groups.get(position);
-        holder.bind(group);
-    }
-
-    @Override
-    public int getItemCount() {
-        return groups != null ? groups.size() : 0;
+        holder.bind(getItem(position));
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {

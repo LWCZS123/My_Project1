@@ -5,9 +5,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.recyclerview.widget.AsyncListDiffer;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.databinding.ItemBillBinding;
@@ -16,42 +16,31 @@ import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import io.reactivex.annotations.NonNull;
 
-public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
+public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowVH> {
 
     private final Context context;
-    private static final String TAG = "BillRowAdapter";
-
     private final BillAdapter.OnBillClickListener listener;
     private final RecyclerView.RecycledViewPool photoPool;
 
-    private static final DiffUtil.ItemCallback<BillUiModel> DIFF_CALLBACK =
-            new DiffUtil.ItemCallback<BillUiModel>() {
-                @Override
-                public boolean areItemsTheSame(@NonNull BillUiModel oldItem, @NonNull BillUiModel newItem) {
-                    return oldItem.localId == newItem.localId || 
-                           (oldItem.objectId != null && oldItem.objectId.equals(newItem.objectId));
-                }
-
-                @Override
-                public boolean areContentsTheSame(@NonNull BillUiModel oldItem, @NonNull BillUiModel newItem) {
-                    return oldItem.equals(newItem);
-                }
-            };
-
-    private final AsyncListDiffer<BillUiModel> differ = new AsyncListDiffer<>(this, DIFF_CALLBACK);
-
     public BillRowAdapter(Context context, BillAdapter.OnBillClickListener listener, RecyclerView.RecycledViewPool photoPool) {
+        super(new DiffUtil.ItemCallback<BillUiModel>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull BillUiModel oldItem, @NonNull BillUiModel newItem) {
+                return oldItem.localId == newItem.localId || 
+                       (oldItem.objectId != null && oldItem.objectId.equals(newItem.objectId));
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull BillUiModel oldItem, @NonNull BillUiModel newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
         this.context = context;
         this.listener = listener;
         this.photoPool = photoPool;
-    }
-
-    public void setBills(List<BillUiModel> newBills) {
-        differ.submitList(newBills);
     }
 
     @NonNull
@@ -62,12 +51,7 @@ public class BillRowAdapter extends RecyclerView.Adapter<BillRowAdapter.RowVH> {
 
     @Override
     public void onBindViewHolder(@NonNull RowVH holder, int position) {
-        holder.bind(differ.getCurrentList().get(position), position == differ.getCurrentList().size() - 1);
-    }
-
-    @Override
-    public int getItemCount() {
-        return differ.getCurrentList().size();
+        holder.bind(getItem(position), position == getItemCount() - 1);
     }
 
     class RowVH extends RecyclerView.ViewHolder {

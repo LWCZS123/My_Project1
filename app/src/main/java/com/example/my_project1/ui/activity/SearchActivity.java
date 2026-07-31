@@ -247,8 +247,7 @@ public class SearchActivity extends AppCompatActivity {
         // 观察搜索结果
         viewModel.searchResults.observe(this, bills -> {
             if (bills != null && !bills.isEmpty()) {
-                // 🔥 修复点：调用新写的转换方法，将 List<Bill> 转为聚合卡片组
-                List<BillAdapter.BillGroup> uiGroups = convertBillsToUiGroups(bills, viewModel.accountMap.getValue());
+                List<BillAdapter.BillGroup> uiGroups = viewModel.mapBillsToUiGroups(bills);
                 billAdapter.submitList(uiGroups);
                 showSearchResults();
             }
@@ -279,97 +278,6 @@ public class SearchActivity extends AppCompatActivity {
         });
     }
 
-    // ==================== 核心转换逻辑 (聚合版) ====================
-
-    private List<BillAdapter.BillGroup> convertBillsToUiGroups(List<Bill> bills, java.util.Map<String, com.example.my_project1.data.model.account.Account> accountMap) {
-        List<BillAdapter.BillGroup> groups = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return groups;
-
-        SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        SimpleDateFormat dateDispFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
-        SimpleDateFormat timeFmt     = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        DecimalFormat    amtFmt      = new DecimalFormat("#,##0.00");
-        String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
-
-        String  prevDateKey = null;
-        double  dayExpense  = 0;
-        double  dayIncome   = 0;
-        List<BillUiModel> currentDayBills = new ArrayList<>();
-        BillAdapter.DateHeader currentHeader = null;
-
-        for (int i = 0; i < bills.size(); i++) {
-            Bill bill = bills.get(i);
-            if (bill.getBillTime() == null) continue;
-
-            String dateKey = dateKeyFmt.format(bill.getBillTime());
-
-            if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
-                groups.add(new BillAdapter.BillGroup(
-                        new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
-                                String.format(Locale.getDefault(), "支 %.2f", dayExpense),
-                                String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
-                        new ArrayList<>(currentDayBills)
-                ));
-                dayExpense = 0;
-                dayIncome  = 0;
-                currentDayBills.clear();
-            }
-
-            if (bill.getType() == 0) dayExpense += bill.getAmount();
-            else if (bill.getType() == 1) dayIncome  += bill.getAmount();
-
-            if (currentDayBills.isEmpty()) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(bill.getBillTime());
-                String weekDay  = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1];
-                String dateDisp = dateDispFmt.format(bill.getBillTime()) + "（" + weekDay + "）";
-                currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
-            }
-
-            String amountText;
-            int amountColor;
-            
-            if (bill.getType() == 0) {
-                amountText = "- ¥" + amtFmt.format(bill.getAmount());
-                amountColor = ContextCompat.getColor(this, R.color.red);
-            } else if (bill.getType() == 1) {
-                amountText = "+ ¥" + amtFmt.format(bill.getAmount());
-                amountColor = ContextCompat.getColor(this, R.color.green);
-            } else {
-                amountText = "¥" + amtFmt.format(bill.getAmount());
-                amountColor = ContextCompat.getColor(this, R.color.orange_500);
-            }
-
-            com.example.my_project1.data.model.account.Account account =
-                    accountMap != null ? accountMap.get(bill.getAccountId()) : null;
-
-            currentDayBills.add(BillUiModel.builder()
-                    .localId(bill.getId())
-                    .objectId(bill.getObjectId())
-                    .timeText(timeFmt.format(bill.getBillTime()))
-                    .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "未知")
-                    .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
-                    .amountText(amountText)
-                    .amountColor(amountColor)
-                    .accountName(account != null ? account.getName() : "")
-                    .remarkText(bill.getRemark())
-                    .imageUrls(bill.getImageUrls())
-                    .build());
-
-            prevDateKey = dateKey;
-        }
-
-        if (!currentDayBills.isEmpty() && currentHeader != null) {
-            groups.add(new BillAdapter.BillGroup(
-                    new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
-                            String.format(Locale.getDefault(), "支 %.2f", dayExpense),
-                            String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
-                    currentDayBills
-            ));
-        }
-
-        return groups;
-    }
 
     // ==================== 筛选功能 ====================
 

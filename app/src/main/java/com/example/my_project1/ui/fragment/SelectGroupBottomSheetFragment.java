@@ -103,7 +103,8 @@ public class SelectGroupBottomSheetFragment extends BottomSheetDialogFragment {
             groupList = filtered;
         }
 
-        GroupAdapter adapter = new GroupAdapter(groupList);
+        GroupAdapter adapter = new GroupAdapter();
+        adapter.submitList(groupList);
         binding.recyclerGroup.setLayoutManager(new LinearLayoutManager(getContext()));
         binding.recyclerGroup.setAdapter(adapter);
 

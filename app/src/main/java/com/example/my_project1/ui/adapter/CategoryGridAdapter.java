@@ -6,6 +6,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
@@ -30,11 +33,10 @@ import io.reactivex.annotations.NonNull;
  * ✅ 原有功能：显示分类、选中状态、子分类弹窗
  * ✅ ⭐ 新增功能：支持通过categoryId设置选中状态（编辑模式使用）
  */
-public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapter.ViewHolder> {
+public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, CategoryGridAdapter.ViewHolder> {
 
     private static final String TAG = "CategoryGridAdapter";
 
-    private List<CategoryWithSubCategories> categories;
     private Context context;
     private OnCategorySelectedListener listener;
 
@@ -51,8 +53,19 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
         void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl);
     }
 
-    public CategoryGridAdapter(List<CategoryWithSubCategories> categories, Context context) {
-        this.categories = categories != null ? categories : new ArrayList<>();
+    public CategoryGridAdapter(Context context) {
+        super(new DiffUtil.ItemCallback<CategoryWithSubCategories>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull CategoryWithSubCategories oldItem, @NonNull CategoryWithSubCategories newItem) {
+                return oldItem.category.getId() == newItem.category.getId();
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull CategoryWithSubCategories oldItem, @NonNull CategoryWithSubCategories newItem) {
+                return Objects.equals(oldItem.category, newItem.category) &&
+                        Objects.equals(oldItem.subCategories, newItem.subCategories);
+            }
+        });
         this.context = context;
     }
 
@@ -69,9 +82,7 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
         this.preSelectedCategoryId = categoryId;
 
         // 查找对应的位置并选中
-        if (categories != null && !categories.isEmpty()) {
-            findAndSelectCategory(categoryId);
-        }
+        findAndSelectCategory(categoryId);
     }
 
     /**
@@ -83,8 +94,8 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
         }
 
         // 遍历所有分类查找匹配的categoryId
-        for (int i = 0; i < categories.size(); i++) {
-            CategoryWithSubCategories item = categories.get(i);
+        for (int i = 0; i < getItemCount(); i++) {
+            CategoryWithSubCategories item = getItem(i);
 
             // 1. 检查一级分类是否匹配
             if (categoryId.equals(item.category.getCloudId())) {
@@ -126,13 +137,15 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
     }
 
     public void updateData(List<CategoryWithSubCategories> newCategories) {
-        this.categories = newCategories != null ? newCategories : new ArrayList<>();
-        notifyDataSetChanged();
+        submitList(newCategories);
 
         // ⭐ 数据更新后，如果有预选中的分类ID，重新查找并选中
         if (preSelectedCategoryId != null) {
             Log.d(TAG, "⭐ 数据更新后重新查找选中分类: " + preSelectedCategoryId);
-            findAndSelectCategory(preSelectedCategoryId);
+            // 🔴 延时一会，等 submitList 完成（ListAdapter 是异步的）
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                findAndSelectCategory(preSelectedCategoryId);
+            }, 100);
         }
     }
 
@@ -146,13 +159,8 @@ public class CategoryGridAdapter extends RecyclerView.Adapter<CategoryGridAdapte
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        CategoryWithSubCategories item = categories.get(position);
+        CategoryWithSubCategories item = getItem(position);
         holder.bind(item, position);
-    }
-
-    @Override
-    public int getItemCount() {
-        return categories.size();
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {

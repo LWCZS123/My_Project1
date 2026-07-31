@@ -8,50 +8,34 @@ import android.view.LayoutInflater;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.databinding.ItemCategoryStatBinding;
 import com.example.my_project1.utils.GlideImageLoader;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
 /**
  * 饼图分类列表 Adapter
- *
- * 进度条方案：原生水平 ProgressBar + bg_progress_capsule.xml (LayerDrawable)
- * ─────────────────────────────────────────────────────────────────────────
- * 为什么这样做：
- *   原先用 FrameLayout + 手动设置子 View 宽度，需要等待 View 完成测量
- *   才能知道轨道宽度，因此不得不依赖 OnPreDrawListener。
- *   但 OnPreDrawListener 在 RecyclerView 复用场景下极易重复叠加，
- *   导致进度条反复重绘，产生闪烁。
- *
- *   改用系统 ProgressBar：
- *     • 内部由 Android 框架管理绘制，setProgress() 是轻量的整数赋值，
- *       不涉及任何 layout pass，彻底规避闪烁。
- *     • 宽度由 XML weight 决定，无需监听测量事件。
- *     • 颜色通过 LayerDrawable.findDrawableByLayerId() + setColorFilter()
- *       动态修改，仅在颜色真正变化时才执行，复用代价极小。
- *
- * ProgressBar 的 max 设为 10000，percent（0~100）乘以 100 传入，
- * 保留两位小数精度，避免浮点误差。
+ * ...
  */
-public class CategoryStatAdapter extends RecyclerView.Adapter<CategoryStatAdapter.VH> {
+public class CategoryStatAdapter extends ListAdapter<CategoryStatAdapter.CategoryStatItem, CategoryStatAdapter.VH> {
 
     // ================================================================
     //  数据模型
     // ================================================================
 
     public static class CategoryStatItem {
-        public String categoryName;
-        public String categoryIconUrl;
-        public float  amount;
-        public float  percent;      // 0 ~ 100
-        public int    color;
-        public int    billCount;
+        public final String categoryName;
+        public final String categoryIconUrl;
+        public final float  amount;
+        public final float  percent;      // 0 ~ 100
+        public final int    color;
+        public final int    billCount;
 
         public CategoryStatItem(String name, String iconUrl, float amount,
                                 float percent, int color, int count) {
@@ -61,6 +45,24 @@ public class CategoryStatAdapter extends RecyclerView.Adapter<CategoryStatAdapte
             this.percent         = percent;
             this.color           = color;
             this.billCount       = count;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            CategoryStatItem that = (CategoryStatItem) o;
+            return Float.compare(that.amount, amount) == 0 &&
+                    Float.compare(that.percent, percent) == 0 &&
+                    color == that.color &&
+                    billCount == that.billCount &&
+                    Objects.equals(categoryName, that.categoryName) &&
+                    Objects.equals(categoryIconUrl, that.categoryIconUrl);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(categoryName, categoryIconUrl, amount, percent, color, billCount);
         }
     }
 
@@ -72,13 +74,21 @@ public class CategoryStatAdapter extends RecyclerView.Adapter<CategoryStatAdapte
     //  成员
     // ================================================================
 
-    private List<CategoryStatItem> items           = new ArrayList<>();
     private OnItemClickListener    listener;
     private int                    selectedPosition = -1;
 
-    public void setItems(List<CategoryStatItem> items) {
-        this.items = (items != null) ? items : new ArrayList<>();
-        notifyDataSetChanged();
+    public CategoryStatAdapter() {
+        super(new DiffUtil.ItemCallback<CategoryStatItem>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull CategoryStatItem oldItem, @NonNull CategoryStatItem newItem) {
+                return oldItem.categoryName.equals(newItem.categoryName);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull CategoryStatItem oldItem, @NonNull CategoryStatItem newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
     }
 
     public void setSelectedPosition(int position) {
@@ -104,7 +114,7 @@ public class CategoryStatAdapter extends RecyclerView.Adapter<CategoryStatAdapte
 
     @Override
     public void onBindViewHolder(@NonNull VH h, int pos) {
-        CategoryStatItem item = items.get(pos);
+        CategoryStatItem item = getItem(pos);
         ItemCategoryStatBinding b = h.binding;
 
         // ── 文字 ──────────────────────────────────────────────────────
@@ -140,11 +150,6 @@ public class CategoryStatAdapter extends RecyclerView.Adapter<CategoryStatAdapte
             if (listener != null) listener.onItemClicked(item, pos);
         });
     }
-
-    @Override
-    public int getItemCount() { return items.size(); }
-
-
 
     private void updateProgressBar(ProgressBar bar, float percent, int color, VH h) {
         // percent [0,100] → progress [0,10000]，保留两位小数精度

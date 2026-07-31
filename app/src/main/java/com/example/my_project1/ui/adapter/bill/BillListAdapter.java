@@ -12,16 +12,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.widget.LinearLayout;
 import com.example.my_project1.R;
-import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ItemTransactionBinding;
 import com.example.my_project1.databinding.ItemTransationDateHeaderBinding;
+import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
-import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, RecyclerView.ViewHolder> {
@@ -33,7 +30,7 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
     private static final int TYPE_BILLS_CARD = 2;
 
     public interface OnBillClickListener {
-        void onBillClick(Bill bill);
+        void onBillClick(BillUiModel bill);
     }
 
     public void setOnBillClickListener(OnBillClickListener listener) {
@@ -89,52 +86,44 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
 
     class BillsCardViewHolder extends RecyclerView.ViewHolder {
         private final LinearLayout container;
-        private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        private final DecimalFormat amountFormat = new DecimalFormat("#,##0.00");
 
         public BillsCardViewHolder(@NonNull View itemView) {
             super(itemView);
             container = itemView.findViewById(R.id.ll_bill_container);
         }
 
-        public void bind(List<Bill> bills) {
+        public void bind(List<BillUiModel> bills) {
             container.removeAllViews();
             if (bills == null) return;
             for (int i = 0; i < bills.size(); i++) {
-                Bill bill = bills.get(i);
+                BillUiModel bill = bills.get(i);
                 ItemTransactionBinding b = ItemTransactionBinding.inflate(
                         LayoutInflater.from(context), container, false);
 
-                // Bind bill data
-                if (bill.getBillTime() != null) {
-                    int hour = Integer.parseInt(new SimpleDateFormat("H", Locale.getDefault()).format(bill.getBillTime()));
-                    b.ivTimeIcon.setImageResource(hour >= 6 && hour < 18 ? R.drawable.ic_sun : R.drawable.ic_moon);
-                    b.tvTime.setText(timeFormat.format(bill.getBillTime()));
-                }
-                if (bill.getCategoryIconUrl() != null && !bill.getCategoryIconUrl().isEmpty()) {
-                    ImageLoaderUtils.loadThumbnail(context, bill.getCategoryIconUrl(), b.ivCategoryIcon);
+                // Bind bill data from UiModel - NO CALCULATION HERE
+                b.tvTime.setText(bill.timeText);
+                
+                if (bill.categoryIconUrl != null && !bill.categoryIconUrl.isEmpty()) {
+                    ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, b.ivCategoryIcon);
                 } else {
                     b.ivCategoryIcon.setImageResource(R.drawable.ic_wechat);
                 }
-                b.tvCategoryName.setText(bill.getCategoryName() != null ? bill.getCategoryName() : "未分类");
+                b.tvCategoryName.setText(bill.categoryName);
                 
                 // Bind note
-                if (bill.getRemark() != null && !bill.getRemark().isEmpty()) {
-                    b.tvNote.setText(bill.getRemark());
+                if (bill.remarkText != null && !bill.remarkText.isEmpty()) {
+                    b.tvNote.setText(bill.remarkText);
                     b.tvNote.setVisibility(View.VISIBLE);
                 } else {
                     b.tvNote.setVisibility(View.GONE);
                 }
 
-                String prefix = bill.getType() == 0 ? "- ¥" : "+ ¥";
-                int color = context.getColor(bill.getType() == 0 ? R.color.red : R.color.green);
-                b.tvAmount.setText(prefix + amountFormat.format(bill.getAmount()));
-                b.tvAmount.setTextColor(color);
+                b.tvAmount.setText(bill.amountText);
+                b.tvAmount.setTextColor(bill.amountColor);
                 b.layoutAccountInfo.setVisibility(View.GONE);
 
                 // Hide last separator
                 if (i == bills.size() - 1) {
-                    // In item_transaction.xml, the divider is the last child of the main LinearLayout
                     View root = b.getRoot();
                     if (root instanceof LinearLayout) {
                         LinearLayout ll = (LinearLayout) root;
@@ -170,8 +159,6 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
 
     class BillViewHolder extends RecyclerView.ViewHolder {
         private final ItemTransactionBinding binding;
-        private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        private final DecimalFormat amountFormat = new DecimalFormat("#,##0.00");
 
         public BillViewHolder(ItemTransactionBinding binding) {
             super(binding.getRoot());
@@ -187,38 +174,32 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
             });
         }
 
-        public void bind(Bill bill) {
+        public void bind(BillUiModel bill) {
             if (bill == null) return;
-            // 时间图标
-            if (bill.getBillTime() != null) {
-                int hour = Integer.parseInt(new SimpleDateFormat("H", Locale.getDefault()).format(bill.getBillTime()));
-                binding.ivTimeIcon.setImageResource(hour >= 6 && hour < 18 ? R.drawable.ic_sun : R.drawable.ic_moon);
-                binding.tvTime.setText(timeFormat.format(bill.getBillTime()));
-            }
+            
+            binding.tvTime.setText(bill.timeText);
 
             // 分类图标
-            if (bill.getCategoryIconUrl() != null && !bill.getCategoryIconUrl().isEmpty()) {
-                ImageLoaderUtils.loadThumbnail(context, bill.getCategoryIconUrl(), binding.ivCategoryIcon);
+            if (bill.categoryIconUrl != null && !bill.categoryIconUrl.isEmpty()) {
+                ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, binding.ivCategoryIcon);
             } else {
                 binding.ivCategoryIcon.setImageResource(R.drawable.ic_wechat);
             }
 
             // 分类名
-            binding.tvCategoryName.setText(bill.getCategoryName() != null ? bill.getCategoryName() : "未分类");
+            binding.tvCategoryName.setText(bill.categoryName);
 
             // 备注
-            if (bill.getRemark() != null && !bill.getRemark().isEmpty()) {
-                binding.tvNote.setText(bill.getRemark());
+            if (bill.remarkText != null && !bill.remarkText.isEmpty()) {
+                binding.tvNote.setText(bill.remarkText);
                 binding.tvNote.setVisibility(View.VISIBLE);
             } else {
                 binding.tvNote.setVisibility(View.GONE);
             }
 
             // 金额
-            String prefix = bill.getType() == 0 ? "- ¥" : "+ ¥";
-            int color = context.getColor(bill.getType() == 0 ? R.color.red : R.color.green);
-            binding.tvAmount.setText(prefix + amountFormat.format(bill.getAmount()));
-            binding.tvAmount.setTextColor(color);
+            binding.tvAmount.setText(bill.amountText);
+            binding.tvAmount.setTextColor(bill.amountColor);
 
             binding.layoutAccountInfo.setVisibility(View.GONE);
         }
@@ -228,8 +209,8 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
         public boolean isHeader;
         public String date;
         public int count;
-        public Bill bill;
-        public List<Bill> bills;
+        public BillUiModel bill;
+        public List<BillUiModel> bills;
 
         public ListItem(String date, int count) {
             this.isHeader = true;
@@ -237,12 +218,12 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
             this.count = count;
         }
 
-        public ListItem(Bill bill) {
+        public ListItem(BillUiModel bill) {
             this.isHeader = false;
             this.bill = bill;
         }
 
-        public ListItem(List<Bill> bills) {
+        public ListItem(List<BillUiModel> bills) {
             this.isHeader = false;
             this.bills = bills;
         }
@@ -274,18 +255,14 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
                 return Objects.equals(oldItem.date, newItem.date);
             }
 
-            // Both are not headers. Check types.
             if (oldItem.bills != null && newItem.bills != null) {
-                // Both are bill cards. Compare lists.
                 return Objects.equals(oldItem.bills, newItem.bills);
             }
 
             if (oldItem.bill != null && newItem.bill != null) {
-                // Both are single bills.
-                return oldItem.bill.getId() == newItem.bill.getId();
+                return oldItem.bill.localId == newItem.bill.localId;
             }
 
-            // Mismatched types or both null
             return oldItem.bill == null && newItem.bill == null && oldItem.bills == null && newItem.bills == null;
         }
 

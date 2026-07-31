@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.data.model.account.AccountGroup;
@@ -12,12 +14,12 @@ import com.example.my_project1.databinding.ItemGroupBinding;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.util.List;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
-public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHolder> {
+public class GroupAdapter extends ListAdapter<AccountGroup, GroupAdapter.GroupViewHolder> {
 
-    private List<AccountGroup> groupList;
     private int selectedPosition = -1;
 
     public interface OnGroupSelectListener {
@@ -30,8 +32,18 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
         this.listener = listener;
     }
 
-    public GroupAdapter(List<AccountGroup> groupList) {
-        this.groupList = groupList;
+    public GroupAdapter() {
+        super(new DiffUtil.ItemCallback<AccountGroup>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull AccountGroup oldItem, @NonNull AccountGroup newItem) {
+                return Objects.equals(oldItem.getObjectId(), newItem.getObjectId());
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull AccountGroup oldItem, @NonNull AccountGroup newItem) {
+                return Objects.equals(oldItem.getName(), newItem.getName());
+            }
+        });
     }
 
     @NonNull
@@ -45,7 +57,7 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
 
     @Override
     public void onBindViewHolder(@NonNull GroupViewHolder holder, @SuppressLint("RecyclerView") int position) {
-        AccountGroup group = groupList.get(position);
+        AccountGroup group = getItem(position);
 
         holder.binding.tvGroupName.setText(group.getName());
 
@@ -70,14 +82,9 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
         });
     }
 
-    @Override
-    public int getItemCount() {
-        return groupList == null ? 0 : groupList.size();
-    }
-
     public void setSelectedGroup(String groupId) {
-        for (int i = 0; i < groupList.size(); i++) {
-            if (groupList.get(i).getObjectId().equals(groupId)) {
+        for (int i = 0; i < getItemCount(); i++) {
+            if (getItem(i).getObjectId().equals(groupId)) {
                 selectedPosition = i;
                 break;
             }

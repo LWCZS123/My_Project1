@@ -6,6 +6,8 @@ import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -14,6 +16,7 @@ import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ItemAccountTransactionBinding;
 import com.example.my_project1.databinding.ItemDayHeaderBinding;
 import com.example.my_project1.databinding.ItemMonthHeaderBinding;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountBillUiModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
 import java.text.DecimalFormat;
@@ -32,24 +35,11 @@ import java.util.Set;
 /**
  * AccountBillAdapter - 使用 View Binding 的账户账单适配器
  */
-public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-
-    private static final int TYPE_MONTH_HEADER = 0;
-    private static final int TYPE_DAY_HEADER = 1;
-    private static final int TYPE_BILL_ITEM = 2;
+public class AccountBillAdapter extends ListAdapter<AccountBillUiModel, RecyclerView.ViewHolder> {
 
     private final Context context;
-    private final List<Object> displayItems = new ArrayList<>();
-    
-    // 数据缓存
-    private final Map<String, MonthGroup> monthGroupsMap = new LinkedHashMap<>();
-    private final Set<String> collapsedMonths = new HashSet<>();
-    private final Map<Long, Double> billBalanceMap = new HashMap<>();
-    
-    private boolean isCredit = false;
-    private String currentAccountId;
-    private long currentLocalAccountId;
     private OnBillClickListener listener;
+    private OnMonthToggleListener monthToggleListener;
 
     public interface OnBillClickListener {
         void onBillClick(Bill bill);
@@ -58,7 +48,26 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         void onBillEdit(Bill bill);
     }
 
+    public interface OnMonthToggleListener {
+        void onMonthToggle(String monthKey);
+    }
+
     public AccountBillAdapter(Context context) {
+        super(new DiffUtil.ItemCallback<AccountBillUiModel>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull AccountBillUiModel oldItem, @NonNull AccountBillUiModel newItem) {
+                if (oldItem.type != newItem.type) return false;
+                if (oldItem.type == AccountBillUiModel.TYPE_BILL_ITEM) {
+                    return oldItem.id == newItem.id;
+                }
+                return oldItem.key.equals(newItem.key);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull AccountBillUiModel oldItem, @NonNull AccountBillUiModel newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
         this.context = context;
     }
 
@@ -66,111 +75,23 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         this.listener = listener;
     }
 
-    public Object getItem(int position) {
-        if (position >= 0 && position < displayItems.size()) {
-            return displayItems.get(position);
-        }
-        return null;
-    }
-
-    /**
-     * 设置数据并根据月份、日期进行分组，同时计算每笔交易后的余额
-     */
-    public void setData(List<Bill> bills, Account currentAccount) {
-        if (currentAccount != null) {
-            this.currentAccountId = currentAccount.getObjectId();
-            this.currentLocalAccountId = currentAccount.getId();
-            this.isCredit = currentAccount.isCredit();
-        }
-        
-        monthGroupsMap.clear();
-        billBalanceMap.clear();
-        
-        if (bills == null || bills.isEmpty()) {
-            displayItems.clear();
-            notifyDataSetChanged();
-            return;
-        }
-
-        // 1. 计算每笔交易发生后的余额 (从当前余额倒推)
-        double runningBalance = currentAccount != null ? currentAccount.getBalance() : 0;
-        for (Bill bill : bills) {
-            billBalanceMap.put(bill.getId(), runningBalance);
-            boolean isPositive = isPositiveImpact(bill);
-            double impact = isPositive ? bill.getAmount() : -bill.getAmount();
-            runningBalance -= impact;
-        }
-
-        // 2. 按月和日进行分组
-        SimpleDateFormat monthKeyFormat = new SimpleDateFormat("yyyy-MM", Locale.getDefault());
-        SimpleDateFormat dayKeyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-
-        for (Bill bill : bills) {
-            String monthKey = monthKeyFormat.format(bill.getBillTime());
-            String dayKey = dayKeyFormat.format(bill.getBillTime());
-
-            MonthGroup mGroup = monthGroupsMap.get(monthKey);
-            if (mGroup == null) {
-                mGroup = new MonthGroup(monthKey, bill.getBillTime(), this);
-                monthGroupsMap.put(monthKey, mGroup);
-            }
-            
-            mGroup.addBill(bill, dayKey);
-        }
-
-        // 3. 构建显示列表
-        updateDisplayItems();
-    }
-
-    private boolean isPositiveImpact(Bill bill) {
-        if (bill.getType() == 1) return true;
-        if (bill.getType() == 2 || bill.getType() == 3) {
-            // 转账或还款：判断当前账户是转入还是转出
-            return isCurrentAccountTarget(bill);
-        }
-        return false;
-    }
-
-    private boolean isCurrentAccountTarget(Bill bill) {
-        if (currentAccountId != null && !currentAccountId.isEmpty() && currentAccountId.equals(bill.getToAccountId())) {
-            return true;
-        }
-        return currentLocalAccountId > 0 && currentLocalAccountId == bill.getToLocalAccountId();
-    }
-
-    /**
-     * 根据折叠状态更新显示项列表
-     */
-    private void updateDisplayItems() {
-        displayItems.clear();
-        for (MonthGroup mGroup : monthGroupsMap.values()) {
-            displayItems.add(mGroup);
-            if (!collapsedMonths.contains(mGroup.key)) {
-                for (DayGroup dGroup : mGroup.dayGroups.values()) {
-                    displayItems.add(dGroup);
-                    displayItems.addAll(dGroup.bills);
-                }
-            }
-        }
-        notifyDataSetChanged();
+    public void setOnMonthToggleListener(OnMonthToggleListener listener) {
+        this.monthToggleListener = listener;
     }
 
     @Override
     public int getItemViewType(int position) {
-        Object item = displayItems.get(position);
-        if (item instanceof MonthGroup) return TYPE_MONTH_HEADER;
-        if (item instanceof DayGroup) return TYPE_DAY_HEADER;
-        return TYPE_BILL_ITEM;
+        return getItem(position).type;
     }
 
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         LayoutInflater inflater = LayoutInflater.from(context);
-        if (viewType == TYPE_MONTH_HEADER) {
+        if (viewType == AccountBillUiModel.TYPE_MONTH_HEADER) {
             ItemMonthHeaderBinding binding = ItemMonthHeaderBinding.inflate(inflater, parent, false);
             return new MonthViewHolder(binding);
-        } else if (viewType == TYPE_DAY_HEADER) {
+        } else if (viewType == AccountBillUiModel.TYPE_DAY_HEADER) {
             ItemDayHeaderBinding binding = ItemDayHeaderBinding.inflate(inflater, parent, false);
             return new DayViewHolder(binding);
         } else {
@@ -181,19 +102,14 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        Object item = displayItems.get(position);
+        AccountBillUiModel item = getItem(position);
         if (holder instanceof MonthViewHolder) {
-            ((MonthViewHolder) holder).bind((MonthGroup) item);
+            ((MonthViewHolder) holder).bind(item);
         } else if (holder instanceof DayViewHolder) {
-            ((DayViewHolder) holder).bind((DayGroup) item);
+            ((DayViewHolder) holder).bind(item);
         } else if (holder instanceof BillViewHolder) {
-            ((BillViewHolder) holder).bind((Bill) item);
+            ((BillViewHolder) holder).bind(item);
         }
-    }
-
-    @Override
-    public int getItemCount() {
-        return displayItems.size();
     }
 
     // ==================== ViewHolders ====================
@@ -207,39 +123,18 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             
             binding.getRoot().setOnClickListener(v -> {
                 int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION) {
-                    MonthGroup group = (MonthGroup) displayItems.get(pos);
-                    if (collapsedMonths.contains(group.key)) {
-                        collapsedMonths.remove(group.key);
-                    } else {
-                        collapsedMonths.add(group.key);
-                    }
-                    updateDisplayItems();
+                if (pos != RecyclerView.NO_POSITION && monthToggleListener != null) {
+                    monthToggleListener.onMonthToggle(getItem(pos).key);
                 }
             });
         }
 
-        void bind(MonthGroup group) {
-            SimpleDateFormat titleFmt = new SimpleDateFormat("yyyy年MM月", Locale.getDefault());
-            binding.tvMonthTitle.setText(titleFmt.format(group.date));
-            
-            // 计算月份范围
-            Calendar cal = Calendar.getInstance();
-            cal.setTime(group.date);
-            cal.set(Calendar.DAY_OF_MONTH, 1);
-            Date start = cal.getTime();
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
-            Date end = cal.getTime();
-            
-            SimpleDateFormat rangeFmt = new SimpleDateFormat("MM月dd日", Locale.getDefault());
-            binding.tvMonthRange.setText(rangeFmt.format(start) + " - " + rangeFmt.format(end));
-
-            DecimalFormat df = new DecimalFormat("#,##0.00");
-            binding.tvInflow.setText("流入: ¥" + df.format(group.totalInflow));
-            binding.tvOutflow.setText("流出: ¥" + df.format(group.totalOutflow));
-            
-            // 折叠箭头动画/状态
-            binding.ivArrow.setRotation(collapsedMonths.contains(group.key) ? 0 : 180);
+        void bind(AccountBillUiModel item) {
+            binding.tvMonthTitle.setText(item.title);
+            binding.tvMonthRange.setText(item.subtitle);
+            binding.tvInflow.setText(item.inflowText);
+            binding.tvOutflow.setText(item.outflowText);
+            binding.ivArrow.setRotation(item.isCollapsed ? 0 : 180);
         }
     }
 
@@ -251,12 +146,9 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             this.binding = binding;
         }
 
-        void bind(DayGroup group) {
-            SimpleDateFormat dayFmt = new SimpleDateFormat("MM月dd日 EEEE", Locale.getDefault());
-            binding.tvDayTitle.setText(dayFmt.format(group.date));
-            
-            DecimalFormat df = new DecimalFormat("#,##0.00");
-            binding.tvDaySummary.setText("流出: ¥" + df.format(group.totalOutflow) + " 流入: ¥" + df.format(group.totalInflow));
+        void bind(AccountBillUiModel item) {
+            binding.tvDayTitle.setText(item.title);
+            binding.tvDaySummary.setText(item.subtitle);
         }
     }
 
@@ -266,142 +158,43 @@ public class AccountBillAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         BillViewHolder(ItemAccountTransactionBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
-            
-            binding.contentView.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onBillClick((Bill) displayItems.get(pos));
-                }
-            });
-
-            binding.btnDelete.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onBillDelete((Bill) displayItems.get(pos));
-                    binding.swipeLayout.quickClose();
-                }
-            });
-
-            binding.btnRefund.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onBillRefund((Bill) displayItems.get(pos));
-                    binding.swipeLayout.quickClose();
-                }
-            });
-
-            binding.btnEdit.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onBillEdit((Bill) displayItems.get(pos));
-                    binding.swipeLayout.quickClose();
-                }
-            });
         }
 
-        void bind(Bill bill) {
-            // 设置分类图标
-            if (bill.getCategoryIconUrl() != null && !bill.getCategoryIconUrl().isEmpty()) {
-                ImageLoaderUtils.loadThumbnail(context, bill.getCategoryIconUrl(), binding.ivCategoryIcon);
+        void bind(AccountBillUiModel item) {
+            if (item.categoryIconUrl != null && !item.categoryIconUrl.isEmpty()) {
+                ImageLoaderUtils.loadThumbnail(context, item.categoryIconUrl, binding.ivCategoryIcon);
             } else {
                 binding.ivCategoryIcon.setImageResource(R.drawable.ic_category);
             }
             
-            // 分类名
-            binding.tvCategoryName.setText(bill.getCategoryName());
-            
-            // 时间和备注
-            SimpleDateFormat timeFmt = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-            String timeNote = timeFmt.format(bill.getBillTime());
-            if (bill.getRemark() != null && !bill.getRemark().isEmpty()) {
-                timeNote += " · " + bill.getRemark();
-            }
-            binding.tvTransactionTime.setText(timeNote);
+            binding.tvCategoryName.setText(item.categoryName);
+            binding.tvTransactionTime.setText(item.timeNote);
+            binding.tvAmount.setText(item.amountText);
+            binding.tvAmount.setTextColor(item.amountColor);
+            binding.tvBalanceAfter.setText(item.balanceText);
 
-            // 金额
-            DecimalFormat df = new DecimalFormat("#,##0.00");
-            boolean isIncome = isPositiveImpact(bill);
-            String prefix = isIncome ? "+" : "-";
-            binding.tvAmount.setText(prefix + "¥" + df.format(bill.getAmount()));
-            binding.tvAmount.setTextColor(isIncome ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B"));
+            binding.contentView.setOnClickListener(v -> {
+                if (listener != null) listener.onBillClick(item.originalBill);
+            });
 
-            // 交易后余额/欠款
-            Double balanceAfter = billBalanceMap.get(bill.getId());
-            if (balanceAfter == null) balanceAfter = 0.0;
-            
-            String balanceLabel = isCredit ? "欠款: " : "余额: ";
-            double displayBalance = isCredit ? Math.abs(balanceAfter) : balanceAfter;
-            binding.tvBalanceAfter.setText(balanceLabel + "¥" + df.format(displayBalance));
-
-            // 侧滑菜单点击
             binding.btnDelete.setOnClickListener(v -> {
                 if (listener != null) {
-                    listener.onBillDelete(bill);
+                    listener.onBillDelete(item.originalBill);
                     binding.swipeLayout.quickClose();
                 }
             });
             binding.btnRefund.setOnClickListener(v -> {
                 if (listener != null) {
-                    listener.onBillRefund(bill);
+                    listener.onBillRefund(item.originalBill);
                     binding.swipeLayout.quickClose();
                 }
             });
             binding.btnEdit.setOnClickListener(v -> {
                 if (listener != null) {
-                    listener.onBillEdit(bill);
+                    listener.onBillEdit(item.originalBill);
                     binding.swipeLayout.quickClose();
                 }
             });
-        }
-    }
-
-    // ==================== 数据结构 ====================
-
-    private static class MonthGroup {
-        String key;
-        Date date;
-        double totalInflow = 0;
-        double totalOutflow = 0;
-        Map<String, DayGroup> dayGroups = new LinkedHashMap<>();
-        private final AccountBillAdapter adapter;
-
-        MonthGroup(String key, Date date, AccountBillAdapter adapter) {
-            this.key = key;
-            this.date = date;
-            this.adapter = adapter;
-        }
-
-        void addBill(Bill bill, String dayKey) {
-            if (adapter.isPositiveImpact(bill)) totalInflow += bill.getAmount();
-            else totalOutflow += bill.getAmount();
-
-            DayGroup dGroup = dayGroups.get(dayKey);
-            if (dGroup == null) {
-                dGroup = new DayGroup(dayKey, bill.getBillTime(), adapter);
-                dayGroups.put(dayKey, dGroup);
-            }
-            dGroup.addBill(bill);
-        }
-    }
-
-    private static class DayGroup {
-        String key;
-        Date date;
-        double totalInflow = 0;
-        double totalOutflow = 0;
-        List<Bill> bills = new ArrayList<>();
-        private final AccountBillAdapter adapter;
-
-        DayGroup(String key, Date date, AccountBillAdapter adapter) {
-            this.key = key;
-            this.date = date;
-            this.adapter = adapter;
-        }
-
-        void addBill(Bill bill) {
-            if (adapter.isPositiveImpact(bill)) totalInflow += bill.getAmount();
-            else totalOutflow += bill.getAmount();
-            bills.add(bill);
         }
     }
 }

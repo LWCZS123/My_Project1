@@ -21,6 +21,7 @@ import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ActivityAccountDetailBinding;
 import com.example.my_project1.ui.adapter.ChartLegendAdapter;
 import com.example.my_project1.ui.adapter.bill.AccountBillAdapter;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountBillUiModel;
 import com.example.my_project1.ui.fragment.AccountMoreBottomSheetFragment;
 import com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment;
 import com.example.my_project1.ui.fragment.BillChooseAccountFragment;
@@ -84,6 +85,7 @@ public class AccountDetailActivity extends AppCompatActivity {
     private Account currentAccount;
     private List<Bill> allBills = new ArrayList<>();
     private List<Bill> filteredBills = new ArrayList<>();
+    private java.util.Set<String> collapsedMonths = new java.util.HashSet<>();
 
     // 图表切换状态：true=支出，false=收入
     private boolean showingExpense = true;
@@ -179,7 +181,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                 updateAccountInfo(account);
                 
                 if (!filteredBills.isEmpty() && billAdapter != null) {
-                    billAdapter.setData(filteredBills, currentAccount);
+                    refreshBillList();
                 }
             } else {
                 if (currentAccount == null) {
@@ -197,6 +199,15 @@ public class AccountDetailActivity extends AppCompatActivity {
         binding.rvTransactions.setLayoutManager(layoutManager);
         binding.rvTransactions.setAdapter(billAdapter);
         binding.rvTransactions.setNestedScrollingEnabled(false);
+
+        billAdapter.setOnMonthToggleListener(monthKey -> {
+            if (collapsedMonths.contains(monthKey)) {
+                collapsedMonths.remove(monthKey);
+            } else {
+                collapsedMonths.add(monthKey);
+            }
+            refreshBillList();
+        });
 
         // 点击账单跳转到详情页
         billAdapter.setOnBillClickListener(new AccountBillAdapter.OnBillClickListener() {
@@ -223,7 +234,6 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             @Override
             public void onBillRefund(Bill bill) {
-                // TODO: 实现退款逻辑
                 SnackbarUtils.showInfo(binding.getRoot(), "已触发退款申请");
             }
 
@@ -454,11 +464,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                 calculateStatistics(filteredBills);
                 updateStatisticsUI();
 
-                // 🔑 核心修复：只有在 currentAccount 已经加载的情况下才调用 setData
-                // 如果还没加载，loadAccountData 结束后会补刷。
-                if (currentAccount != null) {
-                    billAdapter.setData(filteredBills, currentAccount);
-                }
+                refreshBillList();
 
                 updateChart();
             } else {
@@ -467,6 +473,13 @@ public class AccountDetailActivity extends AppCompatActivity {
                 binding.cardOverview.setVisibility(View.GONE);
             }
         });
+    }
+
+    private void refreshBillList() {
+        if (currentAccount != null) {
+            List<AccountBillUiModel> uiModels = accountViewModel.mapAccountBillsToUiModels(filteredBills, currentAccount, collapsedMonths);
+            billAdapter.submitList(uiModels);
+        }
     }
 
     private void addSystemBills(List<Bill> bills) {
@@ -853,9 +866,7 @@ public class AccountDetailActivity extends AppCompatActivity {
             }
         }
 
-        if (currentAccount != null) {
-            billAdapter.setData(filteredBills, currentAccount);
-        }
+        refreshBillList();
         calculateStatistics(filteredBills);
     }
 

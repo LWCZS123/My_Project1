@@ -274,6 +274,66 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     // ════════════════════════════════════════════════════
+    //  ✅ UiModel 映射 (单层列表版)
+    // ════════════════════════════════════════════════════
+    public List<BillUiModel> mapBillsToUiModels(List<Bill> bills) {
+        List<BillUiModel> uiModels = new ArrayList<>();
+        if (bills == null || bills.isEmpty()) return uiModels;
+
+        List<Account> accounts = allAccountsLive.getValue();
+        Map<String, Account> accountMap = new HashMap<>();
+        if (accounts != null) {
+            for (Account acc : accounts) {
+                accountMap.put(acc.getObjectId(), acc);
+            }
+        }
+
+        SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        DecimalFormat amtFmt = new DecimalFormat("#,##0.00");
+
+        for (Bill bill : bills) {
+            int billType = bill.getType();
+            String prefix = "";
+            int amountColor;
+            String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
+
+            if (billType == 0) {
+                prefix = "- ¥";
+                amountColor = getApplication().getColor(R.color.red);
+            } else if (billType == 1) {
+                prefix = "+ ¥";
+                amountColor = getApplication().getColor(R.color.green);
+            } else {
+                prefix = "¥";
+                amountColor = getApplication().getColor(R.color.orange_500);
+                Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
+                categoryIcon = uri.toString();
+            }
+
+            String amountText = prefix + amtFmt.format(bill.getAmount());
+
+            Account account = accountMap.get(bill.getAccountId());
+            Account toAccount = (billType == 2 || billType == 3) ? accountMap.get(bill.getToAccountId()) : null;
+
+            uiModels.add(BillUiModel.builder()
+                    .localId(bill.getId())
+                    .objectId(bill.getObjectId())
+                    .timeText(timeFmt.format(bill.getBillTime()))
+                    .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
+                    .categoryIconUrl(categoryIcon)
+                    .amountText(amountText)
+                    .amountColor(amountColor)
+                    .accountName(account != null ? account.getName() : "")
+                    .toAccountName(toAccount != null ? toAccount.getName() : "")
+                    .billType(billType)
+                    .remarkText(bill.getRemark())
+                    .imageUrls(bill.getImageUrls())
+                    .build());
+        }
+        return uiModels;
+    }
+
+    // ════════════════════════════════════════════════════
     //  ✅ UiModel 映射 (聚合版)
     // ════════════════════════════════════════════════════
     private List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills, Map<String, Account> accountMap) {

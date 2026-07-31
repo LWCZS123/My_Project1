@@ -5,9 +5,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.recyclerview.widget.AsyncListDiffer;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -28,7 +28,7 @@ import io.reactivex.annotations.NonNull;
  * ✅ 每个 Item 代表一天的账单组，由一个大卡片包裹
  * ✅ 内部项支持向左滑动显示：退款、编辑、删除
  */
-public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
+public class BillAdapter extends ListAdapter<BillAdapter.BillGroup, BillAdapter.DayGroupVH> {
 
     private final Context context;
     private OnBillClickListener listener;
@@ -36,21 +36,6 @@ public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
     private static final RecyclerView.RecycledViewPool sharedPhotoPool =
             new RecyclerView.RecycledViewPool();
     static { sharedPhotoPool.setMaxRecycledViews(0, 20); }
-
-    private static final DiffUtil.ItemCallback<BillGroup> DIFF_CALLBACK =
-            new DiffUtil.ItemCallback<BillGroup>() {
-                @Override
-                public boolean areItemsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
-                    return oldItem.header.dateKey.equals(newItem.header.dateKey);
-                }
-
-                @Override
-                public boolean areContentsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
-                    return oldItem.equals(newItem);
-                }
-            };
-
-    private final AsyncListDiffer<BillGroup> differ = new AsyncListDiffer<>(this, DIFF_CALLBACK);
 
     public interface OnBillClickListener {
         void onBillClick(long localId, String objectId, View itemView);
@@ -61,17 +46,19 @@ public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
     }
 
     public BillAdapter(Context context, OnBillClickListener listener) {
+        super(new DiffUtil.ItemCallback<BillGroup>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
+                return oldItem.header.dateKey.equals(newItem.header.dateKey);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
         this.context = context;
         this.listener = listener;
-    }
-
-    public void submitList(List<BillGroup> items) {
-        differ.submitList(items);
-    }
-
-    @Override
-    public int getItemCount() {
-        return differ.getCurrentList().size();
     }
 
     @NonNull
@@ -83,7 +70,7 @@ public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
 
     @Override
     public void onBindViewHolder(@NonNull DayGroupVH holder, int position) {
-        holder.bind(differ.getCurrentList().get(position));
+        holder.bind(getItem(position));
     }
 
     class DayGroupVH extends RecyclerView.ViewHolder {
@@ -106,7 +93,7 @@ public class BillAdapter extends RecyclerView.Adapter<BillAdapter.DayGroupVH> {
             
             BillRowAdapter rowAdapter = (BillRowAdapter) b.rvBills.getAdapter();
             if (rowAdapter != null) {
-                rowAdapter.setBills(group.bills);
+                rowAdapter.submitList(group.bills);
             }
         }
     }

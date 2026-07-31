@@ -96,7 +96,7 @@ public class CategoryGridFragment extends Fragment {
         binding.recyclerCategory.setLayoutManager(layoutManager);
 
         // 初始化适配器
-        adapter = new CategoryGridAdapter(new ArrayList<>(), getContext());
+        adapter = new CategoryGridAdapter(getContext());
 
         // 设置分类选择监听器
         adapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {

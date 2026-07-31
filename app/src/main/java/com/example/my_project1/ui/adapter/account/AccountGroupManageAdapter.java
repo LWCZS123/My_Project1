@@ -5,26 +5,42 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.ItemAccountGroupManageBinding;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class AccountGroupManageAdapter extends RecyclerView.Adapter<AccountGroupManageAdapter.ViewHolder> {
+public class AccountGroupManageAdapter extends ListAdapter<AccountGroup, AccountGroupManageAdapter.ViewHolder> {
 
-    private final List<AccountGroup> groups = new ArrayList<>();
     private final Map<String, List<Account>> groupAccounts = new HashMap<>();
     private final Set<String> expandedGroupIds = new HashSet<>();
     private OnItemClickListener listener;
+
+    public AccountGroupManageAdapter() {
+        super(new DiffUtil.ItemCallback<AccountGroup>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull AccountGroup oldItem, @NonNull AccountGroup newItem) {
+                return oldItem.getId() == newItem.getId() || 
+                       (oldItem.getObjectId() != null && oldItem.getObjectId().equals(newItem.getObjectId()));
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull AccountGroup oldItem, @NonNull AccountGroup newItem) {
+                return oldItem.getName().equals(newItem.getName()) && 
+                       oldItem.getAccountCount() == newItem.getAccountCount();
+            }
+        });
+    }
 
     public interface OnItemClickListener {
         void onEdit(AccountGroup group);
@@ -37,16 +53,15 @@ public class AccountGroupManageAdapter extends RecyclerView.Adapter<AccountGroup
         this.listener = listener;
     }
 
-    public void setGroups(List<AccountGroup> newGroups) {
-        groups.clear();
-        if (newGroups != null) groups.addAll(newGroups);
-        notifyDataSetChanged();
+    public void setGroups(List<AccountGroup> groups) {
+        submitList(groups);
     }
 
     public void setGroupAccounts(String groupId, List<Account> accounts) {
         groupAccounts.put(groupId, accounts);
-        for (int i = 0; i < groups.size(); i++) {
-            if (groups.get(i).getObjectId().equals(groupId)) {
+        // Find position and refresh
+        for (int i = 0; i < getItemCount(); i++) {
+            if (getItem(i).getObjectId().equals(groupId)) {
                 notifyItemChanged(i);
                 break;
             }
@@ -62,12 +77,7 @@ public class AccountGroupManageAdapter extends RecyclerView.Adapter<AccountGroup
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.bind(groups.get(position));
-    }
-
-    @Override
-    public int getItemCount() {
-        return groups.size();
+        holder.bind(getItem(position));
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {
@@ -121,7 +131,7 @@ public class AccountGroupManageAdapter extends RecyclerView.Adapter<AccountGroup
                 } else {
                     expandedGroupIds.add(groupId);
                 }
-                notifyItemChanged(getAdapterPosition());
+                notifyItemChanged(getBindingAdapterPosition());
             });
 
             binding.btnMore.setOnClickListener(v -> showMoreMenu(v, group, isDefault));

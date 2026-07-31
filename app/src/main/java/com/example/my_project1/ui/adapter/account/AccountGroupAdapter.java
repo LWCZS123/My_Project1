@@ -6,7 +6,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
@@ -14,7 +16,10 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.ItemAccountGroupBinding;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountGroupUiModel;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountUiModel;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,15 +35,18 @@ import io.reactivex.annotations.NonNull;
  * 展示账户组及其子账户的折叠式列表适配器。
  * 支持点击展开组、加载子账户、编辑组、子项点击。
  */
-public class AccountGroupAdapter extends RecyclerView.Adapter<AccountGroupAdapter.GroupViewHolder> {
+public class AccountGroupAdapter extends ListAdapter<AccountGroupUiModel, AccountGroupAdapter.GroupViewHolder> {
 
     private static final String TAG = "AccountGroupAdapter";
 
-    private final List<AccountGroup> groupList = new ArrayList<>();
-    private final Set<String> expandedGroupIds = new HashSet<>();
     private OnGroupActionClickListener groupActionClickListener;
-    private final Map<String, List<Account>> groupAccounts = new HashMap<>();
+    
+    // ── 临时存储状态，用于兼容旧的 Activity 调用 ──────────────────
+    private List<AccountGroup> rawGroups = new ArrayList<>();
+    private final Map<String, List<Account>> groupAccountsMap = new HashMap<>();
+    private final Set<String> expandedGroupIds = new HashSet<>();
     private String currentExpandedGroupId = null;
+    // ────────────────────────────────────────────────────────────
 
     // ---------------- 外部接口 ----------------
     public interface OnGroupActionClickListener {
@@ -54,46 +62,80 @@ public class AccountGroupAdapter extends RecyclerView.Adapter<AccountGroupAdapte
         return currentExpandedGroupId;
     }
 
-    public AccountGroupAdapter() {}
+    public AccountGroupAdapter() {
+        super(new DiffUtil.ItemCallback<AccountGroupUiModel>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull AccountGroupUiModel oldItem, @NonNull AccountGroupUiModel newItem) {
+                return oldItem.id == newItem.id || (oldItem.objectId != null && oldItem.objectId.equals(newItem.objectId));
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull AccountGroupUiModel oldItem, @NonNull AccountGroupUiModel newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
+    }
 
     public void setOnGroupActionClickListener(OnGroupActionClickListener listener) {
         this.groupActionClickListener = listener;
     }
 
     public void setGroups(List<AccountGroup> groups) {
-        groupList.clear();
-        if (groups != null) groupList.addAll(groups);
-        notifyDataSetChanged();
+        this.rawGroups = groups != null ? new ArrayList<>(groups) : new ArrayList<>();
+        rebuildUiModels();
     }
 
     /**
      * 【关键修复】更新指定账户组的账户列表
      */
     public void updateAccountsForExpandedGroup(String groupId, List<Account> accounts) {
-        Log.d(TAG, "📝 updateAccountsForExpandedGroup 被调用");
-        Log.d(TAG, "   - 目标组ID: " + groupId);
-        Log.d(TAG, "   - 账户数量: " + (accounts != null ? accounts.size() : "null"));
-        Log.d(TAG, "   - 当前展开组ID: " + currentExpandedGroupId);
-
-        // 保存账户数据到缓存（始终保存）
-        List<Account> accountsCopy = accounts != null ? new ArrayList<>(accounts) : new ArrayList<>();
-        groupAccounts.put(groupId, accountsCopy);
-
-        Log.d(TAG, "✅ 已保存到缓存，准备刷新UI");
-
-        // 查找对应的 position 并刷新（始终刷新找到的那一项）
-        for (int i = 0; i < groupList.size(); i++) {
-            if (groupList.get(i).getObjectId().equals(groupId)) {
-                Log.d(TAG, "✅ 找到对应位置: " + i + "，调用 notifyItemChanged");
-                notifyItemChanged(i);
-                return;
-            }
-        }
-
-        Log.w(TAG, "⚠️ 未找到对应的账户组位置");
+        groupAccountsMap.put(groupId, accounts != null ? new ArrayList<>(accounts) : new ArrayList<>());
+        rebuildUiModels();
     }
 
-    // ---------------- Adapter 重写 ----------------
+    private void rebuildUiModels() {
+        List<AccountGroupUiModel> uiModels = new ArrayList<>();
+        DecimalFormat df = new DecimalFormat("#,##0.00");
+
+        for (AccountGroup group : rawGroups) {
+            String groupId = group.getObjectId();
+            List<Account> accounts = groupAccountsMap.get(groupId);
+            
+            List<AccountUiModel> subUiModels = new ArrayList<>();
+            if (accounts != null) {
+                for (Account acc : accounts) {
+                    subUiModels.add(new AccountUiModel(
+                            acc.getId(),
+                            acc.getObjectId(),
+                            acc.getName(),
+                            acc.getAccountType() != null ? acc.getAccountType() : acc.getRemark(),
+                            "¥" + df.format(acc.getBalance()),
+                            acc.getBalance() < 0 ? 0xFFFF6B6B : 0xFF333333,
+                            "可用额度 ¥" + df.format(acc.getCreditLimit() + acc.getBalance()),
+                            acc.isCredit(),
+                            acc.getIconUrl(),
+                            false,
+                            true,
+                            acc
+                    ));
+                }
+            }
+
+            uiModels.add(new AccountGroupUiModel(
+                    group.getId(),
+                    groupId,
+                    group.getName(),
+                    String.valueOf(group.getAccountCount()),
+                    "", "", false, // Not used in this item layout but part of model
+                    expandedGroupIds.contains(groupId),
+                    subUiModels,
+                    false,
+                    group
+            ));
+        }
+        submitList(uiModels);
+    }
+
     @NonNull
     @Override
     public GroupViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -104,12 +146,12 @@ public class AccountGroupAdapter extends RecyclerView.Adapter<AccountGroupAdapte
 
     @Override
     public void onBindViewHolder(@NonNull GroupViewHolder holder, int position) {
-        holder.bind(groupList.get(position));
+        holder.bind(getItem(position));
     }
 
     @Override
     public int getItemCount() {
-        return groupList.size();
+        return getCurrentList().size();
     }
 
     // ---------------- ViewHolder ----------------
@@ -163,34 +205,34 @@ public class AccountGroupAdapter extends RecyclerView.Adapter<AccountGroupAdapte
             });
 
             binding.layoutGroupActions.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
+                int pos = getBindingAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && groupActionClickListener != null) {
-                    groupActionClickListener.onEditGroup(groupList.get(pos));
+                    groupActionClickListener.onEditGroup(getItem(pos).originalGroup);
                 }
             });
 
             binding.layoutHeader.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
+                int pos = getBindingAdapterPosition();
                 if (pos == RecyclerView.NO_POSITION) return;
 
-                AccountGroup group = groupList.get(pos);
-                boolean currentlyExpanded = expandedGroupIds.contains(group.getObjectId());
+                AccountGroupUiModel uiModel = getItem(pos);
+                String groupId = uiModel.objectId;
+                boolean currentlyExpanded = expandedGroupIds.contains(groupId);
 
                 if (currentlyExpanded) {
-                    expandedGroupIds.remove(group.getObjectId());
+                    expandedGroupIds.remove(groupId);
                     collapseSection(binding.layoutAccountsContainer);
                     binding.ivArrow.animate().rotation(0f).setDuration(200).start();
                     currentExpandedGroupId = null;
                 } else {
-                    expandedGroupIds.add(group.getObjectId());
-                    currentExpandedGroupId = group.getObjectId();
-                    Log.d("AccountGroup", group.getObjectId().toString().trim());
+                    expandedGroupIds.add(groupId);
+                    currentExpandedGroupId = groupId;
 
                     if (groupActionClickListener != null)
-                        groupActionClickListener.onGroupExpand(group.getObjectId()); // 通知 Activity 加载
+                        groupActionClickListener.onGroupExpand(groupId); // 通知 Activity 加载
 
                     // 【关键修复】在展开之前先设置数据，这样可以正确计算高度
-                    List<Account> cachedAccounts = groupAccounts.get(group.getObjectId());
+                    List<Account> cachedAccounts = groupAccountsMap.get(groupId);
                     if (cachedAccounts != null) {
                         subAdapter.setAccounts(cachedAccounts);
                     } else {
@@ -200,55 +242,40 @@ public class AccountGroupAdapter extends RecyclerView.Adapter<AccountGroupAdapte
                     expandSection(binding.layoutAccountsContainer);
                     binding.ivArrow.animate().rotation(90f).setDuration(200).start();
                 }
+                rebuildUiModels();
             });
         }
 
-        void bind(AccountGroup group) {
-            Log.d(TAG, "🎨 bind() 被调用，组名: " + group.getName() + ", ID: " + group.getObjectId());
+        void bind(AccountGroupUiModel uiModel) {
+            binding.tvGroupName.setText(uiModel.name);
+            binding.tvCount.setText(uiModel.countText);
 
-            binding.tvGroupName.setText(group.getName());
-
-            binding.tvCount.setText(String.valueOf(group.getAccountCount()));
-
-            if (group.getIconUrl() != null && !group.getIconUrl().isEmpty()) {
+            if (uiModel.originalGroup.getIconUrl() != null && !uiModel.originalGroup.getIconUrl().isEmpty()) {
                 binding.ivGroup.setVisibility(View.VISIBLE);
                 Glide.with(binding.ivGroup.getContext())
-                        .load(group.getIconUrl())
+                        .load(uiModel.originalGroup.getIconUrl())
                         .placeholder(R.drawable.ic_cross)
                         .into(binding.ivGroup);
             } else {
                 binding.ivGroup.setVisibility(View.GONE);
             }
 
-            boolean isExpanded = expandedGroupIds.contains(group.getObjectId());
-            Log.d(TAG, "   - 是否展开: " + isExpanded);
-
+            boolean isExpanded = uiModel.isExpanded;
             binding.layoutAccountsContainer.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
             binding.ivArrow.setRotation(isExpanded ? 90f : 0f);
 
             // 【关键修复】如果是展开状态，更新子账户列表
             if (isExpanded) {
-                List<Account> accounts = groupAccounts.get(group.getObjectId());
-                Log.d(TAG, "   - 从缓存获取账户数据: " + (accounts != null ? accounts.size() : "null"));
-                if (accounts != null && !accounts.isEmpty()) {
-                    Log.d(TAG, "🔄 设置账户到子列表，数量: " + accounts.size());
-                    for (int i = 0; i < accounts.size(); i++) {
-                        Log.d(TAG, "     - " + accounts.get(i).getName());
-                    }
-                    subAdapter.setAccounts(accounts);
+                subAdapter.submitList(uiModel.accounts);
 
-                    // 【关键修复】确保容器有正确的高度
-                    binding.layoutAccountsContainer.post(() -> {
-                        if (binding.layoutAccountsContainer.getHeight() == 0 ||
-                                binding.layoutAccountsContainer.getLayoutParams().height != ViewGroup.LayoutParams.WRAP_CONTENT) {
-                            binding.layoutAccountsContainer.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                            binding.layoutAccountsContainer.requestLayout();
-                        }
-                    });
-                } else {
-                    Log.d(TAG, "⚠️ 账户数据为空，显示空列表");
-                    subAdapter.setAccounts(new ArrayList<>());
-                }
+                // 【关键修复】确保容器有正确的高度
+                binding.layoutAccountsContainer.post(() -> {
+                    if (binding.layoutAccountsContainer.getHeight() == 0 ||
+                            binding.layoutAccountsContainer.getLayoutParams().height != ViewGroup.LayoutParams.WRAP_CONTENT) {
+                        binding.layoutAccountsContainer.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        binding.layoutAccountsContainer.requestLayout();
+                    }
+                });
             }
         }
 

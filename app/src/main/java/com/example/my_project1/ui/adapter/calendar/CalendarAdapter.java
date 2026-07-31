@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.databinding.ItemCalendarDayBinding;
@@ -12,12 +14,12 @@ import com.example.my_project1.utils.LunarCalendar;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
-public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.DayViewHolder> {
+public class CalendarAdapter extends ListAdapter<CalendarAdapter.CalendarDay, CalendarAdapter.DayViewHolder> {
 
-    private List<CalendarDay> days = new ArrayList<>();
     private int selectedPosition = -1;
     private OnDayClickListener listener;
 
@@ -29,19 +31,34 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.DayVie
         this.listener = listener;
     }
 
-    public void setDays(List<CalendarDay> days, int selectedDay) {
-        this.days = days;
+    public CalendarAdapter() {
+        super(new DiffUtil.ItemCallback<CalendarDay>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull CalendarDay oldItem, @NonNull CalendarDay newItem) {
+                return oldItem.year == newItem.year &&
+                        oldItem.month == newItem.month &&
+                        oldItem.day == newItem.day;
+            }
 
+            @Override
+            public boolean areContentsTheSame(@NonNull CalendarDay oldItem, @NonNull CalendarDay newItem) {
+                return oldItem.isCurrentMonth == newItem.isCurrentMonth;
+            }
+        });
+    }
+
+    public void setDays(List<CalendarDay> days, int selectedDay) {
         // 找到选中的日期位置
         selectedPosition = -1;
-        for (int i = 0; i < days.size(); i++) {
-            if (days.get(i).day == selectedDay && days.get(i).isCurrentMonth) {
-                selectedPosition = i;
-                break;
+        if (days != null) {
+            for (int i = 0; i < days.size(); i++) {
+                if (days.get(i).day == selectedDay && days.get(i).isCurrentMonth) {
+                    selectedPosition = i;
+                    break;
+                }
             }
         }
-
-        notifyDataSetChanged();
+        submitList(days);
     }
 
     @NonNull
@@ -54,13 +71,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.DayVie
 
     @Override
     public void onBindViewHolder(@NonNull DayViewHolder holder, int position) {
-        CalendarDay calendarDay = days.get(position);
+        CalendarDay calendarDay = getItem(position);
         holder.bind(calendarDay, position == selectedPosition);
-    }
-
-    @Override
-    public int getItemCount() {
-        return days.size();
     }
 
     class DayViewHolder extends RecyclerView.ViewHolder {

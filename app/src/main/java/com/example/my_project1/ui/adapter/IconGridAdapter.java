@@ -6,6 +6,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -16,10 +18,9 @@ import java.util.List;
 
 import io.reactivex.annotations.NonNull;
 
-public class IconGridAdapter extends RecyclerView.Adapter<IconGridAdapter.IconViewHolder> {
+public class IconGridAdapter extends ListAdapter<String, IconGridAdapter.IconViewHolder> {
 
     private final Context context;
-    private List<String> icons = new ArrayList<>();
     private OnIconClickListener listener;
 
     public interface OnIconClickListener {
@@ -31,12 +32,22 @@ public class IconGridAdapter extends RecyclerView.Adapter<IconGridAdapter.IconVi
     }
 
     public IconGridAdapter(Context context) {
+        super(new DiffUtil.ItemCallback<String>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull String oldItem, @NonNull String newItem) {
+                return oldItem.equals(newItem);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull String oldItem, @NonNull String newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
         this.context = context;
     }
 
     public void setData(List<String> data) {
-        this.icons = data;
-        notifyDataSetChanged();
+        submitList(data);
     }
 
     @NonNull
@@ -48,18 +59,13 @@ public class IconGridAdapter extends RecyclerView.Adapter<IconGridAdapter.IconVi
 
     @Override
     public void onBindViewHolder(@NonNull IconViewHolder holder, int position) {
-        String iconUrl = icons.get(position);
+        String iconUrl = getItem(position);
 
         ImageLoaderUtils.load(holder.itemView.getContext(),
                 iconUrl, holder.iconImage);
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onIconClick(iconUrl);
         });
-    }
-
-    @Override
-    public int getItemCount() {
-        return icons.size();
     }
 
     static class IconViewHolder extends RecyclerView.ViewHolder {

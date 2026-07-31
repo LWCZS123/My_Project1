@@ -7,30 +7,43 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
 /**
  * 图表图例适配器 - 支持滚动显示
  */
-public class ChartLegendAdapter extends RecyclerView.Adapter<ChartLegendAdapter.LegendViewHolder> {
+public class ChartLegendAdapter extends ListAdapter<ChartLegendAdapter.LegendItem, ChartLegendAdapter.LegendViewHolder> {
 
     private Context context;
-    private List<LegendItem> legendItems = new ArrayList<>();
 
     public ChartLegendAdapter(Context context) {
+        super(new DiffUtil.ItemCallback<LegendItem>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull LegendItem oldItem, @NonNull LegendItem newItem) {
+                return Objects.equals(oldItem.label, newItem.label);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull LegendItem oldItem, @NonNull LegendItem newItem) {
+                return oldItem.color == newItem.color &&
+                        Objects.equals(oldItem.percentage, newItem.percentage) &&
+                        Objects.equals(oldItem.amount, newItem.amount);
+            }
+        });
         this.context = context;
     }
 
     public void setLegendItems(List<LegendItem> items) {
-        this.legendItems = items;
-        notifyDataSetChanged();
+        submitList(items);
     }
 
     @NonNull
@@ -42,7 +55,7 @@ public class ChartLegendAdapter extends RecyclerView.Adapter<ChartLegendAdapter.
 
     @Override
     public void onBindViewHolder(@NonNull LegendViewHolder holder, int position) {
-        LegendItem item = legendItems.get(position);
+        LegendItem item = getItem(position);
 
         // 设置颜色指示器
         GradientDrawable drawable = new GradientDrawable();
@@ -55,11 +68,6 @@ public class ChartLegendAdapter extends RecyclerView.Adapter<ChartLegendAdapter.
         holder.tvLabel.setText(item.label);
         holder.tvPercentage.setText(item.percentage);
         holder.tvAmount.setText(item.amount);
-    }
-
-    @Override
-    public int getItemCount() {
-        return legendItems.size();
     }
 
     static class LegendViewHolder extends RecyclerView.ViewHolder {

@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.databinding.ItemPhotoSmallBinding;
@@ -23,9 +25,8 @@ import io.reactivex.annotations.NonNull;
  * 2. 使用 ApplicationContext 避免内存泄漏
  * 3. 先显示缩略图，再加载完整图
  */
-public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.PhotoViewHolder> {
+public class PhotoAdapter extends ListAdapter<String, PhotoAdapter.PhotoViewHolder> {
 
-    private final List<String> photoList;  // URL字符串列表
     private final Context appContext;
     private final OnPhotoClickListener listener;
     private final boolean showDelete;
@@ -40,11 +41,24 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.PhotoViewHol
      */
     public PhotoAdapter(Context context, List<String> photoList, boolean showDelete,
                         OnPhotoClickListener listener) {
+        super(new DiffUtil.ItemCallback<String>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull String oldItem, @NonNull String newItem) {
+                return oldItem.equals(newItem);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull String oldItem, @NonNull String newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
         // 🔑 使用ApplicationContext避免内存泄漏
         this.appContext = context.getApplicationContext();
-        this.photoList = photoList != null ? photoList : new ArrayList<>();
         this.showDelete = showDelete;
         this.listener = listener;
+        if (photoList != null) {
+            submitList(new ArrayList<>(photoList));
+        }
     }
 
     @NonNull
@@ -58,49 +72,41 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.PhotoViewHol
 
     @Override
     public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
-        holder.bind(photoList.get(position), position);
-    }
-
-    @Override
-    public int getItemCount() {
-        return photoList.size();
+        holder.bind(getItem(position), position);
     }
 
     public void setPhotos(List<String> urls) {
-        photoList.clear();
-        if (urls != null) {
-            photoList.addAll(urls);
-        }
-        notifyDataSetChanged();
+        submitList(urls != null ? new ArrayList<>(urls) : null);
     }
 
     public void addPhoto(String url) {
-        photoList.add(url);
-        notifyItemInserted(photoList.size() - 1);
+        List<String> currentList = new ArrayList<>(getCurrentList());
+        currentList.add(url);
+        submitList(currentList);
     }
 
     public void addPhotos(List<String> urls) {
         if (urls != null && !urls.isEmpty()) {
-            int startPosition = photoList.size();
-            photoList.addAll(urls);
-            notifyItemRangeInserted(startPosition, urls.size());
+            List<String> currentList = new ArrayList<>(getCurrentList());
+            currentList.addAll(urls);
+            submitList(currentList);
         }
     }
 
     public void removePhoto(int position) {
-        if (position >= 0 && position < photoList.size()) {
-            photoList.remove(position);
-            notifyItemRemoved(position);
+        if (position >= 0 && position < getItemCount()) {
+            List<String> currentList = new ArrayList<>(getCurrentList());
+            currentList.remove(position);
+            submitList(currentList);
         }
     }
 
     public List<String> getPhotos() {
-        return new ArrayList<>(photoList);
+        return new ArrayList<>(getCurrentList());
     }
 
     public void clear() {
-        photoList.clear();
-        notifyDataSetChanged();
+        submitList(null);
     }
 
     class PhotoViewHolder extends RecyclerView.ViewHolder {

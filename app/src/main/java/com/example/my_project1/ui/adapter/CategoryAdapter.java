@@ -10,6 +10,9 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
@@ -21,14 +24,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
-public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.CategoryViewHolder> {
+public class CategoryAdapter extends ListAdapter<Category, CategoryAdapter.CategoryViewHolder> {
 
     private final Context context;
-    private List<Category> categories = new ArrayList<>();
-    private OnCategoryClickListener listener;
     // 用于保存每个分类的展开状态
     private Map<String, Boolean> expandedStates = new HashMap<>();
+    private OnCategoryClickListener listener;
 
     public interface OnCategoryClickListener {
         void onCategoryClick(Category category);
@@ -42,12 +45,20 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     }
 
     public CategoryAdapter(Context context) {
-        this.context = context;
-    }
+        super(new DiffUtil.ItemCallback<Category>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull Category oldItem, @NonNull Category newItem) {
+                return oldItem.getId() == newItem.getId();
+            }
 
-    public void submitList(List<Category> list) {
-        categories = list;
-        notifyDataSetChanged();
+            @Override
+            public boolean areContentsTheSame(@NonNull Category oldItem, @NonNull Category newItem) {
+                return Objects.equals(oldItem.getName(), newItem.getName()) &&
+                        Objects.equals(oldItem.getIconUri(), newItem.getIconUri()) &&
+                        Objects.equals(oldItem.getSubCategories(), newItem.getSubCategories());
+            }
+        });
+        this.context = context;
     }
 
     @Override
@@ -59,7 +70,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
 
     @Override
     public void onBindViewHolder(CategoryViewHolder holder, int position) {
-        Category category = categories.get(position);
+        Category category = getItem(position);
         Log.d("CategoryAdapter", "绑定分类: " + category.getName());
         Log.d("CategoryAdapter", "绑定分类图标1: " + category.getIconUri());
         Log.d("CategoryAdapter", "分类: " + category.getName()
@@ -200,11 +211,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             }
         });
         animator.start();
-    }
-
-    @Override
-    public int getItemCount() {
-        return categories.size();
     }
 
     static class CategoryViewHolder extends RecyclerView.ViewHolder {

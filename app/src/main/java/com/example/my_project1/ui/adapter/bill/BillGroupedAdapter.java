@@ -6,6 +6,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -28,10 +30,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
-public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+public class BillGroupedAdapter extends ListAdapter<Object, RecyclerView.ViewHolder> {
 
     private static final String TAG = "BillGroupedAdapter";
     private static final int VIEW_TYPE_DATE_HEADER = 1;
@@ -41,7 +44,6 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private static final int NIGHT_START_HOUR = 18;
 
     private final Context mContext;
-    private final List<Object> mItems = new ArrayList<>();
     private OnBillClickListener mListener;
     private Map<String, Account> mAccountMap = new HashMap<>();
 
@@ -55,6 +57,24 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     }
 
     public BillGroupedAdapter(Context context) {
+        super(new DiffUtil.ItemCallback<Object>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull Object oldItem, @NonNull Object newItem) {
+                if (oldItem.getClass() != newItem.getClass()) return false;
+                if (oldItem instanceof BillGroup) {
+                    return ((BillGroup) oldItem).dateKey.equals(((BillGroup) newItem).dateKey);
+                }
+                if (oldItem instanceof Bill) {
+                    return ((Bill) oldItem).getId() == ((Bill) newItem).getId();
+                }
+                return false;
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull Object oldItem, @NonNull Object newItem) {
+                return Objects.equals(oldItem, newItem);
+            }
+        });
         this.mContext = context;
         loadAccounts();
     }
@@ -70,22 +90,22 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             }
             AppExecutors.get().mainThread().execute(() -> {
                 this.mAccountMap = map;
-                notifyDataSetChanged();
+                notifyDataSetChanged(); // Re-bind visible items to show account info
             });
         });
     }
 
     public void setBills(List<Bill> bills) {
-        mItems.clear();
+        List<Object> items = new ArrayList<>();
         if (bills != null && !bills.isEmpty()) {
             List<BillGroup> groups = groupBillsByDate(bills);
             for (BillGroup group : groups) {
-                mItems.add(group);
-                mItems.addAll(group.bills);
+                items.add(group);
+                items.addAll(group.bills);
             }
         }
-        Log.d(TAG, "setBills: 共 " + mItems.size() + " 项");
-        notifyDataSetChanged();
+        submitList(items);
+        Log.d(TAG, "setBills: 共 " + items.size() + " 项");
     }
 
     private List<BillGroup> groupBillsByDate(List<Bill> bills) {
@@ -135,7 +155,7 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     @Override
     public int getItemViewType(int position) {
-        return mItems.get(position) instanceof BillGroup ? VIEW_TYPE_DATE_HEADER : VIEW_TYPE_BILL_ITEM;
+        return getItem(position) instanceof BillGroup ? VIEW_TYPE_DATE_HEADER : VIEW_TYPE_BILL_ITEM;
     }
 
     @NonNull
@@ -154,7 +174,7 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        Object obj = mItems.get(position);
+        Object obj = getItem(position);
         if (holder instanceof HeaderVH) {
             ((HeaderVH) holder).bind((BillGroup) obj);
         } else if (holder instanceof BillVH) {
@@ -164,7 +184,7 @@ public class BillGroupedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
     @Override
     public int getItemCount() {
-        return mItems.size();
+        return getCurrentList().size();
     }
 
     // ============== 日期头部 ==============

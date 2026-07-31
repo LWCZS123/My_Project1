@@ -1,6 +1,7 @@
 package com.example.my_project1.ui.viewmodel.accountvm;
 
 import android.app.Application;
+import android.graphics.Color;
 import android.util.Log;
 
 import androidx.lifecycle.AndroidViewModel;
@@ -10,14 +11,23 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
+import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.repository.account.AccountRepository;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ui.UiMessageLiveData;
 import com.example.my_project1.utils.ui.UiState;
 
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
@@ -602,6 +612,171 @@ public class AccountViewModel extends AndroidViewModel {
     }
 
     // ===================== 🔹 云同步 =====================
+
+    /**
+     * ✅ UiModel 映射 (账户账单版)
+     */
+    public List<AccountBillUiModel> mapAccountBillsToUiModels(List<Bill> bills, Account currentAccount, Set<String> collapsedMonths) {
+        List<AccountBillUiModel> uiModels = new ArrayList<>();
+        if (bills == null || bills.isEmpty()) return uiModels;
+
+        String currentAccountId = currentAccount != null ? currentAccount.getObjectId() : null;
+        long currentLocalAccountId = currentAccount != null ? currentAccount.getId() : -1;
+        boolean isCredit = currentAccount != null && currentAccount.isCredit();
+
+        // 1. 计算每笔交易发生后的余额
+        Map<Long, Double> billBalanceMap = new HashMap<>();
+        double runningBalance = currentAccount != null ? currentAccount.getBalance() : 0;
+        for (Bill bill : bills) {
+            billBalanceMap.put(bill.getId(), runningBalance);
+            boolean isPositive = isPositiveImpact(bill, currentAccountId, currentLocalAccountId);
+            double impact = isPositive ? bill.getAmount() : -bill.getAmount();
+            runningBalance -= impact;
+        }
+
+        // 2. 按月和日分组
+        SimpleDateFormat monthKeyFormat = new SimpleDateFormat("yyyy-MM", Locale.getDefault());
+        SimpleDateFormat dayKeyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        Map<String, MonthGroup> monthGroupsMap = new LinkedHashMap<>();
+
+        for (Bill bill : bills) {
+            if (bill.getBillTime() == null) continue;
+            String monthKey = monthKeyFormat.format(bill.getBillTime());
+            String dayKey = dayKeyFormat.format(bill.getBillTime());
+
+            MonthGroup mGroup = monthGroupsMap.get(monthKey);
+            if (mGroup == null) {
+                mGroup = new MonthGroup(monthKey, bill.getBillTime());
+                monthGroupsMap.put(monthKey, mGroup);
+            }
+            mGroup.addBill(bill, dayKey, isPositiveImpact(bill, currentAccountId, currentLocalAccountId));
+        }
+
+        // 3. 构建显示列表
+        DecimalFormat df = new DecimalFormat("#,##0.00");
+        SimpleDateFormat titleFmt = new SimpleDateFormat("yyyy年MM月", Locale.getDefault());
+        SimpleDateFormat rangeFmt = new SimpleDateFormat("MM月dd日", Locale.getDefault());
+        SimpleDateFormat dayFmt = new SimpleDateFormat("MM月dd日 EEEE", Locale.getDefault());
+        SimpleDateFormat timeFmt = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+
+        for (MonthGroup mGroup : monthGroupsMap.values()) {
+            // Month Header
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(mGroup.date);
+            cal.set(Calendar.DAY_OF_MONTH, 1);
+            Date start = cal.getTime();
+            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
+            Date end = cal.getTime();
+
+            boolean isCollapsed = collapsedMonths.contains(mGroup.key);
+            uiModels.add(new AccountBillUiModel(
+                    AccountBillUiModel.TYPE_MONTH_HEADER,
+                    titleFmt.format(mGroup.date),
+                    rangeFmt.format(start) + " - " + rangeFmt.format(end),
+                    "流入: ¥" + df.format(mGroup.totalInflow),
+                    "流出: ¥" + df.format(mGroup.totalOutflow),
+                    isCollapsed,
+                    mGroup.key
+            ));
+
+            if (!isCollapsed) {
+                for (DayGroup dGroup : mGroup.dayGroups.values()) {
+                    // Day Header
+                    uiModels.add(new AccountBillUiModel(
+                            AccountBillUiModel.TYPE_DAY_HEADER,
+                            dayFmt.format(dGroup.date),
+                            "流出: ¥" + df.format(dGroup.totalOutflow) + " 流入: ¥" + df.format(dGroup.totalInflow),
+                            null, null, false, dGroup.key
+                    ));
+
+                    // Bill Items
+                    for (Bill bill : dGroup.bills) {
+                        boolean isIncome = isPositiveImpact(bill, currentAccountId, currentLocalAccountId);
+                        String prefix = isIncome ? "+" : "-";
+                        int amountColor = isIncome ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B");
+                        
+                        Double balanceAfter = billBalanceMap.get(bill.getId());
+                        if (balanceAfter == null) balanceAfter = 0.0;
+                        String balanceLabel = isCredit ? "欠款: " : "余额: ";
+                        double displayBalance = isCredit ? Math.abs(balanceAfter) : balanceAfter;
+
+                        String timeNote = timeFmt.format(bill.getBillTime());
+                        if (bill.getRemark() != null && !bill.getRemark().isEmpty()) {
+                            timeNote += " · " + bill.getRemark();
+                        }
+
+                        uiModels.add(new AccountBillUiModel(
+                                bill.getId(),
+                                bill.getObjectId(),
+                                bill.getCategoryName(),
+                                bill.getCategoryIconUrl(),
+                                timeNote,
+                                prefix + "¥" + df.format(bill.getAmount()),
+                                amountColor,
+                                balanceLabel + "¥" + df.format(displayBalance),
+                                bill
+                        ));
+                    }
+                }
+            }
+        }
+        return uiModels;
+    }
+
+    private boolean isPositiveImpact(Bill bill, String currentAccountId, long currentLocalAccountId) {
+        if (bill.getType() == 1) return true;
+        if (bill.getType() == 2 || bill.getType() == 3) {
+            if (currentAccountId != null && !currentAccountId.isEmpty() && currentAccountId.equals(bill.getToAccountId())) {
+                return true;
+            }
+            return currentLocalAccountId > 0 && currentLocalAccountId == bill.getToLocalAccountId();
+        }
+        return false;
+    }
+
+    private static class MonthGroup {
+        String key;
+        Date date;
+        double totalInflow = 0;
+        double totalOutflow = 0;
+        Map<String, DayGroup> dayGroups = new LinkedHashMap<>();
+
+        MonthGroup(String key, Date date) {
+            this.key = key;
+            this.date = date;
+        }
+
+        void addBill(Bill bill, String dayKey, boolean isPositive) {
+            if (isPositive) totalInflow += bill.getAmount();
+            else totalOutflow += bill.getAmount();
+
+            DayGroup dGroup = dayGroups.get(dayKey);
+            if (dGroup == null) {
+                dGroup = new DayGroup(dayKey, bill.getBillTime());
+                dayGroups.put(dayKey, dGroup);
+            }
+            dGroup.addBill(bill, isPositive);
+        }
+    }
+
+    private static class DayGroup {
+        String key;
+        Date date;
+        double totalInflow = 0;
+        double totalOutflow = 0;
+        List<Bill> bills = new ArrayList<>();
+
+        DayGroup(String key, Date date) {
+            this.key = key;
+            this.date = date;
+        }
+
+        void addBill(Bill bill, boolean isPositive) {
+            if (isPositive) totalInflow += bill.getAmount();
+            else totalOutflow += bill.getAmount();
+            bills.add(bill);
+        }
+    }
 
     public void syncFromCloud(ResultCallback callback) {
         repository.syncFromAccountGroupCloud((success, message) -> {
