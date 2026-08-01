@@ -122,6 +122,23 @@ public class HomeFragment extends Fragment {
         super.onResume();
         checkUserSwitch();
         loadUserAvatar();
+        // 每次回到首页时，尝试静默同步
+        if (billViewModel != null) {
+            billViewModel.checkAndAutoSync();
+        }
+    }
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (!hidden) {
+            // 当从其他 Tab 切换回首页时（MainActivity show/hide）
+            Log.d(TAG, "首页可见，执行静默同步检查");
+            if (billViewModel != null) {
+                billViewModel.checkAndAutoSync();
+            }
+            loadUserAvatar();
+        }
     }
 
     @Override

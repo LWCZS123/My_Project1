@@ -21,8 +21,12 @@ import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.BillRepository;
 import com.example.my_project1.data.repository.user.UserProfileRepository;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
+import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.work.BillSyncWorker;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -41,26 +45,32 @@ import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
 
 /**
- * BillViewModel (重构版)
+ * BillViewModel (旗舰级秒开版)
  * -------------------------------------------------------
- * ✅ 新增：将原始 Bill 列表在后台线程映射为 BillUiModel + DateHeader 混合列表
- * ✅ 新增：分页状态管理（currentPage / isLoading / isLastPage）
- * ✅ 新增：HeaderUiModel 预计算统计数据
- * ✅ 保留：原有同步、CRUD、用户切换等全部逻辑
+ * ✅ 1. 快照优先：构造时立即从 SP 恢复上一次的统计和账单，实现零等待。
+ * ✅ 2. 保护机制：冷启动设置 500ms 保护期，防止数据闪烁。
+ * ✅ 3. 静默刷新：后台默默更新数据，DiffUtil 平滑过渡。
  */
 public class BillViewModel extends AndroidViewModel {
 
     private static final String TAG = "BillViewModel";
+    private static final String SP_NAME = "bill_snapshot";
+    private static final String KEY_HEADER_SNAPSHOT = "header_data";
+    private static final String KEY_BILL_ITEMS_SNAPSHOT = "bill_items";
 
     // ── 分页常量 ──────────────────────────────────────
     private static final int PAGE_SIZE        = 20;  // 每页条数
     private static final int PREFETCH_OFFSET  = 5;   // 距底部 5 条时触发预加载
+    private static final long SNAPSHOT_PROTECT_MS = 500L; // 快照保护期
 
     // ── 后台计算线程 ───────────────────────────────────
     private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler        = new Handler(Looper.getMainLooper());
+    private final Gson gson = new Gson();
 
-    // ── 依赖 ────────────────────────────────────────
+    // ── 标志位 ────────────────────────────────────────
+    private long viewModelStartTime;
+    private boolean isSnapshotLoaded = false;
     private final AccountDao accountDao;
     private final com.example.my_project1.data.repository.account.AccountRepository accountRepository; // 新增
     private final BillRepository repository;
@@ -164,16 +174,66 @@ public class BillViewModel extends AndroidViewModel {
         repository            = new BillRepository(application);
         userProfileRepository = UserProfileRepository.getInstance(application);
 
+        viewModelStartTime = System.currentTimeMillis();
+
         BmobUser user = BmobUser.getCurrentUser();
         if (user != null) {
             currentUserId = user.getObjectId();
             lastUserId    = currentUserId;
         }
 
+        // 🚀 第一时间加载快照
+        loadSnapshot();
+
         initializeLiveData();
         observeAllBillsForStats();
         observeStatsForSync();
         observeMonthBillsForUiMapping();
+    }
+
+    /**
+     * ✅ 快照优先：从 SharedPreferences 恢复数据
+     */
+    private void loadSnapshot() {
+        android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
+        
+        String headerJson = sp.getString(KEY_HEADER_SNAPSHOT, null);
+        String billsJson = sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null);
+
+        if (headerJson != null) {
+            HeaderUiModel header = gson.fromJson(headerJson, HeaderUiModel.class);
+            _headerData.setValue(header);
+        }
+
+        if (billsJson != null) {
+            Type type = new TypeToken<List<BillAdapter.BillGroup>>(){}.getType();
+            List<BillAdapter.BillGroup> groups = gson.fromJson(billsJson, type);
+            _billItems.setValue(groups);
+        }
+        
+        isSnapshotLoaded = true;
+        Log.d(TAG, "⚡ 快照加载完成");
+    }
+
+    /**
+     * ✅ 保存快照：仅保存前 5 天的账单以保证速度
+     */
+    private void saveSnapshot(HeaderUiModel header, List<BillAdapter.BillGroup> billItems) {
+        bgExecutor.execute(() -> {
+            android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
+            
+            // 限制快照大小：只存前 5 组数据
+            List<BillAdapter.BillGroup> snapshotItems = billItems;
+            if (billItems != null && billItems.size() > 5) {
+                snapshotItems = new ArrayList<>(billItems.subList(0, 5));
+            }
+
+            sp.edit()
+                .putString(KEY_HEADER_SNAPSHOT, gson.toJson(header))
+                .putString(KEY_BILL_ITEMS_SNAPSHOT, gson.toJson(snapshotItems))
+                .apply();
+            Log.d(TAG, "💾 快照已持久化");
+        });
     }
 
     private void observeAllBillsForStats() {
@@ -247,9 +307,17 @@ public class BillViewModel extends AndroidViewModel {
                 List<BillAdapter.BillGroup> uiItems = mapBillsToUiGroups(bills, accountMap);
                 HeaderUiModel header = buildHeaderUiModel(bills, accounts);
 
-                mainHandler.post(() -> {
+                // ✅ 3. 计算保护期剩余时间
+                long elapsed = System.currentTimeMillis() - viewModelStartTime;
+                long delay = isSnapshotLoaded ? Math.max(0, SNAPSHOT_PROTECT_MS - elapsed) : 0;
+
+                mainHandler.postDelayed(() -> {
                     _billItems.setValue(uiItems);
                     _headerData.setValue(header);
+                    
+                    // 保存新快照
+                    saveSnapshot(header, uiItems);
+                    isSnapshotLoaded = false; // 保护期过后的下一次更新不再延迟
 
                     // 分页状态：首页加载完成
                     if (currentPage == 1) {
@@ -258,7 +326,7 @@ public class BillViewModel extends AndroidViewModel {
                         _pagingState.setValue(empty || !hasMore
                                 ? PagingState.NO_MORE : PagingState.IDLE);
                     }
-                });
+                }, delay);
             });
         };
 
@@ -822,6 +890,28 @@ public class BillViewModel extends AndroidViewModel {
     }
 
 
+    public void silentSyncFromCloud() {
+        if (isSyncing || currentUserId == null) return;
+        
+        isSyncing = true;
+        // 注意：静默同步不更新 _syncState 为 loading，也不显示 Toast
+        
+        Log.d(TAG, "开始后台静默同步...");
+        
+        accountRepository.syncFromAccountGroupCloud((success, message) -> {
+            repository.syncFromCloud(currentUserId, r -> {
+                isSyncing = false;
+                lastSyncTime = System.currentTimeMillis();
+                if (r.isSuccess()) {
+                    Log.d(TAG, "后台同步成功");
+                    mainHandler.post(this::refreshData);
+                } else {
+                    Log.w(TAG, "后台同步失败: " + r.message);
+                }
+            });
+        });
+    }
+
     // ── 用户切换 ──────────────────────────────────────
     public void checkUserSwitch() {
         BmobUser user      = BmobUser.getCurrentUser();
@@ -865,21 +955,20 @@ public class BillViewModel extends AndroidViewModel {
         _refreshTrigger.setValue(System.currentTimeMillis());
 
         mainHandler.postDelayed(() -> {
-            List<Bill> bills = currentMonthBills.getValue();
-            if (bills == null || bills.isEmpty()) forceSyncFromCloud();
+            if (currentUserId != null) silentSyncFromCloud();
         }, 500);
     }
 
     public void checkAndAutoSync() {
         checkUserSwitch();
-        if (currentUserId == null) { isFirstInit = false; return; }
-        if (!isFirstInit) return;
+        if (currentUserId == null) return;
 
-        mainHandler.postDelayed(() -> {
-            List<Bill> bills = currentMonthBills.getValue();
-            if (bills == null || bills.isEmpty()) forceSyncFromCloud();
+        long now = System.currentTimeMillis();
+        // 如果是首次初始化，或者距离上次同步超过阈值，则触发静默同步
+        if (isFirstInit || (now - lastSyncTime > SYNC_THROTTLE_MS)) {
             isFirstInit = false;
-        }, 800);
+            silentSyncFromCloud();
+        }
     }
 
     // ── 统计写回 UserProfile ──────────────────────────
