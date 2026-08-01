@@ -417,7 +417,7 @@
             <!-- 第一行：1 2 3 删除 -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="60dp"
                 android:layout_marginBottom="4dp"
                 android:orientation="horizontal">
 
@@ -475,7 +475,7 @@
             <!-- 第二行：4 5 6 加减 -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="60dp"
                 android:layout_marginBottom="4dp"
                 android:orientation="horizontal">
 
@@ -534,7 +534,7 @@
             <!-- 第三行：7 8 9 乘除 -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="60dp"
                 android:layout_marginBottom="4dp"
                 android:orientation="horizontal">
 
@@ -593,7 +593,7 @@
             <!-- 第四行：再记 0 . 完成 -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="60dp"
                 android:orientation="horizontal">
 
                 <TextView

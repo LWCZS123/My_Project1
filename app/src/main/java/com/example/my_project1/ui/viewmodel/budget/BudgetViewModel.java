@@ -12,8 +12,9 @@ import com.example.my_project1.data.model.CategoryWithSubCategories;
 import com.example.my_project1.data.model.SubCategory;
 import com.example.my_project1.data.model.budget.Budget;
 import com.example.my_project1.data.repository.budget.BudgetRepository;
-import com.example.my_project1.utils.AppExecutors;
+import com.example.my_project1.utils.BudgetConfig;
 import com.example.my_project1.utils.BudgetPeriodHelper;
+import com.example.my_project1.utils.AppExecutors;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -85,21 +86,34 @@ public class BudgetViewModel extends AndroidViewModel {
             
             // 根据当前选中的类型计算统计范围
             int period = Budget.PERIOD_MONTH;
-            if (Budget.TYPE_WEEK.equals(type)) period = Budget.PERIOD_WEEK;
-            else if (Budget.TYPE_YEAR.equals(type)) period = Budget.PERIOD_YEAR;
+            boolean isWeek = Budget.TYPE_WEEK.equals(type);
+            boolean isYear = Budget.TYPE_YEAR.equals(type);
+            
+            if (isWeek) period = Budget.PERIOD_WEEK;
+            else if (isYear) period = Budget.PERIOD_YEAR;
 
             Calendar base = Calendar.getInstance();
+            base.setFirstDayOfWeek(Calendar.SUNDAY);
             base.set(Calendar.YEAR, year);
-            base.set(Calendar.MONTH, month - 1);
-            base.set(Calendar.DAY_OF_MONTH, 1);
+            if (isWeek) {
+                base.set(Calendar.WEEK_OF_YEAR, month);
+                base.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
+            } else if (isYear) {
+                base.set(Calendar.MONTH, 0);
+                base.set(Calendar.DAY_OF_MONTH, 1);
+            } else {
+                base.set(Calendar.MONTH, month - 1);
+                base.set(Calendar.DAY_OF_MONTH, 1);
+            }
             
-            long[] range = BudgetPeriodHelper.getPeriodRange(period, 1, base);
+            int startDay = BudgetConfig.getStartDay(getApplication());
+            long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, base);
             double inc = repo.getTotalIncomeInPeriod(userId, range[0], range[1]);
             double exp = repo.getTotalSpentInPeriod(userId, range[0], range[1]);
             
             Budget bud;
-            if (Budget.TYPE_YEAR.equals(type)) bud = repo.getYearBudgetSync(userId, year);
-            else if (Budget.TYPE_WEEK.equals(type)) bud = repo.getWeekBudgetSync(userId, year, month);
+            if (isYear) bud = repo.getYearBudgetSync(userId, year);
+            else if (isWeek) bud = repo.getWeekBudgetSync(userId, year, month);
             else bud = repo.getMonthBudgetSync(userId, year, month);
 
             BudgetStats stats = new BudgetStats();
@@ -108,12 +122,19 @@ public class BudgetViewModel extends AndroidViewModel {
             stats.expenseBudget = (bud != null) ? bud.getAmount() : 0;
             
             Calendar cal = (Calendar) base.clone();
-            int days = (period == Budget.PERIOD_YEAR) ? (cal.getActualMaximum(Calendar.DAY_OF_YEAR)) : 
-                      (period == Budget.PERIOD_WEEK ? 7 : cal.getActualMaximum(Calendar.DAY_OF_MONTH));
+            int days;
+            if (isYear) {
+                days = cal.getActualMaximum(Calendar.DAY_OF_YEAR);
+            } else if (isWeek) {
+                days = 7;
+            } else {
+                days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+            }
+            
             stats.dailyAvgIncome = inc / days;
             stats.dailyAvgExpense = exp / days;
             
-            if (Budget.TYPE_YEAR.equals(type)) {
+            if (isYear) {
                 AppExecutors.get().mainThread().execute(() -> yearlyStatsLive.setValue(stats));
             } else {
                 AppExecutors.get().mainThread().execute(() -> monthlyStatsLive.setValue(stats));
@@ -270,18 +291,30 @@ public class BudgetViewModel extends AndroidViewModel {
     // ────────────────────────────────────────────────────────────────────
 
     public void switchToWeek() {
-        if (!Budget.TYPE_WEEK.equals(currentBudgetType.getValue()))
+        if (!Budget.TYPE_WEEK.equals(currentBudgetType.getValue())) {
             currentBudgetType.setValue(Budget.TYPE_WEEK);
+            Calendar cal = Calendar.getInstance();
+            selectedMonth.setValue(cal.get(Calendar.WEEK_OF_YEAR));
+            selectedYear.setValue(cal.get(Calendar.YEAR));
+        }
     }
 
     public void switchToMonth() {
-        if (!Budget.TYPE_MONTH.equals(currentBudgetType.getValue()))
+        if (!Budget.TYPE_MONTH.equals(currentBudgetType.getValue())) {
             currentBudgetType.setValue(Budget.TYPE_MONTH);
+            Calendar cal = Calendar.getInstance();
+            selectedMonth.setValue(cal.get(Calendar.MONTH) + 1);
+            selectedYear.setValue(cal.get(Calendar.YEAR));
+        }
     }
 
     public void switchToYear() {
-        if (!Budget.TYPE_YEAR.equals(currentBudgetType.getValue()))
+        if (!Budget.TYPE_YEAR.equals(currentBudgetType.getValue())) {
             currentBudgetType.setValue(Budget.TYPE_YEAR);
+            Calendar cal = Calendar.getInstance();
+            selectedMonth.setValue(0);
+            selectedYear.setValue(cal.get(Calendar.YEAR));
+        }
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -308,15 +341,28 @@ public class BudgetViewModel extends AndroidViewModel {
             else if (isWeek) existing = repo.getWeekBudgetSync(userId, year, finalMonth);
             else existing = repo.getMonthBudgetSync(userId, year, finalMonth);
 
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.YEAR, year);
+            if (isWeek) {
+                cal.set(Calendar.WEEK_OF_YEAR, finalMonth);
+            } else if (isYear) {
+                cal.set(Calendar.MONTH, 0);
+            } else {
+                cal.set(Calendar.MONTH, finalMonth - 1);
+            }
+            cal.set(Calendar.DAY_OF_MONTH, 1);
+
+            int startDay = BudgetConfig.getStartDay(getApplication());
+
             if (existing != null) {
                 existing.setAmount(amount);
                 existing.setPeriod(period);
-                long[] range = BudgetPeriodHelper.getPeriodRange(period);
+                long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, cal);
                 existing.setStartTime(range[0]);
                 existing.setEndTime(range[1]);
                 repo.update(existing);
             } else {
-                Budget b = buildTotalBudget(amount, period, budgetType, year, finalMonth);
+                Budget b = buildTotalBudget(amount, period, budgetType, year, finalMonth, cal);
                 repo.insert(b, null);
             }
 
@@ -390,7 +436,22 @@ public class BudgetViewModel extends AndroidViewModel {
 
         String  bType  = getBudgetType();
         boolean isYear = Budget.TYPE_YEAR.equals(bType);
+        boolean isWeek = Budget.TYPE_WEEK.equals(bType);
+        int     year   = getCurrentYear();
         int     month  = isYear ? 0 : getCurrentMonth();
+
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.YEAR, year);
+        if (isWeek) {
+            cal.set(Calendar.WEEK_OF_YEAR, month);
+        } else if (isYear) {
+            cal.set(Calendar.MONTH, 0);
+        } else {
+            cal.set(Calendar.MONTH, month - 1);
+        }
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+
+        int startDay = BudgetConfig.getStartDay(getApplication());
 
         Budget b = new Budget();
         b.setTargetType(Budget.TARGET_CATEGORY);
@@ -398,12 +459,12 @@ public class BudgetViewModel extends AndroidViewModel {
         b.setAmount(amount);
         b.setPeriod(period);
         b.setBudgetType(bType);
-        b.setYear(getCurrentYear());
+        b.setYear(year);
         b.setMonth(month);
         b.setOwnerId(userId);
         b.setCategoryName(categoryName);        // ← 新增
         b.setCategoryIconUrl(categoryIconUrl);  // ← 新增
-        long[] range = BudgetPeriodHelper.getPeriodRange(period);
+        long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, cal);
         b.setStartTime(range[0]);
         b.setEndTime(range[1]);
         b.setUpdatedAt(System.currentTimeMillis());
@@ -432,9 +493,22 @@ public class BudgetViewModel extends AndroidViewModel {
             return false;
         }
 
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.YEAR, budget.getYear());
+        if (Budget.TYPE_WEEK.equals(budget.getBudgetType())) {
+            cal.set(Calendar.WEEK_OF_YEAR, budget.getMonth());
+        } else if (budget.getMonth() > 0) {
+            cal.set(Calendar.MONTH, budget.getMonth() - 1);
+        } else {
+            cal.set(Calendar.MONTH, 0);
+        }
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+
+        int startDay = BudgetConfig.getStartDay(getApplication());
+
         budget.setAmount(amount);
         budget.setPeriod(period);
-        long[] range = BudgetPeriodHelper.getPeriodRange(period);
+        long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, cal);
         budget.setStartTime(range[0]);
         budget.setEndTime(range[1]);
 
@@ -499,34 +573,15 @@ public class BudgetViewModel extends AndroidViewModel {
         Budget total = totalBudgetLive.getValue();
         if (total == null) return;
 
-        String  bType  = getBudgetType();
-        boolean isYear = Budget.TYPE_YEAR.equals(bType);
+        final long periodStart = total.getStartTime();
+        final long periodEnd   = total.getEndTime();
+        
+        // 计算天数
+        long diff = periodEnd - periodStart;
+        final int days = (int) (diff / 86_400_000L) + 1;
 
-        Calendar cal = Calendar.getInstance();
-        long periodStart;
-        long periodEnd;
-        int  days;
-
-        if (isYear) {
-            cal.set(getCurrentYear(), Calendar.JANUARY, 1, 0, 0, 0);
-            cal.set(Calendar.MILLISECOND, 0);
-            periodStart = cal.getTimeInMillis();
-            boolean leap = (getCurrentYear() % 4 == 0 && getCurrentYear() % 100 != 0)
-                    || (getCurrentYear() % 400 == 0);
-            days      = leap ? 366 : 365;
-            periodEnd = periodStart + (long) days * 86_400_000L - 1;
-        } else {
-            cal.set(getCurrentYear(), getCurrentMonth() - 1, 1, 0, 0, 0);
-            cal.set(Calendar.MILLISECOND, 0);
-            periodStart = cal.getTimeInMillis();
-            days      = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
-            periodEnd = periodStart + (long) days * 86_400_000L - 1;
-        }
-
-        final long start = periodStart, end = periodEnd;
-        final int  d     = days;
         AppExecutors.get().diskIO().execute(() -> {
-            double[] data = repo.getDailyAccumulatedSpent(userId, start, end, d);
+            double[] data = repo.getDailyAccumulatedSpent(userId, periodStart, periodEnd, days);
             AppExecutors.get().mainThread().execute(() -> dailyAccumulatedLive.setValue(data));
         });
     }
@@ -536,8 +591,8 @@ public class BudgetViewModel extends AndroidViewModel {
         if (total == null) return;
 
         String  bType       = getBudgetType();
-        boolean isYear      = Budget.TYPE_YEAR.equals(bType);
-        int     month       = isYear ? 0 : getCurrentMonth();
+        int     year        = total.getYear();
+        int     month       = total.getMonth();
         double  totalAmount = total.getAmount();
 
         int[] colors = {
@@ -546,7 +601,7 @@ public class BudgetViewModel extends AndroidViewModel {
         };
 
         AppExecutors.get().diskIO().execute(() -> {
-            List<Budget> cats = repo.getCategoryBudgetsSync(userId, bType, getCurrentYear(), month);
+            List<Budget> cats = repo.getCategoryBudgetsSync(userId, bType, year, month);
             List<PieSlice> slices = new ArrayList<>();
             double allocated = 0;
 
@@ -657,8 +712,9 @@ public class BudgetViewModel extends AndroidViewModel {
     // ────────────────────────────────────────────────────────────────────
 
     private Budget buildTotalBudget(double amount, int period, String budgetType,
-                                    int year, int month) {
-        long[] range = BudgetPeriodHelper.getPeriodRange(period);
+                                    int year, int month, Calendar cal) {
+        int startDay = BudgetConfig.getStartDay(getApplication());
+        long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, cal);
         Budget b = new Budget();
         b.setTargetType(Budget.TARGET_TOTAL);
         b.setTargetId(null);

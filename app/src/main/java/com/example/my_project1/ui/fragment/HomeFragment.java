@@ -229,6 +229,8 @@ public class HomeFragment extends Fragment {
 
     private void setupSwipeRefresh() {
         binding.swipeRefreshLayout.setColorSchemeResources(R.color.accent_color);
+        // Increase distance to trigger sync to prevent accidental refreshes
+        binding.swipeRefreshLayout.setDistanceToTriggerSync(350);
         binding.swipeRefreshLayout.setOnRefreshListener(() -> {
             // 重置页码 + 清除缓存 + 重新请求
             billViewModel.refresh();

@@ -215,7 +215,7 @@ public class CategoryBudgetAdapter
         h.b.tvBudgetHint.setText(String.format(Locale.getDefault(), "%d%% | %.2f",
                 (int) (spent / budgetAmt * 100), budgetAmt));
 
-        // ── 背景进度条样式 ────────────────────────────────────
+        // 进度条样式处理
         h.b.pbBgProgress.setProgress(progress);
         if (overBudget) {
             h.b.pbBgProgress.setProgressDrawable(ctx.getDrawable(R.drawable.bg_progress_fill_light));
@@ -224,10 +224,6 @@ public class CategoryBudgetAdapter
             h.b.pbBgProgress.setProgressDrawable(ctx.getDrawable(R.drawable.bg_progress_fill_blue_light));
             h.b.tvSpent.setTextColor(0xFF333333);
         }
-
-        // ── 分割线逻辑 ──────────────────────────────────────
-        h.b.itemDivider.setVisibility(pos == getItemCount() - 1
-                ? android.view.View.GONE : android.view.View.VISIBLE);
 
         // ── 点击事件 ─────────────────────────────────────────
         if (listener != null) {

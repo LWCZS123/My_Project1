@@ -68,6 +68,8 @@ public class BillViewModel extends AndroidViewModel {
     private final Handler mainHandler        = new Handler(Looper.getMainLooper());
     private final Gson gson = new Gson();
 
+    private volatile boolean isCleared = false;
+
     // ── 标志位 ────────────────────────────────────────
     private long viewModelStartTime;
     private boolean isSnapshotLoaded = false;
@@ -141,6 +143,14 @@ public class BillViewModel extends AndroidViewModel {
     /** Toast 消息 */
     private final MutableLiveData<String> _toastMessage = new MutableLiveData<>();
     public final LiveData<String> toastMessage = _toastMessage;
+
+    /** ✅ 日历专用的每日统计映射 */
+    private final MutableLiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> _dailyStatsMap = new MutableLiveData<>(new HashMap<>());
+    public final LiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> dailyStatsMap = _dailyStatsMap;
+
+    /** ✅ 日历专用的每日账单列表映射 */
+    private final MutableLiveData<Map<String, List<Bill>>> _groupedBillsMap = new MutableLiveData<>(new HashMap<>());
+    public final LiveData<Map<String, List<Bill>>> groupedBillsMap = _groupedBillsMap;
 
     // ── 同步节流 ──────────────────────────────────────
     private long    lastSyncTime        = 0;
@@ -219,7 +229,11 @@ public class BillViewModel extends AndroidViewModel {
      * ✅ 保存快照：仅保存前 5 天的账单以保证速度
      */
     private void saveSnapshot(HeaderUiModel header, List<BillAdapter.BillGroup> billItems) {
+        if (isCleared || bgExecutor.isShutdown()) {
+            return;
+        }
         bgExecutor.execute(() -> {
+            if (isCleared) return;
             android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
             
             // 限制快照大小：只存前 5 组数据
@@ -242,13 +256,46 @@ public class BillViewModel extends AndroidViewModel {
         }
 
         allBillsObserver = bills -> {
-            if (bills == null) return;
+            if (bills == null || isCleared) return;
+            if (bgExecutor.isShutdown()) return;
             bgExecutor.execute(() -> {
+                if (isCleared) return;
                 int count = computeBillCount(bills);
                 int days  = computeBillDays(bills);
+                
+                // 计算日历所需的映射
+                Map<String, com.example.my_project1.data.model.calendar.DailyStat> statsMap = new HashMap<>();
+                Map<String, List<Bill>> groupedMap = new HashMap<>();
+                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                
+                for (Bill b : bills) {
+                    if (b.getBillTime() == null) continue;
+                    String key = fmt.format(b.getBillTime());
+                    
+                    // 分组
+                    List<Bill> list = groupedMap.get(key);
+                    if (list == null) {
+                        list = new ArrayList<>();
+                        groupedMap.put(key, list);
+                    }
+                    list.add(b);
+                    
+                    // 统计
+                    com.example.my_project1.data.model.calendar.DailyStat stat = statsMap.get(key);
+                    if (stat == null) {
+                        stat = new com.example.my_project1.data.model.calendar.DailyStat(0, 0, 0);
+                        statsMap.put(key, stat);
+                    }
+                    stat.count++;
+                    if (b.getType() == 1) stat.income += b.getAmount();
+                    else if (b.getType() == 0) stat.expense += b.getAmount();
+                }
+
                 mainHandler.post(() -> {
                     _billCount.setValue(count);
                     _billDays.setValue(days);
+                    _dailyStatsMap.setValue(statsMap);
+                    _groupedBillsMap.setValue(groupedMap);
                 });
             });
         };
@@ -291,11 +338,14 @@ public class BillViewModel extends AndroidViewModel {
 
         // 定义统一的计算逻辑
         Runnable updateAction = () -> {
+            if (isCleared) return;
             List<Bill> bills = currentMonthBills.getValue();
             List<Account> accounts = allAccountsLive.getValue();
             
             // 提交到后台线程计算，避免主线程卡顿
+            if (bgExecutor.isShutdown()) return;
             bgExecutor.execute(() -> {
+                if (isCleared) return;
                 Map<String, Account> accountMap = new HashMap<>();
                 if (accounts != null) {
                     for (Account acc : accounts) {
@@ -392,6 +442,7 @@ public class BillViewModel extends AndroidViewModel {
                     .amountText(amountText)
                     .amountColor(amountColor)
                     .accountName(account != null ? account.getName() : "")
+                    .accountIconUrl(account != null ? account.getIconUrl() : "")
                     .toAccountName(toAccount != null ? toAccount.getName() : "")
                     .billType(billType)
                     .remarkText(bill.getRemark())
@@ -485,6 +536,7 @@ public class BillViewModel extends AndroidViewModel {
                     .amountText(amountText)
                     .amountColor(amountColor)
                     .accountName(account != null ? account.getName() : "")
+                    .accountIconUrl(account != null ? account.getIconUrl() : "")
                     .toAccountName(toAccount != null ? toAccount.getName() : "")
                     .billType(billType)
                     .remarkText(bill.getRemark())
@@ -660,6 +712,8 @@ public class BillViewModel extends AndroidViewModel {
     /** 兼容旧代码：返回原始账单列表（首页请改用 billItems） */
     public LiveData<List<Bill>> getHomeBills() { return currentMonthBills; }
     public LiveData<List<Bill>> getAllBills()   { return allBills; }
+
+    public LiveData<List<Account>> getAllAccountsLive() { return allAccountsLive; }
 
     public LiveData<List<Bill>> getBillsInTimeRange(Date start, Date end) {
         if (currentUserId == null) return new MutableLiveData<>();
@@ -1030,8 +1084,13 @@ public class BillViewModel extends AndroidViewModel {
 
     @Override
     protected void onCleared() {
-        super.onCleared();
-        bgExecutor.shutdown();
+        isCleared = true;
+        
+        // 1. 立即移除所有 Handler 任务，防止销毁后继续回调
+        mainHandler.removeCallbacksAndMessages(null);
+        statsDebounceHandler.removeCallbacksAndMessages(null);
+        
+        // 2. 移除所有观察者
         if (billCountObserver  != null) billCount.removeObserver(billCountObserver);
         if (billDaysObserver   != null) billDays .removeObserver(billDaysObserver);
         if (allBillsObserver   != null && allBills != null)
@@ -1040,8 +1099,15 @@ public class BillViewModel extends AndroidViewModel {
             currentMonthBills.removeObserver(monthBillsObserver);
         if (accountsObserver != null && allAccountsLive != null)
             allAccountsLive.removeObserver(accountsObserver);
-        if (statsDebounceRunnable != null)
-            statsDebounceHandler.removeCallbacks(statsDebounceRunnable);
-        Log.d(TAG, "ViewModel cleared");
+        
+        // 3. 安全且快速地关闭线程池
+        try {
+            bgExecutor.shutdownNow();
+        } catch (Exception e) {
+            Log.e(TAG, "Error shutting down executor: " + e.getMessage());
+        }
+
+        super.onCleared();
+        Log.d(TAG, "ViewModel cleared - all tasks cancelled");
     }
 }

@@ -38,12 +38,15 @@ public class CategorySelectorAdapter
         public final String iconUri;
         /** 已设预算描述，例如 "¥100/月"，null 表示未设置 */
         public final String budgetTag;
+        /** 是否已设置预算，若为 true 则不可再次选择 */
+        public final boolean isAlreadySet;
 
-        public Item(String cloudId, String name, String iconUri, String budgetTag) {
-            this.cloudId   = cloudId;
-            this.name      = name;
-            this.iconUri   = iconUri;
-            this.budgetTag = budgetTag;
+        public Item(String cloudId, String name, String iconUri, String budgetTag, boolean isAlreadySet) {
+            this.cloudId      = cloudId;
+            this.name         = name;
+            this.iconUri      = iconUri;
+            this.budgetTag    = budgetTag;
+            this.isAlreadySet = isAlreadySet;
         }
     }
 
@@ -98,10 +101,16 @@ public class CategorySelectorAdapter
         Context ctx     = h.b.getRoot().getContext();
         boolean checked = item.cloudId != null && item.cloudId.equals(selectedId);
 
-        // ── 容器背景（选中/默认）──────────────────────────────
-        h.b.llItemRoot.setBackgroundResource(checked
-                ? R.drawable.bg_category_item_selected
-                : R.drawable.bg_category_item_normal);
+        // ── 容器背景（选中/默认/禁用）──────────────────────────────
+        if (item.isAlreadySet) {
+            h.b.llItemRoot.setBackgroundResource(R.drawable.bg_category_item_normal);
+            h.b.llItemRoot.setAlpha(0.5f);
+        } else {
+            h.b.llItemRoot.setBackgroundResource(checked
+                    ? R.drawable.bg_category_item_selected
+                    : R.drawable.bg_category_item_normal);
+            h.b.llItemRoot.setAlpha(1.0f);
+        }
 
         // ── 图标 ──────────────────────────────────────────────
         if (item.iconUri != null && !item.iconUri.isEmpty()) {
@@ -115,7 +124,7 @@ public class CategorySelectorAdapter
             h.b.ivCatIcon.setImageResource(R.drawable.ic_category_default);
         }
 
-        // 图标背景：选中蓝色，否则默认灰
+        // 图标背景
         h.b.flIconBg.setBackgroundResource(checked
                 ? R.drawable.bg_circle_icon_selected
                 : R.drawable.bg_circle_icon);
@@ -138,6 +147,9 @@ public class CategorySelectorAdapter
 
         // ── 点击 ──────────────────────────────────────────────
         h.b.getRoot().setOnClickListener(v -> {
+            if (item.isAlreadySet) {
+                return; // 已设置预算的不能再选
+            }
             selectedId = (item.cloudId != null && item.cloudId.equals(selectedId))
                     ? null          // 再次点击取消
                     : item.cloudId;

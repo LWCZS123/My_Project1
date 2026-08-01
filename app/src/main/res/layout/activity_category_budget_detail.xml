@@ -41,10 +41,15 @@
             android:textStyle="bold"
             android:gravity="center"/>
 
-        <!-- 占位，保持标题居中 -->
-        <View
+        <ImageView
+            android:id="@+id/iv_menu"
             android:layout_width="24dp"
-            android:layout_height="24dp"/>
+            android:layout_height="24dp"
+            android:src="@drawable/ic_more_vert"
+            android:clickable="true"
+            android:focusable="true"
+            app:tint="#333333"
+            android:contentDescription="更多"/>
     </LinearLayout>
 
     <!-- 可滚动内容区域 -->
@@ -342,7 +347,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:paddingTop="18dp"
+                    android:paddingBottom="8dp">
 
                     <!-- 标题行 -->
                     <LinearLayout
@@ -350,7 +356,9 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="10dp">
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:layout_marginBottom="12dp">
 
                         <TextView
                             android:layout_width="0dp"
@@ -379,8 +387,8 @@
                         android:textColor="#BBBBBB"
                         android:textSize="13sp"
                         android:gravity="center"
-                        android:paddingTop="24dp"
-                        android:paddingBottom="24dp"
+                        android:paddingTop="32dp"
+                        android:paddingBottom="32dp"
                         android:visibility="gone"/>
 
                     <!-- 账单 RecyclerView -->

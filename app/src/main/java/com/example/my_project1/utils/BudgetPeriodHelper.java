@@ -36,8 +36,9 @@ public class BudgetPeriodHelper {
                 break;
 
             case Budget.PERIOD_WEEK:
+                // 周预算默认从周日开始（符合截图展示）
                 int dow = start.get(Calendar.DAY_OF_WEEK);
-                int offset = (dow == Calendar.SUNDAY) ? -6 : (Calendar.MONDAY - dow);
+                int offset = Calendar.SUNDAY - dow;
                 start.add(Calendar.DAY_OF_MONTH, offset);
                 end.setTimeInMillis(start.getTimeInMillis());
                 end.add(Calendar.DAY_OF_MONTH, 6);

@@ -4,6 +4,7 @@ import android.app.Application;
 import android.util.Log;
 
 import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.my_project1.data.dao.BillDao;
@@ -24,16 +25,13 @@ import io.reactivex.annotations.NonNull;
 /**
  * CategoryBudgetDetailViewModel
  *
- * 分类预算详情页的数据层，提供：
- *   1. 当前分类预算信息（总额 / 已用 / 剩余）
- *   2. 该分类在当前预算周期内的账单列表
- *   3. 趋势折线图数据（周 / 月 / 年视图）
+ * Data layer for Category Budget Detail, providing:
+ *   1. Category budget info (Total / Spent / Remaining)
+ *   2. Bill list in the budget period
+ *   3. Trend data (Week / Month / Year views)
  *
- * 时间范围说明：
- *   账单列表和已用金额使用通过 BudgetPeriodHelper 实时计算的时间范围，
- *   而非直接读取 Budget 对象中存储的 startTime/endTime。
- *   原因：天/周预算在 BudgetResetWorker 尚未触发时，存储的时间窗口可能
- *   仍是上一个周期的旧值，直接使用会导致账单查询为空。
+ * Time Range:
+ *   Bills and spent amount use real-time calculated range from BudgetPeriodHelper.
  */
 public class CategoryBudgetDetailViewModel extends AndroidViewModel {
 
@@ -49,6 +47,8 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
     public final MutableLiveData<double[]>     trendDataLive    = new MutableLiveData<>();
     // 当前趋势图视图类型
     public final MutableLiveData<String>       trendTypeLive    = new MutableLiveData<>(TREND_MONTH);
+    // 监听特定预算变更
+    public LiveData<Budget>                    budgetLive;
     // 已用金额（从账单实时统计）
     public final MutableLiveData<Double>       spentLive        = new MutableLiveData<>(0.0);
     // 预算设定金额
@@ -76,38 +76,46 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
     }
 
     /**
-     * 初始化，传入分类预算对象并加载数据。
-     * 在 Activity.onCreate() 中调用一次。
-     *
-     * 时间范围计算规则：
-     *   - PERIOD_MONTH / PERIOD_YEAR：使用 Budget 中存储的 startTime/endTime，
-     *     月/年周期的时间窗口在预算创建时已由 BudgetPeriodHelper 写入，不会过期。
-     *   - PERIOD_DAY / PERIOD_WEEK：始终以当前时间重新计算，
-     *     避免存储值落后于当前周期导致账单查询为空。
+     * Initialize with budget object and load data.
+     * Called once in Activity.onCreate().
      */
     public void init(Budget budget, String catCloudId) {
         this.currentBudget     = budget;
         this.currentCatCloudId = catCloudId;
         budgetAmountLive.setValue(budget.getAmount());
+        budgetLive = repo.getByIdLive(budget.getId());
 
         int period = budget.getPeriod();
-        if (period == Budget.PERIOD_DAY || period == Budget.PERIOD_WEEK) {
-            // 天/周预算：实时重算当前周期范围
-            long[] range = BudgetPeriodHelper.getPeriodRange(period);
-            effectiveStartTime = range[0];
-            effectiveEndTime   = range[1];
-        } else {
-            // 月/年预算：直接使用存储的稳定值
-            effectiveStartTime = budget.getStartTime();
-            effectiveEndTime   = budget.getEndTime();
+        int year = budget.getYear();
+        int month = budget.getMonth(); // Stores weekNum for week budget
+        
+        Calendar cal = Calendar.getInstance();
+        cal.setFirstDayOfWeek(Calendar.SUNDAY);
+        cal.set(Calendar.YEAR, year);
+        
+        if (period == Budget.PERIOD_WEEK) {
+            cal.set(Calendar.WEEK_OF_YEAR, month);
+            cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
+        } else if (period == Budget.PERIOD_MONTH) {
+            cal.set(Calendar.MONTH, month > 0 ? month - 1 : 0);
+            cal.set(Calendar.DAY_OF_MONTH, 1);
+        } else if (period == Budget.PERIOD_YEAR) {
+            cal.set(Calendar.MONTH, 0);
+            cal.set(Calendar.DAY_OF_MONTH, 1);
         }
+
+        // Calculate effective range consistently with main screen
+        int startDay = com.example.my_project1.utils.BudgetConfig.getStartDay(getApplication());
+        long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, cal);
+        effectiveStartTime = range[0];
+        effectiveEndTime   = range[1];
 
         loadBills();
         loadTrendData(trendTypeLive.getValue());
     }
 
     // ════════════════════════════════════════════════════════
-    //  账单加载
+    //  Bill Loading
     // ════════════════════════════════════════════════════════
 
     private void loadBills() {
@@ -134,18 +142,17 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
                     spentLive.setValue(finalSpent);
                 });
             } catch (Exception e) {
-                Log.e(TAG, "加载账单失败：" + e.getMessage());
+                Log.e(TAG, "Failed to load bills: " + e.getMessage());
             }
         });
     }
 
     // ════════════════════════════════════════════════════════
-    //  趋势图数据
+    //  Trend Data
     // ════════════════════════════════════════════════════════
 
     /**
-     * 切换趋势图视图类型并重新加载数据。
-     * @param trendType TREND_WEEK / TREND_MONTH / TREND_YEAR
+     * Switch trend view type and reload data.
      */
     public void switchTrend(String trendType) {
         trendTypeLive.setValue(trendType);
@@ -159,7 +166,17 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
         final String type = trendType;
 
         AppExecutors.get().diskIO().execute(() -> {
+            // Base date based on budget year/month to align trend with budget period
             Calendar cal = Calendar.getInstance();
+            cal.setFirstDayOfWeek(Calendar.SUNDAY);
+            cal.set(Calendar.YEAR, currentBudget.getYear());
+            
+            if (currentBudget.isMonthType()) {
+                cal.set(Calendar.MONTH, currentBudget.getMonth() - 1);
+            } else if (Budget.TYPE_WEEK.equals(currentBudget.getBudgetType())) {
+                cal.set(Calendar.WEEK_OF_YEAR, currentBudget.getMonth());
+            }
+
             long   periodStart;
             long   periodEnd;
             int    points;
@@ -167,33 +184,34 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
 
             switch (type) {
                 case TREND_WEEK: {
-                    // 本周一 00:00 到本周日 23:59:59
-                    cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+                    // Sunday to Saturday of the budget week
+                    cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
                     cal.set(Calendar.HOUR_OF_DAY, 0);
                     cal.set(Calendar.MINUTE, 0);
                     cal.set(Calendar.SECOND, 0);
                     cal.set(Calendar.MILLISECOND, 0);
                     periodStart = cal.getTimeInMillis();
                     points      = 7;
-                    periodEnd   = periodStart + 7L * 86_400_000L - 1;
-                    labels = new String[]{"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+                    cal.add(Calendar.DAY_OF_YEAR, 7);
+                    periodEnd   = cal.getTimeInMillis() - 1;
+                    labels = new String[]{"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
                     break;
                 }
                 case TREND_YEAR: {
-                    // 本年 1/1 到 12/31
+                    // Jan 1 to Dec 31 of the budget year
                     int year = cal.get(Calendar.YEAR);
                     cal.set(year, Calendar.JANUARY, 1, 0, 0, 0);
                     cal.set(Calendar.MILLISECOND, 0);
                     periodStart = cal.getTimeInMillis();
-                    boolean leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-                    points    = leap ? 366 : 365;
-                    periodEnd = periodStart + (long) points * 86_400_000L - 1;
-                    // 年视图按月聚合，展示 12 个点
+                    cal.add(Calendar.YEAR, 1);
+                    periodEnd = cal.getTimeInMillis() - 1;
+                    points    = 12;
                     labels = new String[]{"1月","2月","3月","4月","5月","6月",
                             "7月","8月","9月","10月","11月","12月"};
                     break;
                 }
                 default: { // TREND_MONTH
+                    // 1st to last day of the budget month
                     int year  = cal.get(Calendar.YEAR);
                     int month = cal.get(Calendar.MONTH);
                     cal.set(year, month, 1, 0, 0, 0);
@@ -201,19 +219,21 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
                     periodStart = cal.getTimeInMillis();
                     int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
                     points    = daysInMonth;
-                    periodEnd = periodStart + (long) points * 86_400_000L - 1;
-                    labels = buildDayLabels(daysInMonth,
-                            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1);
+                    
+                    labels = buildDayLabels(daysInMonth, year, month + 1);
+
+                    cal.add(Calendar.MONTH, 1);
+                    periodEnd = cal.getTimeInMillis() - 1;
                     break;
                 }
             }
 
             double[] result;
             if (TREND_YEAR.equals(type)) {
-                // 年视图按月聚合，输出 12 个点
+                // Annual view aggregated by month
                 result = getMonthlySpent(periodStart, periodEnd);
             } else {
-                // 周/月视图按天统计，每天独立（非累计）
+                // Week/Month view aggregated by day
                 result = getDailySpent(periodStart, periodEnd, points);
             }
 
@@ -228,8 +248,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
     }
 
     /**
-     * 按天统计各天的独立支出，用于周/月视图折线图。
-     * 返回长度为 days 的数组，index i 对应第 i+1 天的支出。
+     * Statistical daily spent for week/month views.
      */
     private double[] getDailySpent(long periodStart, long periodEnd, int days) {
         double[] result = new double[days];
@@ -248,14 +267,13 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "统计每日支出失败：" + e.getMessage());
+            Log.e(TAG, "Failed to aggregate daily spent: " + e.getMessage());
         }
         return result;
     }
 
     /**
-     * 按月聚合全年支出，用于年视图折线图（12 个点）。
-     * 返回长度为 12 的数组，index i 对应第 i+1 月的支出。
+     * Statistical monthly spent for annual view.
      */
     private double[] getMonthlySpent(long periodStart, long periodEnd) {
         double[] result = new double[12];
@@ -274,14 +292,13 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "统计月度支出失败：" + e.getMessage());
+            Log.e(TAG, "Failed to aggregate monthly spent: " + e.getMessage());
         }
         return result;
     }
 
     /**
-     * 生成月视图的 X 轴日期标签。
-     * 每 5 天显示一个标签（格式：月.日），其余为空字符串，避免标签拥挤。
+     * Build day labels for month view.
      */
     private String[] buildDayLabels(int days, int year, int month) {
         String[] labels = new String[days];
@@ -292,10 +309,19 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
     }
 
     /**
-     * 外部刷新入口，账单更新后可调用此方法重新加载全部数据。
+     * Refresh all data.
      */
     public void refresh() {
         loadBills();
         loadTrendData(trendTypeLive.getValue());
+    }
+
+    /**
+     * Delete current category budget.
+     */
+    public void deleteCategoryBudget() {
+        if (currentBudget != null) {
+            repo.markDeleteById(currentBudget.getId());
+        }
     }
 }

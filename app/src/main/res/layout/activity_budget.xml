@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F4F8">
+    android:background="@color/white">
 
     <!-- 顶部栏 -->
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -55,14 +55,13 @@
                 android:gravity="center_vertical"
                 android:padding="4dp">
 
-                <TextView
-                    android:id="@+id/tv_date_selector_top"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textSize="14sp"
-                    android:textColor="#666666"
-                    android:visibility="gone"/>
+                <ImageView
+                    android:id="@+id/iv_prev_period"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_back3"
+                    android:padding="2dp"
+                    app:tint="#007AFF"/>
 
                 <TextView
                     android:id="@+id/tv_date_display"
@@ -70,15 +69,19 @@
                     android:layout_height="wrap_content"
                     android:text="2026年7月26日"
                     android:textSize="14sp"
-                    android:textColor="#666666"/>
+                    android:textColor="#333333"
+                    android:textStyle="bold"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"/>
 
                 <ImageView
-                    android:id="@+id/iv_date_arrow"
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:layout_marginStart="4dp"
-                    android:src="@drawable/down"
-                    app:tint="#666666"/>
+                    android:id="@+id/iv_next_period"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_back3"
+                    android:rotation="180"
+                    android:padding="2dp"
+                    app:tint="#007AFF"/>
             </LinearLayout>
         </LinearLayout>
 

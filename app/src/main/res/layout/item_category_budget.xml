@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="#FFFFFF">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="2dp">
+        android:layout_height="72dp">
 
-        <!-- Progress Background -->
         <ProgressBar
             android:id="@+id/pb_bg_progress"
             style="?android:attr/progressBarStyleHorizontal"
@@ -34,53 +35,48 @@
 
             <ImageView
                 android:id="@+id/iv_category_icon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_centerVertical="true"
                 android:src="@drawable/ic_category_default"/>
 
-            <TextView
-                android:id="@+id/tv_category_name"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_toEndOf="@id/iv_category_icon"
                 android:layout_centerVertical="true"
                 android:layout_marginStart="12dp"
-                android:text="餐饮"
-                android:textColor="#333333"
-                android:textSize="16sp"/>
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_category_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="餐饮"
+                    android:textColor="#333333"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tv_budget_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0% | 8333.33"
+                    android:textColor="#999999"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tv_spent"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
-                android:layout_marginTop="12dp"
+                android:layout_centerVertical="true"
                 android:text="0"
                 android:textColor="#333333"
-                android:textSize="18sp"
+                android:textSize="20sp"
                 android:textStyle="bold"/>
-
-            <TextView
-                android:id="@+id/tv_budget_hint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_below="@id/tv_spent"
-                android:text="0% | 8333.33"
-                android:textColor="#999999"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp"/>
         </RelativeLayout>
     </FrameLayout>
-
-    <!-- Divider -->
-    <View
-        android:id="@+id/item_divider"
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#F0F0F0"
-        android:layout_marginTop="2dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"/>
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

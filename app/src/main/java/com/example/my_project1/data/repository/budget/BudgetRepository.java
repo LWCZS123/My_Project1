@@ -235,6 +235,10 @@ public class BudgetRepository {
 
     public Budget getByCloudId(String cloudId)  { return dao.getByCloudId(cloudId); }
 
+    public LiveData<Budget> getByIdLive(int id) {
+        return dao.getByIdLive(id);
+    }
+
     public void updateCloudId(int id, String cloudId, int syncState) {
         dao.updateCloudId(id, cloudId, syncState);
     }

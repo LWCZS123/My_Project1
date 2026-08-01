@@ -23,15 +23,95 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="20dp" />
+            android:layout_marginBottom="24dp" />
 
-        <!-- Period Selection -->
+        <!-- ① Amount Input Card (Modernized & Moved Up) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="预算金额"
+            android:textColor="#333333"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:background="@drawable/bg_amount_input_elegant"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="¥"
+                android:textColor="#304FFE"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/et_amount"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@null"
+                android:hint="0.00"
+                android:inputType="numberDecimal"
+                android:paddingStart="12dp"
+                android:textColor="#333333"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:imeOptions="actionDone"
+                tools:ignore="RtlSymmetry" />
+        </LinearLayout>
+
+        <!-- ② Quick Amount Buttons (Moved Up) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/btn_3000"
+                style="@style/BudgetQuickButtonStyle"
+                android:text="3000" />
+
+            <TextView
+                android:id="@+id/btn_5000"
+                style="@style/BudgetQuickButtonStyle"
+                android:text="5000"
+                android:layout_marginHorizontal="10dp" />
+
+            <TextView
+                android:id="@+id/btn_8000"
+                style="@style/BudgetQuickButtonStyle"
+                android:text="8000" />
+
+            <TextView
+                android:id="@+id/btn_10000"
+                style="@style/BudgetQuickButtonStyle"
+                android:text="10000"
+                android:layout_marginStart="10dp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#F0F0F0"
+            android:layout_marginVertical="24dp"/>
+
+        <!-- ③ Period Selection (Moved Down) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="预算周期"
-            android:textColor="#666666"
+            android:textColor="#333333"
             android:textSize="14sp"
+            android:textStyle="bold"
             android:layout_marginBottom="12dp" />
 
         <RadioGroup
@@ -80,13 +160,14 @@
                 android:textSize="13sp" />
         </RadioGroup>
 
-        <!-- Date Selection -->
+        <!-- ④ Date Selection (Moved Down) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="生效时间"
-            android:textColor="#666666"
+            android:textColor="#333333"
             android:textSize="14sp"
+            android:textStyle="bold"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="12dp" />
 
@@ -128,7 +209,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="24dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -137,7 +218,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="自动沿用上个周期预算"
-                android:textColor="#333333"
+                android:textColor="#666666"
                 android:textSize="14sp" />
 
             <androidx.appcompat.widget.SwitchCompat
@@ -146,87 +227,6 @@
                 android:layout_height="wrap_content"
                 style="@style/AppSwitchStyle"
                />
-        </LinearLayout>
-
-        <!-- Amount Input Card -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="预算金额"
-            android:textColor="#666666"
-            android:textSize="14sp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="12dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="80dp"
-            android:background="@drawable/bg_amount_input_elegant"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="20dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="¥"
-                android:textColor="#333333"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-
-            <EditText
-                android:id="@+id/et_amount"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@null"
-                android:hint="0.00"
-                android:inputType="numberDecimal"
-                android:paddingStart="12dp"
-                android:textColor="#333333"
-                android:textSize="32sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:imeOptions="actionDone"
-                tools:ignore="RtlSymmetry" />
-        </LinearLayout>
-
-        <!-- Quick Amount Buttons -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="快捷金额"
-            android:textColor="#666666"
-            android:textSize="14sp"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="12dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/btn_3000"
-                style="@style/BudgetQuickButtonStyle"
-                android:text="3000" />
-
-            <TextView
-                android:id="@+id/btn_5000"
-                style="@style/BudgetQuickButtonStyle"
-                android:text="5000"
-                android:layout_marginHorizontal="10dp" />
-
-            <TextView
-                android:id="@+id/btn_8000"
-                style="@style/BudgetQuickButtonStyle"
-                android:text="8000" />
-
-            <TextView
-                android:id="@+id/btn_10000"
-                style="@style/BudgetQuickButtonStyle"
-                android:text="10000"
-                android:layout_marginStart="10dp" />
         </LinearLayout>
 
         <!-- Reference Suggestion -->

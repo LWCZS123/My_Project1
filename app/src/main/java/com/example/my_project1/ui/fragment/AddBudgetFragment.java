@@ -245,6 +245,18 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
 
     private void doSave(double amount) {
         vm.saveTotalBudget(amount, selectedBudgetType, targetYear, targetMonth);
+        
+        // 关键修复：保存成功后，立即更新 ViewModel 的状态，触发主界面刷新
+        vm.setYear(targetYear);
+        vm.setMonth(targetMonth);
+        if (Budget.TYPE_YEAR.equals(selectedBudgetType)) {
+            vm.switchToYear();
+        } else if (Budget.TYPE_WEEK.equals(selectedBudgetType)) {
+            vm.switchToWeek();
+        } else {
+            vm.switchToMonth();
+        }
+
         Toast.makeText(requireContext(), "总预算已保存", Toast.LENGTH_SHORT).show();
         dismiss();
     }

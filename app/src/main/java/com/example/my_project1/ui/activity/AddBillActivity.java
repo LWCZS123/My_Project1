@@ -544,7 +544,10 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         // 观察Toast消息
         billViewModel.toastMessage.observe(this, message -> {
             if (message != null && !message.isEmpty()) {
-                showSnackbar(message, SnackbarUtils.Type.INFO);
+                // 过滤掉“成功”类的提示，保留“失败”、“警告”等
+                if (!message.contains("成功")) {
+                    showSnackbar(message, SnackbarUtils.Type.INFO);
+                }
             }
         });
 
@@ -617,25 +620,22 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
      * 设置Tab
      */
     private void setupTabs() {
-        binding.tabExpense.setOnClickListener(v -> {
-            binding.viewpagerCategory.setVisibility(View.VISIBLE);
-            binding.viewpagerCategory.setCurrentItem(0, true);
-            billType = 0;
-            updateTransferUi();
-        });
-
-        binding.tabIncome.setOnClickListener(v -> {
-            binding.viewpagerCategory.setVisibility(View.VISIBLE);
-            binding.viewpagerCategory.setCurrentItem(1, true);
-            billType = 1;
-            updateTransferUi();
-        });
-
-        binding.tabTransfer.setOnClickListener(v -> {
-            switchToTransferTab(2);
-        });
+        binding.tabExpense.setOnClickListener(v -> handleTabClick(0));
+        binding.tabIncome.setOnClickListener(v -> handleTabClick(1));
+        binding.tabTransfer.setOnClickListener(v -> handleTabClick(2));
 
         updateTabSelection(billType);
+    }
+
+    private void handleTabClick(int type) {
+        if (type == 2) {
+            switchToTransferTab(2);
+        } else {
+            binding.viewpagerCategory.setVisibility(View.VISIBLE);
+            binding.viewpagerCategory.setCurrentItem(type, true);
+            billType = type;
+            updateTransferUi();
+        }
     }
 
     /**
@@ -1361,6 +1361,10 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
      */
     private void showSnackbar(String message, SnackbarUtils.Type type) {
         if (binding != null && binding.getRoot() != null) {
+            // 过滤掉明确标为 SUCCESS 且包含“成功”字样的消息
+            if (type == SnackbarUtils.Type.SUCCESS && message != null && message.contains("成功")) {
+                return;
+            }
             SnackbarUtils.show(binding.getRoot(), message, type);
         }
     }

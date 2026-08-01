@@ -44,18 +44,15 @@ public class CategoryViewModel extends AndroidViewModel {
 
     /** 获取支出分类 */
     public LiveData<List<CategoryWithSubCategories>> getExpenseCategories(String userId) {
-        if (expenseCategories == null){
-            expenseCategories = repository.getCategoriesWithSubs(userId,"expense");
-        }
+        // 允许传入不同的 userId 刷新 LiveData
+        expenseCategories = repository.getCategoriesWithSubs(userId, "expense");
         return expenseCategories;
     }
 
 
     /** 获取收入分类 */
     public LiveData<List<CategoryWithSubCategories>> getIncomeCategories(String userId) {
-        if (incomeCategories == null) {
-            incomeCategories = repository.getCategoriesWithSubs(userId,"income");
-        }
+        incomeCategories = repository.getCategoriesWithSubs(userId, "income");
         return incomeCategories;
     }
 

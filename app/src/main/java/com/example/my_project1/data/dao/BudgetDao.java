@@ -40,6 +40,12 @@ public interface BudgetDao {
     @Query("SELECT * FROM budgets WHERE id = :id LIMIT 1")
     Budget getById(int id);
 
+    /**
+     * LiveData：按主键查询单条预算，用于详情页实时监听特定预算的变更。
+     */
+    @Query("SELECT * FROM budgets WHERE id = :id LIMIT 1")
+    LiveData<Budget> getByIdLive(int id);
+
     // ── 总预算查询（按 budgetType + year + month 精确定位）───
 
     /** 同步查询：指定年月的月预算 */

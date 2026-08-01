@@ -44,6 +44,9 @@ public class ConfirmDialog {
             params.gravity = Gravity.CENTER;
             window.setAttributes(params);
         }
+
+        // 默认取消按钮逻辑
+        binding.btnCancel.setOnClickListener(v -> dialog.dismiss());
     }
 
     /**

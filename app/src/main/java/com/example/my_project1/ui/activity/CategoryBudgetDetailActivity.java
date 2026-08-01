@@ -11,6 +11,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -25,6 +26,9 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.budget.Budget;
 import com.example.my_project1.databinding.ActivityCategoryBudgetDetailBinding;
+import com.example.my_project1.ui.dialog.ConfirmDialog;
+import com.example.my_project1.ui.fragment.AddCategoryBudgetFragment;
+import com.example.my_project1.ui.fragment.CategoryBudgetMenuFragment;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.budget.CategoryBudgetDetailViewModel;
@@ -36,8 +40,8 @@ import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -66,6 +70,8 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
     public static final String EXTRA_PERIOD        = "extra_period";
     public static final String EXTRA_START_TIME    = "extra_start_time";
     public static final String EXTRA_END_TIME      = "extra_end_time";
+    public static final String EXTRA_YEAR          = "extra_year";
+    public static final String EXTRA_MONTH         = "extra_month";
 
     private ActivityCategoryBudgetDetailBinding binding;
     private CategoryBudgetDetailViewModel vm;
@@ -85,6 +91,8 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         i.putExtra(EXTRA_PERIOD,       budget.getPeriod());
         i.putExtra(EXTRA_START_TIME,   budget.getStartTime());
         i.putExtra(EXTRA_END_TIME,     budget.getEndTime());
+        i.putExtra(EXTRA_YEAR,         budget.getYear());
+        i.putExtra(EXTRA_MONTH,        budget.getMonth());
         ctx.startActivity(i);
     }
 
@@ -108,7 +116,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
             return insets;
         });
 
-        // 设置状态栏图标为深色（因为背景是浅色 #F0F4FF）
+        // Set status bar icons to dark
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
@@ -117,7 +125,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         vm = new ViewModelProvider(this).get(CategoryBudgetDetailViewModel.class);
         billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
 
-        // 从 Intent 还原参数
+        // Restore args from Intent
         Intent intent    = getIntent();
         String catName   = intent.getStringExtra(EXTRA_CAT_NAME);
         String catIcon   = intent.getStringExtra(EXTRA_CAT_ICON);
@@ -127,8 +135,10 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         long   startTime = intent.getLongExtra(EXTRA_START_TIME, 0);
         long   endTime   = intent.getLongExtra(EXTRA_END_TIME, 0);
         String budgetType= intent.getStringExtra(EXTRA_BUDGET_TYPE);
+        int    year      = intent.getIntExtra(EXTRA_YEAR, Calendar.getInstance().get(Calendar.YEAR));
+        int    month     = intent.getIntExtra(EXTRA_MONTH, Calendar.getInstance().get(Calendar.MONTH) + 1);
 
-        // 构造轻量 Budget 对象
+        // Build lightweight Budget object
         Budget budget = new Budget();
         budget.setId(intent.getIntExtra(EXTRA_BUDGET_ID, 0));
         budget.setAmount(budgetAmt);
@@ -136,28 +146,71 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         budget.setBudgetType(budgetType);
         budget.setStartTime(startTime);
         budget.setEndTime(endTime);
+        budget.setYear(year);
+        budget.setMonth(month);
         budget.setTargetId(catCloudId);
+        budget.setCategoryName(catName);
+        budget.setCategoryIconUrl(catIcon);
 
         initTopBar(catName);
         initCategoryHeader(catName, catIcon, period, startTime, endTime);
-        initTrendTabs();
+        
+        // Initial trend type: week for week budget, month otherwise
+        String initialTrend = (period == Budget.PERIOD_WEEK) 
+                ? CategoryBudgetDetailViewModel.TREND_WEEK 
+                : CategoryBudgetDetailViewModel.TREND_MONTH;
+        
+        initTrendTabs(initialTrend);
         initChart();
         initRecyclerView();
-        observeViewModel(budget, catCloudId);
-
         vm.init(budget, catCloudId);
+        observeViewModel(budget, catCloudId);
     }
 
     private void initTopBar(String catName) {
         binding.tvTitle.setText(catName != null ? catName + " 预算详情" : "预算详情");
         binding.ivBack.setOnClickListener(v -> finish());
+        binding.ivMenu.setOnClickListener(v -> showMenu());
+    }
+
+    private void showMenu() {
+        Budget current = vm.budgetLive.getValue();
+        if (current == null) return;
+        
+        // Ensure metadata is carried over to the menu/edit dialog
+        if (current.getCategoryName().isEmpty()) {
+            current.setCategoryName(getIntent().getStringExtra(EXTRA_CAT_NAME));
+        }
+        if (current.getCategoryIconUrl() == null || current.getCategoryIconUrl().isEmpty()) {
+            current.setCategoryIconUrl(getIntent().getStringExtra(EXTRA_CAT_ICON));
+        }
+
+        CategoryBudgetMenuFragment menu = CategoryBudgetMenuFragment.newInstance(current);
+        menu.setOnMenuActionListener(new CategoryBudgetMenuFragment.OnMenuActionListener() {
+            @Override
+            public void onEdit(Budget budget) {
+                AddCategoryBudgetFragment.newInstance(budget, true)
+                        .show(getSupportFragmentManager(), AddCategoryBudgetFragment.TAG);
+            }
+
+            @Override
+            public void onDelete(Budget budget) {
+                new ConfirmDialog(CategoryBudgetDetailActivity.this)
+                        .setTitle("删除预算")
+                        .setMessage("确定要删除该分类预算吗？")
+                        .setConfirmListener(() -> {
+                            vm.deleteCategoryBudget();
+                        }).show();
+            }
+        });
+        menu.show(getSupportFragmentManager(), CategoryBudgetMenuFragment.TAG);
     }
 
     private void initCategoryHeader(String catName, String catIcon, int period,
                                     long startTime, long endTime) {
         binding.tvCategoryName.setText(catName != null ? catName : "未知分类");
 
-        // 对天/周预算，显示的周期标签附带实际日期范围，便于用户理解当前统计窗口
+        // Period label with actual date range for day/week budgets
         String periodLabel = Budget.getPeriodLabel(period) + "预算";
         if (period == Budget.PERIOD_DAY || period == Budget.PERIOD_WEEK) {
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MM/dd", Locale.getDefault());
@@ -180,7 +233,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         }
     }
 
-    private void initTrendTabs() {
+    private void initTrendTabs(String defaultTrend) {
         binding.tabTrendWeek.setOnClickListener(v -> {
             vm.switchTrend(CategoryBudgetDetailViewModel.TREND_WEEK);
             applyTrendTab(CategoryBudgetDetailViewModel.TREND_WEEK);
@@ -193,7 +246,9 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
             vm.switchTrend(CategoryBudgetDetailViewModel.TREND_YEAR);
             applyTrendTab(CategoryBudgetDetailViewModel.TREND_YEAR);
         });
-        applyTrendTab(CategoryBudgetDetailViewModel.TREND_MONTH);
+        
+        vm.trendTypeLive.setValue(defaultTrend);
+        applyTrendTab(defaultTrend);
     }
 
     private void applyTrendTab(String activeType) {
@@ -220,19 +275,38 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         chart.setDragEnabled(true);
         chart.setScaleEnabled(false);
         chart.getLegend().setEnabled(false);
+        chart.setDrawBorders(false);
+        
+        // Match the clean look of the target image
+        chart.setViewPortOffsets(80f, 40f, 40f, 60f);
 
         XAxis xAxis = chart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setDrawGridLines(false);
-        xAxis.setTextColor(0xFF888888);
+        xAxis.setDrawAxisLine(false);
+        xAxis.setTextColor(0xFFBBBBBB);
         xAxis.setTextSize(10f);
         xAxis.setGranularity(1f);
+        xAxis.setYOffset(10f);
 
         YAxis left = chart.getAxisLeft();
-        left.setTextColor(0xFF888888);
+        left.setTextColor(0xFFBBBBBB);
         left.setTextSize(10f);
         left.setDrawGridLines(true);
         left.setGridColor(0xFFEEEEEE);
+        left.setDrawAxisLine(false);
+        left.setLabelCount(4, true);
+        left.setXOffset(10f);
+        left.setAxisMinimum(0f); // Ensure it starts from 0.0M
+        
+        left.setValueFormatter(new ValueFormatter() {
+            @Override
+            public String getFormattedValue(float value) {
+                if (value >= 1000000) return String.format(Locale.getDefault(), "%.1fM", value / 1000000f);
+                if (value >= 1000) return String.format(Locale.getDefault(), "%.0fK", value / 1000f);
+                return String.valueOf((int) value);
+            }
+        });
 
         chart.getAxisRight().setEnabled(false);
     }
@@ -245,9 +319,20 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
     }
 
     private void observeViewModel(Budget budget, String catCloudId) {
-        // 预算金额或已用金额任一更新时刷新汇总卡片
+        // Refresh summary card when budget or spent amount updates
         vm.budgetAmountLive.observe(this, amt -> refreshSummaryCard());
         vm.spentLive.observe(this, spent -> refreshSummaryCard());
+
+        // Sync with budget changes
+        vm.budgetLive.observe(this, b -> {
+            if (b == null) {
+                finish();
+                return;
+            }
+            if (vm.budgetAmountLive.getValue() == null || Double.compare(vm.budgetAmountLive.getValue(), b.getAmount()) != 0) {
+                vm.budgetAmountLive.setValue(b.getAmount());
+            }
+        });
 
         vm.trendDataLive.observe(this, data -> {
             String[] labels = vm.trendLabelsLive.getValue();
@@ -259,13 +344,21 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         });
 
         vm.billsLive.observe(this, bills -> {
-            // 账单列表由 ViewModel 根据 effectiveStartTime/endTime 查询
-            // 与列表页进度条使用相同的时间范围，数据一致
-            binding.tvBillCount.setText("共 " + (bills != null ? bills.size() : 0) + " 笔消费");
+            // Bills are queried by ViewModel according to effectiveStartTime/endTime
+            binding.tvBillCount.setText(String.format(Locale.getDefault(), "共 %d 笔消费", bills != null ? bills.size() : 0));
             List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
             billAdapter.submitList(uiModels);
             binding.tvEmptyBills.setVisibility(
                     (bills == null || bills.isEmpty()) ? View.VISIBLE : View.GONE);
+        });
+
+        // Trigger UI refresh when accounts are loaded to ensure correct account names
+        billViewModel.getAllAccountsLive().observe(this, accounts -> {
+            List<Bill> currentBills = vm.billsLive.getValue();
+            if (currentBills != null && !currentBills.isEmpty()) {
+                List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(currentBills);
+                billAdapter.submitList(uiModels);
+            }
         });
     }
 
@@ -294,10 +387,10 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         binding.progressDetail.setProgress(progress);
         if (progress < 100 && !over) {
             binding.progressDetail.setProgressDrawable(
-                    getResources().getDrawable(R.drawable.bg_progress_budget_blue));
+                    AppCompatResources.getDrawable(this, R.drawable.bg_progress_budget_blue));
         } else {
             binding.progressDetail.setProgressDrawable(
-                    getResources().getDrawable(R.drawable.progress_budget_red));
+                    AppCompatResources.getDrawable(this, R.drawable.progress_budget_red));
         }
     }
 
@@ -307,33 +400,37 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         LineChart chart = binding.lineChartTrend;
         List<Entry> entries = new ArrayList<>();
 
-        boolean isYear = data.length == 12 && (labels != null && labels.length == 12);
-        int pointCount = isYear ? 12 : data.length;
-        for (int i = 0; i < Math.min(pointCount, data.length); i++) {
+        for (int i = 0; i < data.length; i++) {
             entries.add(new Entry(i, (float) data[i]));
         }
 
         LineDataSet dataSet = new LineDataSet(entries, "支出");
-        dataSet.setColor(0xFF5B8DEF);
-        dataSet.setLineWidth(2f);
-        dataSet.setCircleColor(0xFF5B8DEF);
-        dataSet.setCircleRadius(3f);
+        dataSet.setColor(0xFF444444); // Dark grey line
+        dataSet.setLineWidth(2.5f);
+        
+        // Hide all data points (circles)
+        dataSet.setDrawCircles(false);
+        dataSet.setDrawCircleHole(false);
+        
         dataSet.setDrawValues(false);
         dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+        dataSet.setCubicIntensity(0.1f);
+        
+        // Setup gradient fill
         dataSet.setDrawFilled(true);
-        dataSet.setFillColor(0xFF5B8DEF);
-        dataSet.setFillAlpha(30);
+        android.graphics.drawable.Drawable drawable = androidx.core.content.ContextCompat.getDrawable(this, R.drawable.bg_chart_gradient_blue);
+        dataSet.setFillDrawable(drawable);
 
         LineData lineData = new LineData(dataSet);
         chart.setData(lineData);
 
         if (labels != null && labels.length > 0) {
             chart.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
-            chart.getXAxis().setLabelCount(Math.min(labels.length, isYear ? 12 : 6), false);
+            chart.getXAxis().setLabelCount(Math.min(labels.length, 5), false);
         }
 
         chart.invalidate();
-        chart.animateX(400);
+        chart.animateX(800);
     }
 
     @Override
@@ -342,8 +439,26 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
     }
 
+    /**
+     * Helper to load icon from URI/String resource
+     */
+    private static void loadIcon(Context ctx, String uri, ImageView iv, int defaultRes) {
+        if (uri == null || uri.isEmpty()) {
+            iv.setImageResource(defaultRes);
+            return;
+        }
+        try {
+            int resId = Integer.parseInt(uri);
+            if (resId > 0) GlideImageLoader.load1(ctx, iv, resId);
+            else iv.setImageResource(defaultRes);
+        } catch (NumberFormatException e) {
+            GlideImageLoader.load(ctx, uri, iv);
+        }
+    }
+
     // ==============================
     // 适配器：已完成 太阳/月亮 + 点击跳转详情
+
     // ==============================
     static class BillListAdapter extends ListAdapter<BillUiModel, BillListAdapter.VH> {
 
@@ -372,12 +487,10 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         public void onBindViewHolder(VH h, int pos) {
             BillUiModel b = getItem(pos);
 
-            // 1. 时间显示 - 零计算，从 UiModel 直接获取
+            // 1. Time display
             h.tvTime.setText(b.timeText);
             
-            // 处理太阳/月亮图标逻辑 (虽然 UiModel 没有显式包含这个资源 ID，但可以根据 timeText 判断或者在 ViewModel 中预处理)
-            // 为了保持“适配器零计算”，理想情况下应该把这个图标也放入 UiModel。
-            // 但现在我们直接根据 timeText 的小时判断。
+            // Time icon logic
             try {
                 int hour = Integer.parseInt(b.timeText.split(":")[0]);
                 h.ivTimeIcon.setImageResource(hour >= 6 && hour < 18 ? R.drawable.ic_sun : R.drawable.ic_moon);
@@ -385,23 +498,25 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
                 h.ivTimeIcon.setImageResource(R.drawable.ic_sun);
             }
 
-            // 2. 分类名称
+            // 2. Category name
             h.tvCategoryName.setText(b.categoryName);
 
-            // 3. 金额
+            // 3. Amount
             h.tvAmount.setText(b.amountText);
             h.tvAmount.setTextColor(b.amountColor);
 
-            // 4. 分类图标
+            // 4. Account name
+            h.tvAccount.setText(b.accountName != null && !b.accountName.isEmpty() ? b.accountName : "无账户");
+            loadIcon(h.itemView.getContext(), b.accountIconUrl, h.ivAccountIcon, R.drawable.ic_wallet);
+
+            // 5. Category icon
             if (b.categoryIconUrl != null && !b.categoryIconUrl.isEmpty()) {
-                GlideImageLoader.load(h.itemView.getContext(), b.categoryIconUrl, h.ivCategoryIcon);
+                loadIcon(h.itemView.getContext(), b.categoryIconUrl, h.ivCategoryIcon, R.drawable.ic_category_default);
             } else {
                 h.ivCategoryIcon.setImageResource(R.drawable.ic_category_default);
             }
 
-            // ======================
-            // 点击条目跳转到详情页
-            // ======================
+            // Open detail on click
             h.itemView.setOnClickListener(v -> {
                 Intent intent = new Intent(v.getContext(), BillDetailActivity.class);
                 intent.putExtra(BillDetailActivity.EXTRA_BILL_ID, b.objectId);
@@ -417,16 +532,18 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         }
 
         static class VH extends RecyclerView.ViewHolder {
-            ImageView ivTimeIcon, ivCategoryIcon;
-            TextView tvTime, tvCategoryName, tvAmount;
+            ImageView ivTimeIcon, ivCategoryIcon, ivAccountIcon;
+            TextView tvTime, tvCategoryName, tvAmount, tvAccount;
 
             VH(View v) {
                 super(v);
                 ivTimeIcon      = v.findViewById(R.id.iv_time_icon);
                 tvTime          = v.findViewById(R.id.tv_time);
                 ivCategoryIcon  = v.findViewById(R.id.iv_category_icon);
+                ivAccountIcon   = v.findViewById(R.id.iv_account_icon);
                 tvCategoryName  = v.findViewById(R.id.tv_category_name);
                 tvAmount        = v.findViewById(R.id.tv_amount);
+                tvAccount       = v.findViewById(R.id.tv_account);
             }
         }
     }
