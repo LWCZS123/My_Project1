@@ -11,17 +11,18 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#FFFFFF"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="12dp">
+        android:paddingHorizontal="16dp"
+        android:paddingTop="16dp">
 
         <ImageView
             android:id="@+id/iv_category_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="8dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:padding="10dp"
             android:background="@drawable/bg_circle_grey"
             android:src="@drawable/ic_category"
-            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginBottom="16dp"
+            app:layout_constraintBottom_toTopOf="@+id/divider"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:shapeAppearanceOverlay="@style/CircleAppearance" />
@@ -30,7 +31,7 @@
             android:id="@+id/tv_category_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="16dp"
             android:text="理发"
             android:textColor="#2D3436"
             android:textSize="15sp"
@@ -42,7 +43,7 @@
             android:id="@+id/tv_transaction_time"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:singleLine="true"
             android:text="07-18 00:34 · 备注"
@@ -58,7 +59,8 @@
             android:layout_height="wrap_content"
             android:gravity="end"
             android:orientation="vertical"
-            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginBottom="16dp"
+            app:layout_constraintBottom_toTopOf="@+id/divider"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -68,18 +70,28 @@
                 android:layout_height="wrap_content"
                 android:text="-¥96.00"
                 android:textColor="#E74C3C"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tv_balance_after"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:text="欠款: ¥58,965.00"
                 android:textColor="#999999"
                 android:textSize="11sp" />
         </LinearLayout>
+
+        <View
+            android:id="@+id/divider"
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:layout_marginStart="60dp"
+            android:background="#EEEEEE"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

@@ -16,6 +16,8 @@ import android.widget.Scroller;
  */
 public class SwipeMenuLayout extends ViewGroup {
 
+    private static java.lang.ref.WeakReference<SwipeMenuLayout> mViewCache;
+
     private int mScaledTouchSlop;
     private Scroller mScroller;
     private VelocityTracker mVelocityTracker;
@@ -84,6 +86,12 @@ public class SwipeMenuLayout extends ViewGroup {
         if (!isSwipeEnable) return false;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
+                if (mViewCache != null) {
+                    SwipeMenuLayout cache = mViewCache.get();
+                    if (cache != null && cache != this) {
+                        cache.smoothClose();
+                    }
+                }
                 mLastX = ev.getX();
                 mLastY = ev.getY();
                 if (!mScroller.isFinished()) {
@@ -95,6 +103,12 @@ public class SwipeMenuLayout extends ViewGroup {
                 float dy = ev.getY() - mLastY;
                 if (Math.abs(dx) > mScaledTouchSlop && Math.abs(dx) > Math.abs(dy)) {
                     isSwipe = true;
+                    if (mViewCache != null) {
+                        SwipeMenuLayout cache = mViewCache.get();
+                        if (cache != null && cache != this) {
+                            cache.smoothClose();
+                        }
+                    }
                     return true;
                 }
                 break;
@@ -125,6 +139,10 @@ public class SwipeMenuLayout extends ViewGroup {
                     newScrollX = mMenuView.getMeasuredWidth();
                 }
 
+                if (newScrollX != 0) {
+                    mViewCache = new java.lang.ref.WeakReference<>(this);
+                }
+
                 scrollTo(newScrollX, 0);
                 mLastX = ev.getX();
                 break;
@@ -136,13 +154,17 @@ public class SwipeMenuLayout extends ViewGroup {
 
                 if (xVelocity < -500) { // 向左快速滑动
                     smoothScrollTo(mMenuView.getMeasuredWidth());
+                    mViewCache = new java.lang.ref.WeakReference<>(this);
                 } else if (xVelocity > 500) { // 向右快速滑动
                     smoothScrollTo(0);
+                    if (mViewCache != null && mViewCache.get() == this) mViewCache = null;
                 } else {
                     if (finalScrollX > mMenuView.getMeasuredWidth() / 2) {
                         smoothScrollTo(mMenuView.getMeasuredWidth());
+                        mViewCache = new java.lang.ref.WeakReference<>(this);
                     } else {
                         smoothScrollTo(0);
+                        if (mViewCache != null && mViewCache.get() == this) mViewCache = null;
                     }
                 }
 
@@ -154,6 +176,13 @@ public class SwipeMenuLayout extends ViewGroup {
                 break;
         }
         return true;
+    }
+
+    public void smoothClose() {
+        smoothScrollTo(0);
+        if (mViewCache != null && mViewCache.get() == this) {
+            mViewCache = null;
+        }
     }
 
     private void smoothScrollTo(int destX) {
@@ -174,6 +203,9 @@ public class SwipeMenuLayout extends ViewGroup {
     public void quickClose() {
         if (getScrollX() != 0) {
             scrollTo(0, 0);
+        }
+        if (mViewCache != null && mViewCache.get() == this) {
+            mViewCache = null;
         }
     }
 }

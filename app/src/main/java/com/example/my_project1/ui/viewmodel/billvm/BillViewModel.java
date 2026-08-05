@@ -8,6 +8,7 @@ import android.util.Log;
 
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.Transformations;
@@ -720,14 +721,47 @@ public class BillViewModel extends AndroidViewModel {
         return repository.getBillsInTimeRange(currentUserId, start, end);
     }
 
+    private final Map<String, List<Bill>> mAccountBillsCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, LiveData<List<Bill>>> mActiveAccountLiveDatas = new java.util.concurrent.ConcurrentHashMap<>();
+
     public LiveData<List<Bill>> getBillsByAccount(String accountId) {
-        if (currentUserId == null || accountId == null) return new MutableLiveData<>();
-        return repository.getBillsByAccount(currentUserId, accountId, -1);
+        return getBillsByAccount(accountId, -1);
     }
 
     public LiveData<List<Bill>> getBillsByAccount(String accountId, long localAccountId) {
-        if (currentUserId == null) return new MutableLiveData<>();
-        return repository.getBillsByAccount(currentUserId, accountId, localAccountId);
+        final String cacheKey = (accountId != null ? accountId : "") + "_" + localAccountId;
+        
+        // 1. 如果已有活跃的 LiveData，直接返回 (避免重复创建 Room 查询)
+        if (mActiveAccountLiveDatas.containsKey(cacheKey)) {
+            return mActiveAccountLiveDatas.get(cacheKey);
+        }
+
+        MediatorLiveData<List<Bill>> result = new MediatorLiveData<>();
+        
+        // 2. 尝试从内存缓存获取并立即返回 (瞬间展示)
+        List<Bill> cached = mAccountBillsCache.get(cacheKey);
+        if (cached != null) {
+            result.setValue(new ArrayList<>(cached));
+        }
+
+        // 3. 观察数据库 LiveData (后台刷新)
+        if (currentUserId != null) {
+            LiveData<List<Bill>> dbLive = repository.getBillsByAccount(currentUserId, accountId, localAccountId);
+            result.addSource(dbLive, bills -> {
+                if (bills != null) {
+                    List<Bill> oldBills = mAccountBillsCache.get(cacheKey);
+                    if (oldBills != null && oldBills.equals(bills)) {
+                        // 内容完全一致，跳过更新，防止 UI 闪烁
+                        return;
+                    }
+                    mAccountBillsCache.put(cacheKey, new ArrayList<>(bills));
+                    result.setValue(bills);
+                }
+            });
+        }
+        
+        mActiveAccountLiveDatas.put(cacheKey, result);
+        return result;
     }
 
     public void refreshData() {

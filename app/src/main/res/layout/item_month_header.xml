@@ -3,16 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@android:color/white"
     android:paddingHorizontal="16dp"
-    android:paddingVertical="12dp">
+    android:paddingTop="16dp"
+    android:paddingBottom="0dp">
 
     <TextView
         android:id="@+id/tv_month_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="2026年07月"
-
         android:textColor="#333333"
         android:textSize="16sp"
         android:textStyle="bold"
@@ -37,7 +36,7 @@
         android:id="@+id/tv_bill_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="4dp"
         android:background="#F5F5F5"
         android:paddingHorizontal="6dp"
         android:paddingVertical="2dp"
@@ -53,9 +52,10 @@
         android:layout_height="wrap_content"
         android:gravity="end"
         android:orientation="vertical"
+        android:layout_marginEnd="8dp"
         app:layout_constraintEnd_toStartOf="@+id/iv_arrow"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginEnd="8dp">
+        app:layout_constraintBottom_toBottomOf="@+id/tv_month_range">
 
         <TextView
             android:id="@+id/tv_outflow"
@@ -69,6 +69,7 @@
             android:id="@+id/tv_inflow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:text="流入: ¥8,656.00"
             android:textColor="#00C48C"
             android:textSize="11sp" />
@@ -79,9 +80,22 @@
         android:layout_width="20dp"
         android:layout_height="20dp"
         android:src="@drawable/ic_down_arrow"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:padding="2dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="@+id/tv_month_range"
         app:tint="#CCCCCC" />
+
+    <!-- 关键修改：使用 GuideLine 或直接约束到内容底部，保证分割线在内容下方固定距离 -->
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1.5dp"
+        android:layout_marginHorizontal="0dp"
+        android:background="#E8E8E8"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_month_range"
+        android:layout_marginTop="24dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

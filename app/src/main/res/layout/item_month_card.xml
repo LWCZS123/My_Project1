@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginTop="12dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/layout_month_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/tv_month_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2026年07月"
+                android:textColor="#333333"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/tv_month_range"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="07.01 - 07.31"
+                android:textColor="#999999"
+                android:textSize="11sp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tv_month_title" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="vertical"
+                app:layout_constraintEnd_toStartOf="@+id/iv_arrow"
+                app:layout_constraintTop_toTopOf="parent"
+                android:layout_marginEnd="8dp">
+
+                <TextView
+                    android:id="@+id/tv_outflow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="支出: ¥0.00"
+                    android:textColor="#FF6B6B"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_inflow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="收入: ¥0.00"
+                    android:textColor="#00C48C"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/iv_arrow"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_down_arrow"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="#CCCCCC" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Bills List -->
+        <LinearLayout
+            android:id="@+id/layout_bills_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="8dp" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

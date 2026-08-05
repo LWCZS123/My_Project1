@@ -1,12 +1,9 @@
 package com.example.my_project1.ui.activity;
 
-import android.animation.ValueAnimator;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
@@ -19,9 +16,7 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ActivityAccountDetailBinding;
-import com.example.my_project1.ui.adapter.ChartLegendAdapter;
 import com.example.my_project1.ui.adapter.bill.AccountBillAdapter;
-import com.example.my_project1.ui.viewmodel.accountvm.AccountBillUiModel;
 import com.example.my_project1.ui.fragment.AccountMoreBottomSheetFragment;
 import com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment;
 import com.example.my_project1.ui.fragment.BillChooseAccountFragment;
@@ -29,26 +24,19 @@ import com.example.my_project1.ui.fragment.BottomSheetAccountEditFragment;
 import com.example.my_project1.ui.fragment.DateRangePickerFragment;
 import com.example.my_project1.ui.fragment.DeleteAccountDialogFragment;
 import com.example.my_project1.ui.fragment.VerificationCodeDialog;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountBillUiModel;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountDetailUiModel;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
-import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
-import com.github.mikephil.charting.animation.Easing;
-import com.github.mikephil.charting.charts.PieChart;
-import com.github.mikephil.charting.components.Legend;
-import com.github.mikephil.charting.data.PieData;
-import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * AccountDetailActivity - 账户详情页（优化版）
@@ -244,29 +232,29 @@ public class AccountDetailActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
+
+        billAdapter.setOnHeaderActionListener(new AccountBillAdapter.OnHeaderActionListener() {
+            @Override public void onEditBalance() { showBalanceAdjustmentBottomSheet(); }
+            @Override public void onMore() { showMoreOptions(); }
+            @Override public void onRepayAction() { startRepaymentFlow(); }
+            @Override public void onRepayNow() { startRepaymentFlow(); }
+            @Override public void onToggleChart() {
+                showingExpense = !showingExpense;
+                refreshBillList();
+            }
+        });
     }
 
     private void setupListeners() {
         binding.btnBack.setOnClickListener(v -> finish());
-        
-        binding.btnMore.setOnClickListener(v -> showMoreOptions());
 
-        binding.btnEditBalance.setOnClickListener(v -> showBalanceAdjustmentBottomSheet());
-        
         binding.btnAddTransaction.setOnClickListener(v -> {
             Intent intent = new Intent(this, AddBillActivity.class);
-            intent.putExtra("account_id", currentAccount.getObjectId());
-            intent.putExtra("account_name", currentAccount.getName());
+            if (currentAccount != null) {
+                intent.putExtra("account_id", currentAccount.getObjectId());
+                intent.putExtra("account_name", currentAccount.getName());
+            }
             startActivity(intent);
-        });
-
-        binding.btnRepayAction.setOnClickListener(v -> startRepaymentFlow());
-        binding.btnRepayNow.setOnClickListener(v -> startRepaymentFlow());
-
-        // 图表切换按钮
-        binding.ivToggleChart.setOnClickListener(v -> {
-            showingExpense = !showingExpense;
-            updateChart();
         });
 
         // 日期筛选按钮 (改为点击标题或者添加一个按钮)
@@ -366,28 +354,11 @@ public class AccountDetailActivity extends AppCompatActivity {
     }
 
     /**
-     * 优雅地更新余额 UI（带淡入淡出动画）
+     * 更新余额 UI
      */
     private void animateBalanceUpdate(double newBalance) {
-        binding.tvBalanceAmount.animate()
-                .alpha(0f)
-                .setDuration(200)
-                .withEndAction(() -> {
-                    // 这里由于 currentAccount 已经在回调里设了新值，所以直接调 updateAccountInfo 即可
-                    updateAccountInfo(currentAccount);
-                    binding.tvBalanceAmount.animate()
-                            .alpha(1f)
-                            .setDuration(300)
-                            .start();
-                })
-                .start();
-        
-        // 如果是信用账户，还涉及到还款进度等卡片刷新
-        if (currentAccount.isCredit()) {
-            binding.cardCreditBill.animate().alpha(0.5f).setDuration(200).withEndAction(() -> {
-                binding.cardCreditBill.animate().alpha(1f).setDuration(300).start();
-            }).start();
-        }
+        // 由于余额显示在 RecyclerView 的 Header 中，直接刷新列表即可
+        refreshBillList();
     }
 
     @Override
@@ -457,30 +428,68 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             // 无论数据是否为空，都尝试刷新 UI (addSystemBills 保证了 allBills 不为空)
             if (!allBills.isEmpty()) {
-                binding.cardTransactions.setVisibility(View.VISIBLE);
-                binding.rvTransactions.setVisibility(View.VISIBLE);
-                binding.cardOverview.setVisibility(View.VISIBLE);
-
                 calculateStatistics(filteredBills);
                 updateStatisticsUI();
 
                 refreshBillList();
-
-                updateChart();
-            } else {
-                // 这种情况理论上由于 addSystemBills 不会发生，除非 account 也没加载
-                binding.cardTransactions.setVisibility(View.GONE);
-                binding.cardOverview.setVisibility(View.GONE);
             }
         });
     }
 
+    // 🔴 标记刷新版本，防止后台线程并发导致的列表抖动
+    private long mRefreshVersion = 0;
+
+    // 🚀 使用单线程池进行映射，保证任务顺序执行，进一步防止列表抖动
+    private final java.util.concurrent.ExecutorService mMapperExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+
     private void refreshBillList() {
-        if (currentAccount != null) {
-            List<AccountBillUiModel> uiModels = accountViewModel.mapAccountBillsToUiModels(filteredBills, currentAccount, collapsedMonths);
-            // 🚀 移除动画：立即刷新
-            billAdapter.submitList(uiModels);
-        }
+        if (currentAccount == null) return;
+        
+        final long version = ++mRefreshVersion;
+        final List<Bill> billsToMap = new ArrayList<>(filteredBills);
+        final Account account = currentAccount;
+        final java.util.Set<String> collapsed = new java.util.HashSet<>(collapsedMonths);
+
+        mMapperExecutor.execute(() -> {
+            List<AccountBillUiModel> billUiModels = accountViewModel.mapAccountBillsToUiModels(billsToMap, account, collapsed);
+            List<AccountDetailUiModel> uiModels = new ArrayList<>();
+
+            // 1. Header with Chart Data
+            List<PieEntry> entries = new ArrayList<>();
+            Map<String, Double> categoryMap = new HashMap<>();
+            for (Bill bill : billsToMap) {
+                if ((showingExpense && bill.getType() == 0) || (!showingExpense && bill.getType() == 1)) {
+                    String cat = bill.getCategoryName();
+                    if (cat == null || cat.isEmpty()) cat = "其他";
+                    Double oldVal = categoryMap.get(cat);
+                    categoryMap.put(cat, (oldVal != null ? oldVal : 0.0) + Math.abs(bill.getAmount()));
+                }
+            }
+            for (Map.Entry<String, Double> entry : categoryMap.entrySet()) {
+                entries.add(new PieEntry(entry.getValue().floatValue(), entry.getKey()));
+            }
+            int[] colors = {0xFFF47670, 0xFFFBA24F, 0xFFFFD05B, 0xFF4DBBDD, 0xFF6B76F1, 0xFFBC76F4, 0xFFF48FB1, 0xFFA1E59C};
+
+            uiModels.add(new AccountDetailUiModel(account, totalIncome, totalExpense, transferIn, transferOut, entries, colors, showingExpense));
+
+            // 2. Bills
+            for (int i = 0; i < billUiModels.size(); i++) {
+                AccountBillUiModel m = billUiModels.get(i);
+                if (m.type == AccountBillUiModel.TYPE_MONTH_HEADER) {
+                    uiModels.add(new AccountDetailUiModel(m, true, false));
+                } else {
+                    boolean isLast = (i + 1 == billUiModels.size() || billUiModels.get(i + 1).type == AccountBillUiModel.TYPE_MONTH_HEADER);
+                    uiModels.add(new AccountDetailUiModel(m, false, isLast));
+                }
+            }
+
+            // 回到主线程提交，校验版本
+            runOnUiThread(() -> {
+                if (version == mRefreshVersion && billAdapter != null) {
+                    billAdapter.submitList(uiModels);
+                }
+            });
+        });
     }
 
     private void addSystemBills(List<Bill> bills) {
@@ -568,93 +577,9 @@ public class AccountDetailActivity extends AppCompatActivity {
     // ==================== UI更新 ====================
 
     private void updateAccountInfo(Account account) {
-        binding.tvAccountName.setText(account.getName());
         binding.tvToolbarTitle.setText("账户详情");
-
-        boolean isCreditAccount = account.isCredit();
-
-        if (isCreditAccount) {
-            binding.tvBalanceLabel.setText("当前欠款 (CNY)");
-            // 信用账户通常余额存为负数，UI显示正数（欠款额）
-            animateNumber(binding.tvBalanceAmount, Math.abs(account.getBalance()));
-
-            binding.btnRepayAction.setVisibility(View.VISIBLE);
-            binding.layoutCreditInfo.setVisibility(View.VISIBLE);
-            binding.cardCreditBill.setVisibility(View.VISIBLE);
-
-            double creditLimit = account.getCreditLimit();
-            double balance = account.getBalance(); // 负数
-            double usedAmount = Math.abs(balance);
-            double availableCredit = creditLimit - usedAmount;
-            
-            binding.tvAvailableLimit.setText(String.format("可用额度 ¥%s", formatMoney(Math.max(0, availableCredit))));
-
-            updateCreditBillingInfo(account);
-            
-            // 账单卡片信息
-            binding.tvBillAmount.setText(String.format("¥%s", formatMoney(usedAmount)));
-            
-        } else {
-            binding.tvBalanceLabel.setText("账户余额 (CNY)");
-            animateNumber(binding.tvBalanceAmount, account.getBalance());
-            
-            binding.btnRepayAction.setVisibility(View.GONE);
-            binding.layoutCreditInfo.setVisibility(View.GONE);
-            binding.cardCreditBill.setVisibility(View.GONE);
-        }
-
-        if (account.getIconUrl() != null && !account.getIconUrl().isEmpty()) {
-            ImageLoaderUtils.loadThumbnail(this, account.getIconUrl(), binding.ivAccountIcon);
-        } else {
-            binding.ivAccountIcon.setImageResource(R.drawable.ic_wallet);
-        }
-    }
-
-    private void updateCreditBillingInfo(Account account) {
-        int billingDay = account.getBillingDay();
-        int repaymentDay = account.getRepaymentDay();
-        if (billingDay <= 0) {
-            binding.tvBillingStatus.setText("出账日 未设置");
-            return;
-        }
-
-        Calendar now = Calendar.getInstance();
-        int currentDay = now.get(Calendar.DAY_OF_MONTH);
-        
-        Calendar billingDate = (Calendar) now.clone();
-        billingDate.set(Calendar.DAY_OF_MONTH, billingDay);
-        
-        if (currentDay > billingDay) {
-            billingDate.add(Calendar.MONTH, 1);
-        }
-        
-        long diffMillis = billingDate.getTimeInMillis() - now.getTimeInMillis();
-        long daysUntilBilling = TimeUnit.MILLISECONDS.toDays(diffMillis);
-        
-        if (daysUntilBilling == 0) {
-            binding.tvBillingStatus.setText("今日出账");
-        } else {
-            binding.tvBillingStatus.setText(String.format("%d天后出账", daysUntilBilling));
-        }
-        
-        if (repaymentDay > 0) {
-            binding.tvRepaymentStatus.setText(String.format("还款日 每月%d日", repaymentDay));
-        } else {
-            binding.tvRepaymentStatus.setText("还款日 未设置");
-        }
-
-        // 计算账单周期 (假设账单日是周期的结束)
-        Calendar periodStart = (Calendar) billingDate.clone();
-        periodStart.add(Calendar.MONTH, -1);
-        periodStart.add(Calendar.DAY_OF_MONTH, 1);
-        
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MM月dd日", Locale.getDefault());
-        String periodStr = sdf.format(periodStart.getTime()) + " - " + sdf.format(billingDate.getTime());
-        
-        // 更新账单月份标签
-        int billMonth = billingDate.get(Calendar.MONTH) + 1;
-        int billYear = billingDate.get(Calendar.YEAR);
-        binding.tvBillMonthLabel.setText(String.format("%d年%02d月账单 (未出账)", billYear, billMonth));
+        currentAccount = account;
+        refreshBillList();
     }
 
     private void updateStatisticsUI() {
@@ -690,135 +615,6 @@ public class AccountDetailActivity extends AppCompatActivity {
                 totalIncome, totalExpense, transferIn, transferOut));
     }
 
-    // ==================== 图表相关 ====================
-
-    private void updateChart() {
-        if (filteredBills == null || filteredBills.isEmpty()) {
-            binding.pieChart.clear();
-            binding.pieChart.setNoDataText("暂无数据");
-            binding.legendRecyclerView.setVisibility(View.GONE);
-            return;
-        }
-
-        Map<String, Double> categoryMap = new HashMap<>();
-
-        for (Bill bill : filteredBills) {
-            if ((showingExpense && bill.getType() == 0) ||
-                    (!showingExpense && bill.getType() == 1)) {
-
-                String categoryName = bill.getCategoryName();
-                if (categoryName == null || categoryName.isEmpty()) {
-                    categoryName = "其他";
-                }
-
-                double amount = bill.getAmount();
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    categoryMap.put(categoryName, categoryMap.getOrDefault(categoryName, 0.0) + amount);
-                }
-            }
-        }
-
-        if (categoryMap.isEmpty()) {
-            binding.pieChart.clear();
-            binding.pieChart.setNoDataText(showingExpense ? "暂无支出数据" : "暂无收入数据");
-            binding.legendRecyclerView.setVisibility(View.GONE);
-            return;
-        }
-
-        List<PieEntry> entries = new ArrayList<>();
-        for (Map.Entry<String, Double> entry : categoryMap.entrySet()) {
-            entries.add(new PieEntry(entry.getValue().floatValue(), entry.getKey()));
-        }
-
-        PieDataSet dataSet = new PieDataSet(entries, "");
-
-        int[] colors = {
-                Color.parseColor("#F47670"), // 珊瑚红
-                Color.parseColor("#FBA24F"), // 橙色
-                Color.parseColor("#FFD05B"), // 黄色
-                Color.parseColor("#4DBBDD"), // 青蓝色
-                Color.parseColor("#6B76F1"), // 蓝紫色
-                Color.parseColor("#BC76F4"), // 紫罗兰
-                Color.parseColor("#F48FB1"), // 粉色
-                Color.parseColor("#A1E59C")  // 浅绿色
-        };
-        dataSet.setColors(colors);
-
-        dataSet.setSliceSpace(3f);
-        dataSet.setSelectionShift(8f);
-        dataSet.setDrawValues(false);
-
-        PieData data = new PieData(dataSet);
-
-        setupPieChartEnhanced(binding.pieChart);
-
-        binding.pieChart.setData(data);
-        binding.pieChart.invalidate();
-
-        binding.pieChart.animateY(1200, Easing.EaseInOutCubic);
-
-        setupScrollableLegend(entries, colors);
-    }
-
-    private void setupPieChartEnhanced(PieChart chart) {
-        chart.setUsePercentValues(false);
-        chart.getDescription().setEnabled(false);
-        chart.setExtraOffsets(5, 5, 5, 5);
-
-        chart.setDragDecelerationFrictionCoef(0.95f);
-        chart.setRotationEnabled(true);
-        chart.setHighlightPerTapEnabled(true);
-        chart.setRotationAngle(0);
-
-        chart.setDrawHoleEnabled(true);
-        chart.setHoleColor(Color.TRANSPARENT);
-        chart.setHoleRadius(58f);
-        chart.setTransparentCircleRadius(61f);
-        chart.setTransparentCircleColor(Color.WHITE);
-        chart.setTransparentCircleAlpha(50);
-
-        chart.setDrawCenterText(true);
-        chart.setCenterText(showingExpense ? "总支出" : "总收入");
-        chart.setCenterTextSize(14f);
-        chart.setCenterTextColor(Color.parseColor("#2D3436"));
-
-        chart.setDrawEntryLabels(false);
-
-        Legend legend = chart.getLegend();
-        legend.setEnabled(false);
-    }
-
-    private void setupScrollableLegend(List<PieEntry> entries, int[] colors) {
-        binding.legendRecyclerView.setVisibility(View.VISIBLE);
-
-        ChartLegendAdapter legendAdapter = new ChartLegendAdapter(this);
-
-        List<ChartLegendAdapter.LegendItem> legendItems = new ArrayList<>();
-        float total = 0;
-        for (PieEntry entry : entries) {
-            total += entry.getValue();
-        }
-
-        for (int i = 0; i < entries.size(); i++) {
-            PieEntry entry = entries.get(i);
-            float percentage = (entry.getValue() / total) * 100;
-
-            ChartLegendAdapter.LegendItem item = new ChartLegendAdapter.LegendItem(
-                    entry.getLabel(),
-                    String.format(Locale.getDefault(), "%.1f%%", percentage),
-                    "$" + formatMoney(entry.getValue()),
-                    colors[i % colors.length]
-            );
-            legendItems.add(item);
-        }
-
-        legendAdapter.setLegendItems(legendItems);
-
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        binding.legendRecyclerView.setLayoutManager(layoutManager);
-        binding.legendRecyclerView.setAdapter(legendAdapter);
-    }
-
     // ==================== 日期筛选 ====================
 
     private void showDateRangePicker() {
@@ -829,7 +625,6 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             filterBillsByDate();
             updateStatisticsUI();
-            updateChart();
 
             String dateRange = formattedStartDate + " 至 " + formattedEndDate;
             SnackbarUtils.showSuccess(binding.getRoot(), "已筛选: " + dateRange);
@@ -852,15 +647,8 @@ public class AccountDetailActivity extends AppCompatActivity {
         for (Bill bill : allBills) {
             Date billTime = bill.getBillTime();
 
-            boolean inRange = true;
-
-            if (startDate != null && billTime.before(startDate)) {
-                inRange = false;
-            }
-
-            if (endDate != null && billTime.after(endDate)) {
-                inRange = false;
-            }
+            boolean inRange = (startDate == null || !billTime.before(startDate)) &&
+                             (endDate == null || !billTime.after(endDate));
 
             if (inRange) {
                 filteredBills.add(bill);
@@ -1058,17 +846,6 @@ public class AccountDetailActivity extends AppCompatActivity {
     private String formatMoney(double amount) {
         DecimalFormat df = new DecimalFormat("#,##0.00");
         return df.format(amount);
-    }
-
-    private void animateNumber(android.widget.TextView textView, double targetValue) {
-        ValueAnimator animator = ValueAnimator.ofFloat(0f, (float) targetValue);
-        animator.setDuration(800);
-        animator.setInterpolator(new androidx.interpolator.view.animation.FastOutSlowInInterpolator());
-        animator.addUpdateListener(animation -> {
-            float value = (float) animation.getAnimatedValue();
-            textView.setText(String.format(Locale.CHINA, "¥%,.2f", value));
-        });
-        animator.start();
     }
 
     @Override
