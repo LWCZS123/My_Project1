@@ -50,6 +50,7 @@ public class CalendarFragment extends Fragment implements
 
     // 缓存已生成的日历 Scheme Map，避免重复生成
     private Map<String, Calendar> mFullSchemeMap = new HashMap<>();
+    private String mLastStatsFingerprint = ""; // 🚀 渲染拦截指纹
     private final ExecutorService mExecutor = Executors.newSingleThreadExecutor();
     private final Handler mMainHandler = new Handler(Looper.getMainLooper());
 
@@ -120,13 +121,18 @@ public class CalendarFragment extends Fragment implements
             updateCalendarSchemes(statsMap);
         });
 
-        // 观察当前选中日期对应的账单列表
-        billViewModel.groupedBillsMap.observe(getViewLifecycleOwner(), groupedMap -> {
-            refreshBillList();
-        });
+        // 🚀 核心优化：按需加载选中日期的账单
+        billViewModel.selectedDateBills.observe(getViewLifecycleOwner(), this::renderBillList);
     }
 
     private void updateCalendarSchemes(Map<String, DailyStat> statsMap) {
+        // 🚀 性能拦截：计算指纹，防止重复渲染
+        String fingerprint = statsMap.size() + "_" + statsMap.hashCode();
+        if (java.util.Objects.equals(fingerprint, mLastStatsFingerprint)) {
+            return;
+        }
+        mLastStatsFingerprint = fingerprint;
+
         mExecutor.execute(() -> {
             Map<String, Calendar> schemeMap = new HashMap<>();
             
@@ -202,20 +208,12 @@ public class CalendarFragment extends Fragment implements
         } catch (Exception e) { return null; }
     }
 
-    private void refreshBillList() {
+    private void renderBillList(List<Bill> bills) {
         if (mCurrentSelectedDate == null || binding == null) return;
-        
-        String dateKey = String.format(Locale.getDefault(), "%04d-%02d-%02d",
-                mCurrentSelectedDate.getYear(), mCurrentSelectedDate.getMonth(), mCurrentSelectedDate.getDay());
-        
-        Map<String, List<Bill>> groupedMap = billViewModel.groupedBillsMap.getValue();
-        List<Bill> bills = (groupedMap != null) ? groupedMap.get(dateKey) : null;
-        
-        if (bills == null) bills = new ArrayList<>();
         
         List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
         List<BillListAdapter.ListItem> items = new ArrayList<>();
-        if (!uiModels.isEmpty()) {
+        if (uiModels != null && !uiModels.isEmpty()) {
             items.add(new BillListAdapter.ListItem(uiModels));
         }
         
@@ -254,7 +252,9 @@ public class CalendarFragment extends Fragment implements
         
         mCurrentSelectedDate = calendar;
         updateDateTitle(calendar);
-        refreshBillList();
+        
+        // 🚀 按需通知 ViewModel 切换日期，触发 selectedDateBills 观察者
+        billViewModel.setSelectedDate(calendar.getYear(), calendar.getMonth(), calendar.getDay());
     }
 
     @Override

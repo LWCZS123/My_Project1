@@ -58,6 +58,7 @@ public class BillViewModel extends AndroidViewModel {
     private static final String SP_NAME = "bill_snapshot";
     private static final String KEY_HEADER_SNAPSHOT = "header_data";
     private static final String KEY_BILL_ITEMS_SNAPSHOT = "bill_items";
+    private static final String KEY_CALENDAR_SNAPSHOT = "calendar_stats";
 
     // ── 分页常量 ──────────────────────────────────────
     private static final int PAGE_SIZE        = 20;  // 每页条数
@@ -68,6 +69,19 @@ public class BillViewModel extends AndroidViewModel {
     private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler        = new Handler(Looper.getMainLooper());
     private final Gson gson = new Gson();
+
+    // 🔴 性能优化相关
+    private final Map<String, BillUiModel> billUiCache = new HashMap<>();
+    private final Map<String, BillAdapter.DateHeader> headerCache = new HashMap<>();
+    private String lastHomeFingerprint = "";
+    private String lastCalendarFingerprint = "";
+
+    // 🔴 预分配格式化工具，避免循环中重复创建
+    private static final SimpleDateFormat DATE_KEY_FMT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    private static final SimpleDateFormat DATE_DISP_FMT = new SimpleDateFormat("M月d日", Locale.getDefault());
+    private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    private static final DecimalFormat AMT_FMT = new DecimalFormat("#,##0.00");
+    private static final String[] WEEK_DAYS = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 
     private volatile boolean isCleared = false;
 
@@ -149,9 +163,9 @@ public class BillViewModel extends AndroidViewModel {
     private final MutableLiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> _dailyStatsMap = new MutableLiveData<>(new HashMap<>());
     public final LiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> dailyStatsMap = _dailyStatsMap;
 
-    /** ✅ 日历专用的每日账单列表映射 */
-    private final MutableLiveData<Map<String, List<Bill>>> _groupedBillsMap = new MutableLiveData<>(new HashMap<>());
-    public final LiveData<Map<String, List<Bill>>> groupedBillsMap = _groupedBillsMap;
+    /** ✅ 新增：选中日期的账单列表（取代全量分组映射） */
+    private final MutableLiveData<Date> _selectedDate = new MutableLiveData<>();
+    public LiveData<List<Bill>> selectedDateBills;
 
     // ── 同步节流 ──────────────────────────────────────
     private long    lastSyncTime        = 0;
@@ -196,6 +210,17 @@ public class BillViewModel extends AndroidViewModel {
         // 🚀 第一时间加载快照
         loadSnapshot();
 
+        selectedDateBills = Transformations.switchMap(_selectedDate, date -> {
+            if (date == null || currentUserId == null) return new MutableLiveData<>(new ArrayList<>());
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(date);
+            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+            Date start = cal.getTime();
+            cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999);
+            Date end = cal.getTime();
+            return repository.getBillsInTimeRange(currentUserId, start, end);
+        });
+
         initializeLiveData();
         observeAllBillsForStats();
         observeStatsForSync();
@@ -210,6 +235,7 @@ public class BillViewModel extends AndroidViewModel {
         
         String headerJson = sp.getString(KEY_HEADER_SNAPSHOT, null);
         String billsJson = sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null);
+        String calendarJson = sp.getString(KEY_CALENDAR_SNAPSHOT, null);
 
         if (headerJson != null) {
             HeaderUiModel header = gson.fromJson(headerJson, HeaderUiModel.class);
@@ -221,23 +247,27 @@ public class BillViewModel extends AndroidViewModel {
             List<BillAdapter.BillGroup> groups = gson.fromJson(billsJson, type);
             _billItems.setValue(groups);
         }
+
+        if (calendarJson != null) {
+            Type type = new TypeToken<Map<String, com.example.my_project1.data.model.calendar.DailyStat>>(){}.getType();
+            Map<String, com.example.my_project1.data.model.calendar.DailyStat> stats = gson.fromJson(calendarJson, type);
+            _dailyStatsMap.setValue(stats);
+        }
         
         isSnapshotLoaded = true;
         Log.d(TAG, "⚡ 快照加载完成");
     }
 
     /**
-     * ✅ 保存快照：仅保存前 5 天的账单以保证速度
+     * ✅ 保存快照：包含统计数据、首页账单和日历统计
      */
-    private void saveSnapshot(HeaderUiModel header, List<BillAdapter.BillGroup> billItems) {
-        if (isCleared || bgExecutor.isShutdown()) {
-            return;
-        }
+    private void saveSnapshot(HeaderUiModel header, List<BillAdapter.BillGroup> billItems, Map<String, com.example.my_project1.data.model.calendar.DailyStat> calendarStats) {
+        if (isCleared || bgExecutor.isShutdown()) return;
         bgExecutor.execute(() -> {
             if (isCleared) return;
             android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
             
-            // 限制快照大小：只存前 5 组数据
+            // 限制首页快照大小：只存前 5 组数据
             List<BillAdapter.BillGroup> snapshotItems = billItems;
             if (billItems != null && billItems.size() > 5) {
                 snapshotItems = new ArrayList<>(billItems.subList(0, 5));
@@ -246,9 +276,14 @@ public class BillViewModel extends AndroidViewModel {
             sp.edit()
                 .putString(KEY_HEADER_SNAPSHOT, gson.toJson(header))
                 .putString(KEY_BILL_ITEMS_SNAPSHOT, gson.toJson(snapshotItems))
+                .putString(KEY_CALENDAR_SNAPSHOT, gson.toJson(calendarStats))
                 .apply();
             Log.d(TAG, "💾 快照已持久化");
         });
+    }
+
+    private void saveSnapshot(HeaderUiModel header, List<BillAdapter.BillGroup> billItems) {
+        saveSnapshot(header, billItems, _dailyStatsMap.getValue());
     }
 
     private void observeAllBillsForStats() {
@@ -258,6 +293,20 @@ public class BillViewModel extends AndroidViewModel {
 
         allBillsObserver = bills -> {
             if (bills == null || isCleared) return;
+            
+            // 🚀 性能优化：日历数据指纹校验
+            StringBuilder sb = new StringBuilder();
+            sb.append(bills.size()).append("_");
+            if (!bills.isEmpty()) {
+                Bill first = bills.get(0);
+                sb.append(first.getId()).append("_").append(first.getUpdatedAt() != null ? first.getUpdatedAt().getTime() : 0);
+            }
+            String fingerprint = sb.toString();
+            if (fingerprint.equals(lastCalendarFingerprint)) {
+                return;
+            }
+            lastCalendarFingerprint = fingerprint;
+
             if (bgExecutor.isShutdown()) return;
             bgExecutor.execute(() -> {
                 if (isCleared) return;
@@ -266,20 +315,10 @@ public class BillViewModel extends AndroidViewModel {
                 
                 // 计算日历所需的映射
                 Map<String, com.example.my_project1.data.model.calendar.DailyStat> statsMap = new HashMap<>();
-                Map<String, List<Bill>> groupedMap = new HashMap<>();
-                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
                 
                 for (Bill b : bills) {
                     if (b.getBillTime() == null) continue;
-                    String key = fmt.format(b.getBillTime());
-                    
-                    // 分组
-                    List<Bill> list = groupedMap.get(key);
-                    if (list == null) {
-                        list = new ArrayList<>();
-                        groupedMap.put(key, list);
-                    }
-                    list.add(b);
+                    String key = DATE_KEY_FMT.format(b.getBillTime());
                     
                     // 统计
                     com.example.my_project1.data.model.calendar.DailyStat stat = statsMap.get(key);
@@ -296,7 +335,6 @@ public class BillViewModel extends AndroidViewModel {
                     _billCount.setValue(count);
                     _billDays.setValue(days);
                     _dailyStatsMap.setValue(statsMap);
-                    _groupedBillsMap.setValue(groupedMap);
                 });
             });
         };
@@ -304,6 +342,12 @@ public class BillViewModel extends AndroidViewModel {
         if (allBills != null) {
             allBills.observeForever(allBillsObserver);
         }
+    }
+
+    public void setSelectedDate(int year, int month, int day) {
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, month - 1, day);
+        _selectedDate.setValue(cal.getTime());
     }
 
     // ════════════════════════════════════════════════════
@@ -326,6 +370,37 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     /**
+     * 快速判断首页数据指纹是否变化
+     */
+    public boolean isHomeDataUnchanged(List<Bill> bills, List<Account> accounts) {
+        if (bills == null) return false;
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append(bills.size()).append("_");
+        if (!bills.isEmpty()) {
+            Bill first = bills.get(0);
+            Bill last = bills.get(bills.size() - 1);
+            sb.append(first.getId()).append("_").append(first.getUpdatedAt() != null ? first.getUpdatedAt().getTime() : 0).append("_");
+            sb.append(last.getId()).append("_").append(last.getUpdatedAt() != null ? last.getUpdatedAt().getTime() : 0).append("_");
+        }
+        
+        // 加入账户指纹 (比对所有账户的余额变化)
+        if (accounts != null) {
+            sb.append(accounts.size()).append("_");
+            for (Account acc : accounts) {
+                sb.append(acc.getBalance()).append(",");
+            }
+        }
+        
+        String newFingerprint = sb.toString();
+        if (newFingerprint.equals(lastHomeFingerprint)) {
+            return true;
+        }
+        lastHomeFingerprint = newFingerprint;
+        return false;
+    }
+
+    /**
      * ✅ 核心优化：联动观察账单与账户
      * 只要账单列表或账户表发生变化，立即刷新 UI Items 和 Header 统计
      */
@@ -343,6 +418,12 @@ public class BillViewModel extends AndroidViewModel {
             List<Bill> bills = currentMonthBills.getValue();
             List<Account> accounts = allAccountsLive.getValue();
             
+            // 🚀 快速指纹比对：如果数据未变，直接返回
+            if (isHomeDataUnchanged(bills, accounts)) {
+                Log.d(TAG, "⚡ 首页数据指纹未变，跳过映射");
+                return;
+            }
+
             // 提交到后台线程计算，避免主线程卡顿
             if (bgExecutor.isShutdown()) return;
             bgExecutor.execute(() -> {
@@ -393,11 +474,10 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     // ════════════════════════════════════════════════════
-    //  ✅ UiModel 映射 (单层列表版)
+    //  ✅ UiModel 映射 (单层列表版) - 优化版
     // ════════════════════════════════════════════════════
     public List<BillUiModel> mapBillsToUiModels(List<Bill> bills) {
-        List<BillUiModel> uiModels = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return uiModels;
+        if (bills == null || bills.isEmpty()) return new ArrayList<>();
 
         List<Account> accounts = allAccountsLive.getValue();
         Map<String, Account> accountMap = new HashMap<>();
@@ -407,10 +487,17 @@ public class BillViewModel extends AndroidViewModel {
             }
         }
 
-        SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        DecimalFormat amtFmt = new DecimalFormat("#,##0.00");
+        List<BillUiModel> uiModels = new ArrayList<>(bills.size());
 
         for (Bill bill : bills) {
+            // 唯一标识符：ID + 更新时间
+            String cacheKey = "B_" + bill.getId() + "_" + (bill.getUpdatedAt() != null ? bill.getUpdatedAt().getTime() : 0);
+            BillUiModel cached = billUiCache.get(cacheKey);
+            if (cached != null) {
+                uiModels.add(cached);
+                continue;
+            }
+
             int billType = bill.getType();
             String prefix = "";
             int amountColor;
@@ -429,15 +516,15 @@ public class BillViewModel extends AndroidViewModel {
                 categoryIcon = uri.toString();
             }
 
-            String amountText = prefix + amtFmt.format(bill.getAmount());
+            String amountText = prefix + AMT_FMT.format(bill.getAmount());
 
             Account account = accountMap.get(bill.getAccountId());
             Account toAccount = (billType == 2 || billType == 3) ? accountMap.get(bill.getToAccountId()) : null;
 
-            uiModels.add(BillUiModel.builder()
+            BillUiModel newModel = BillUiModel.builder()
                     .localId(bill.getId())
                     .objectId(bill.getObjectId())
-                    .timeText(timeFmt.format(bill.getBillTime()))
+                    .timeText(TIME_FMT.format(bill.getBillTime()))
                     .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
                     .categoryIconUrl(categoryIcon)
                     .amountText(amountText)
@@ -448,24 +535,21 @@ public class BillViewModel extends AndroidViewModel {
                     .billType(billType)
                     .remarkText(bill.getRemark())
                     .imageUrls(bill.getImageUrls())
-                    .build());
+                    .build();
+            
+            billUiCache.put(cacheKey, newModel);
+            uiModels.add(newModel);
         }
         return uiModels;
     }
 
     // ════════════════════════════════════════════════════
-    //  ✅ UiModel 映射 (聚合版)
+    //  ✅ UiModel 映射 (聚合版) - 优化版
     // ════════════════════════════════════════════════════
     private List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills, Map<String, Account> accountMap) {
-        List<BillAdapter.BillGroup> groups = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return groups;
+        if (bills == null || bills.isEmpty()) return new ArrayList<>();
 
-        SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        SimpleDateFormat dateDispFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
-        SimpleDateFormat timeFmt     = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        DecimalFormat    amtFmt      = new DecimalFormat("#,##0.00");
-        String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
-
+        List<BillAdapter.BillGroup> groups = new ArrayList<>(10);
         String  prevDateKey = null;
         double  dayExpense  = 0;
         double  dayIncome   = 0;
@@ -474,16 +558,25 @@ public class BillViewModel extends AndroidViewModel {
 
         for (int i = 0; i < bills.size(); i++) {
             Bill   bill    = bills.get(i);
-            String dateKey = dateKeyFmt.format(bill.getBillTime());
+            Date billTime = bill.getBillTime();
+            if (billTime == null) continue;
+            
+            String dateKey = DATE_KEY_FMT.format(billTime);
 
             if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
                 // 保存上一组
-                groups.add(new BillAdapter.BillGroup(
-                        new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+                String headerKey = "H_" + prevDateKey + "_" + dayExpense + "_" + dayIncome;
+                BillAdapter.DateHeader header = headerCache.get(headerKey);
+                if (header == null && currentHeader != null) {
+                    header = new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
                                 String.format(Locale.getDefault(), "支 %.2f", dayExpense),
-                                String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
-                        new ArrayList<>(currentDayBills)
-                ));
+                                String.format(Locale.getDefault(), "收 %.2f", dayIncome));
+                    headerCache.put(headerKey, header);
+                }
+                
+                if (header != null) {
+                    groups.add(new BillAdapter.BillGroup(header, new ArrayList<>(currentDayBills)));
+                }
                 dayExpense = 0;
                 dayIncome  = 0;
                 currentDayBills.clear();
@@ -496,66 +589,75 @@ public class BillViewModel extends AndroidViewModel {
             // 构建 Header (首次或日期改变时)
             if (currentDayBills.isEmpty()) {
                 Calendar cal = Calendar.getInstance();
-                cal.setTime(bill.getBillTime());
-                String weekDay  = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1];
-                String dateDisp = dateDispFmt.format(bill.getBillTime()) + "（" + weekDay + "）";
+                cal.setTime(billTime);
+                String weekDay  = WEEK_DAYS[cal.get(Calendar.DAY_OF_WEEK) - 1];
+                String dateDisp = DATE_DISP_FMT.format(billTime) + "（" + weekDay + "）";
                 currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
             }
 
-            // 构建 BillUiModel
-            int billType = bill.getType();
-            String prefix = "";
-            int amountColor;
-            String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
-            
-            if (billType == 0) {
-                prefix = "- ¥";
-                amountColor = getApplication().getColor(R.color.red);
-            } else if (billType == 1) {
-                prefix = "+ ¥";
-                amountColor = getApplication().getColor(R.color.green);
-            } else {
-                // 转账 或 还款
-                prefix = "¥";
-                amountColor = getApplication().getColor(R.color.orange_500); 
-                // 🔑 强制使用转账图标
-                Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
-                categoryIcon =uri.toString();
+            // 构建 BillUiModel (使用单层映射的缓存逻辑)
+            String billCacheKey = "B_" + bill.getId() + "_" + (bill.getUpdatedAt() != null ? bill.getUpdatedAt().getTime() : 0);
+            BillUiModel billUi = billUiCache.get(billCacheKey);
+            if (billUi == null) {
+                int billType = bill.getType();
+                String prefix = "";
+                int amountColor;
+                String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
+                
+                if (billType == 0) {
+                    prefix = "- ¥";
+                    amountColor = getApplication().getColor(R.color.red);
+                } else if (billType == 1) {
+                    prefix = "+ ¥";
+                    amountColor = getApplication().getColor(R.color.green);
+                } else {
+                    prefix = "¥";
+                    amountColor = getApplication().getColor(R.color.orange_500); 
+                    Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
+                    categoryIcon = uri.toString();
+                }
+                
+                String amountText = prefix + AMT_FMT.format(bill.getAmount());
+                Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
+                Account toAccount = (accountMap != null && (billType == 2 || billType == 3)) ? accountMap.get(bill.getToAccountId()) : null;
+
+                billUi = BillUiModel.builder()
+                        .localId(bill.getId())
+                        .objectId(bill.getObjectId())
+                        .timeText(TIME_FMT.format(bill.getBillTime()))
+                        .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
+                        .categoryIconUrl(categoryIcon)
+                        .amountText(amountText)
+                        .amountColor(amountColor)
+                        .accountName(account != null ? account.getName() : "")
+                        .accountIconUrl(account != null ? account.getIconUrl() : "")
+                        .toAccountName(toAccount != null ? toAccount.getName() : "")
+                        .billType(billType)
+                        .remarkText(bill.getRemark())
+                        .imageUrls(bill.getImageUrls())
+                        .build();
+                billUiCache.put(billCacheKey, billUi);
             }
-            
-            String amountText = prefix + amtFmt.format(bill.getAmount());
-
-            Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
-            Account toAccount = (accountMap != null && (billType == 2 || billType == 3)) ? accountMap.get(bill.getToAccountId()) : null;
-
-            currentDayBills.add(BillUiModel.builder()
-                    .localId(bill.getId())
-                    .objectId(bill.getObjectId())
-                    .timeText(timeFmt.format(bill.getBillTime()))
-                    .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
-                    .categoryIconUrl(categoryIcon)
-                    .amountText(amountText)
-                    .amountColor(amountColor)
-                    .accountName(account != null ? account.getName() : "")
-                    .accountIconUrl(account != null ? account.getIconUrl() : "")
-                    .toAccountName(toAccount != null ? toAccount.getName() : "")
-                    .billType(billType)
-                    .remarkText(bill.getRemark())
-                    .imageUrls(bill.getImageUrls())
-                    .build());
-
+            currentDayBills.add(billUi);
             prevDateKey = dateKey;
         }
 
         // 最后一组
         if (!currentDayBills.isEmpty() && currentHeader != null) {
-            groups.add(new BillAdapter.BillGroup(
-                    new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
+            String lastHeaderKey = "H_" + prevDateKey + "_" + dayExpense + "_" + dayIncome;
+            BillAdapter.DateHeader header = headerCache.get(lastHeaderKey);
+            if (header == null) {
+                header = new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
                             String.format(Locale.getDefault(), "支 %.2f", dayExpense),
-                            String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
-                    currentDayBills
-            ));
+                            String.format(Locale.getDefault(), "收 %.2f", dayIncome));
+                headerCache.put(lastHeaderKey, header);
+            }
+            groups.add(new BillAdapter.BillGroup(header, new ArrayList<>(currentDayBills)));
         }
+
+        // 简单的 LRU 清理，防止缓存无限增长
+        if (billUiCache.size() > 1000) billUiCache.clear();
+        if (headerCache.size() > 200) headerCache.clear();
 
         return groups;
     }
