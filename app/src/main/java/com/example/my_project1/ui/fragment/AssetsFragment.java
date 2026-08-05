@@ -19,6 +19,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.FragmentAssetsBinding;
@@ -292,10 +293,10 @@ public class AssetsFragment extends Fragment {
         List<AccountGroup> displayGroups = new java.util.ArrayList<>();
         Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
         
-        // 0. 过滤掉不计入总资产（已隐藏）的账户
+        // 0. 过滤掉不计入总资产（已隐藏）、已归档、以及待删除的账户
         List<Account> visibleAccounts = new ArrayList<>();
         for (Account acc : allAccounts) {
-            if (acc.isIncludeInTotal()) {
+            if (acc.isIncludeInTotal() && acc.isCanBeSelected() && acc.getSyncState() != SyncState.TO_DELETE) {
                 visibleAccounts.add(acc);
             }
         }

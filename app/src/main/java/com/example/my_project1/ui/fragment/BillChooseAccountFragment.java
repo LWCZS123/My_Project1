@@ -21,7 +21,9 @@ import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.databinding.FragmentBillChooseAccountBinding;
+import com.example.my_project1.ui.adapter.account.AccountSubAdapter;
 import com.example.my_project1.ui.adapter.account.AssetsGroupAdapter;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountUiModel;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.utils.SnackbarUtils;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -44,7 +46,7 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
     private static final String ARG_EXCLUDE_ACCOUNT_ID = "exclude_account_id";
 
     private FragmentBillChooseAccountBinding binding;
-    private AssetsGroupAdapter adapter;
+    private AccountSubAdapter adapter;
     private AccountViewModel viewModel;
 
     private Account selectedAccount = null;
@@ -117,35 +119,18 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
         });
     }
 
-    /** ================== RecyclerView 显示账户组 ================== **/
+    /** ================== RecyclerView 显示账户列表 ================== **/
     private void setupRecyclerView() {
-        adapter = new AssetsGroupAdapter();
+        adapter = new AccountSubAdapter();
+        adapter.setSwipeEnabled(false); // 选择账户时不需要侧滑
 
         binding.rvGroups.setLayoutManager(new LinearLayoutManager(getContext()));
-        binding.rvGroups.setNestedScrollingEnabled(true); // 保持可滑动
-        binding.rvGroups.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        binding.rvGroups.setNestedScrollingEnabled(false); // 交给外部 NestedScrollView
         binding.rvGroups.setAdapter(adapter);
 
-        adapter.setOnGroupActionClickListener(new AssetsGroupAdapter.OnGroupActionClickListener() {
-            @Override public void onEditGroup(AccountGroup group) {}
-
-            // 组展开 → 加载账户
-            @Override public void onGroupExpand(String groupId) {}
-
+        adapter.setOnAccountClickListener(new AccountSubAdapter.OnAccountClickListener() {
             @Override
-            public void onAccountDelete(Account account) {}
-
-            @Override
-            public void onAccountHide(Account account) {}
-
-            @Override
-            public void onAccountArchive(Account account) {}
-
-            @Override
-            public void onAccountEdit(Account account) {}
-
-            // 点击账户 → 返回 AddBillActivity
-            @Override public void onAccount(Account account) {
+            public void onAccountClick(Account account) {
                 // 🔴 防止选择要删除的账户（迁移模式）
                 if (excludeAccountId != null && account.getObjectId() != null
                         && account.getObjectId().equals(excludeAccountId)) {
@@ -165,6 +150,11 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
                     listener.onChoose(account, account.getIconUrl(), account.getName());
                 }
             }
+
+            @Override public void onAccountDelete(Account account) {}
+            @Override public void onAccountHide(Account account) {}
+            @Override public void onAccountArchive(Account account) {}
+            @Override public void onAccountEdit(Account account) {}
         });
     }
 
@@ -202,70 +192,54 @@ public class BillChooseAccountFragment extends BottomSheetDialogFragment {
         this.originalGroups = groups;
         this.originalAccounts = allAccounts;
 
-        List<AccountGroup> displayGroups = new java.util.ArrayList<>();
-        Map<String, List<Account>> groupToAccountsMap = new HashMap<>();
-
-        // 1. 处理真实的账户组
+        List<AccountUiModel> uiModels = new ArrayList<>();
+        java.text.DecimalFormat df = new java.text.DecimalFormat("#,##0.00");
+        
+        // 创建 ID 到组名的映射，用于设置副标题
+        Map<String, String> groupIdToNameMap = new HashMap<>();
         for (AccountGroup group : groups) {
-            List<Account> activeAccounts = new java.util.ArrayList<>();
-            for (Account acc : allAccounts) {
-                if (group.getObjectId().equals(acc.getGroupId())) {
-                    // 过滤逻辑
-                    if (acc.getSyncState() == SyncState.TO_DELETE) continue;
-                    if (!acc.isCanBeSelected()) continue;
-                    if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
-                    
-                    // 搜索过滤
-                    if (!currentSearchKeyword.isEmpty()) {
-                        if (!acc.getName().toLowerCase().contains(currentSearchKeyword.toLowerCase())) {
-                            continue;
-                        }
-                    }
+            groupIdToNameMap.put(group.getObjectId(), group.getName());
+        }
 
-                    activeAccounts.add(acc);
+        for (Account acc : allAccounts) {
+            // 过滤逻辑
+            if (acc.getSyncState() == SyncState.TO_DELETE) continue;
+            if (!acc.isCanBeSelected()) continue;
+            if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
+
+            // 搜索过滤
+            if (!currentSearchKeyword.isEmpty()) {
+                if (!acc.getName().toLowerCase().contains(currentSearchKeyword.toLowerCase())) {
+                    continue;
                 }
             }
-            if (!activeAccounts.isEmpty()) {
-                displayGroups.add(group);
-                groupToAccountsMap.put(group.getObjectId(), activeAccounts);
+
+            // 设置副标题为 [账户组] 备注 或 账户名
+            String groupName = groupIdToNameMap.get(acc.getGroupId());
+            if (groupName == null || groupName.isEmpty()) {
+                groupName = acc.getCategory(); // 如果没有组，使用大类名
             }
+            
+            String subtitle = "[" + (groupName != null ? groupName : "未分类") + "] " + 
+                    (acc.getRemark() != null && !acc.getRemark().isEmpty() ? acc.getRemark() : acc.getName());
+
+            uiModels.add(new AccountUiModel(
+                    acc.getId(),
+                    acc.getObjectId(),
+                    acc.getName(),
+                    subtitle,
+                    "¥" + df.format(acc.getBalance()),
+                    acc.getBalance() < 0 ? 0xFFFF6B6B : 0xFF333333,
+                    "可用额度 ¥" + df.format(acc.getCreditLimit() + acc.getBalance()),
+                    acc.isCredit(),
+                    acc.getIconUrl(),
+                    false, // 选择界面不隐藏金额
+                    false, // 选择界面不需要侧滑
+                    acc
+            ));
         }
 
-        // 2. 处理虚拟账户组 (按大类)
-        String[] categories = {"资金账户", "信用账户", "充值账户"};
-        for (String category : categories) {
-            List<Account> activeAccounts = new java.util.ArrayList<>();
-            for (Account acc : allAccounts) {
-                if ((acc.getGroupId() == null || acc.getGroupId().isEmpty()) && category.equals(acc.getCategory())) {
-                    if (acc.getSyncState() == SyncState.TO_DELETE) continue;
-                    if (!acc.isCanBeSelected()) continue;
-                    if (excludeAccountId != null && acc.getObjectId() != null && acc.getObjectId().equals(excludeAccountId)) continue;
-
-                    // 搜索过滤
-                    if (!currentSearchKeyword.isEmpty()) {
-                        if (!acc.getName().toLowerCase().contains(currentSearchKeyword.toLowerCase())) {
-                            continue;
-                        }
-                    }
-
-                    activeAccounts.add(acc);
-                }
-            }
-            if (!activeAccounts.isEmpty()) {
-                AccountGroup virtualGroup = new AccountGroup();
-                virtualGroup.setObjectId("CATEGORY_" + category);
-                virtualGroup.setName(category);
-                virtualGroup.setAccountCount(activeAccounts.size());
-                
-                displayGroups.add(virtualGroup);
-                groupToAccountsMap.put(virtualGroup.getObjectId(), activeAccounts);
-            }
-        }
-
-        adapter.setGroups(displayGroups);
-        for (Map.Entry<String, List<Account>> entry : groupToAccountsMap.entrySet()) {
-            adapter.updateAccountsForExpandedGroup(entry.getKey(), entry.getValue());
-        }
+        adapter.submitList(uiModels);
     }
 
     /** ================== 默认“无账户”按钮 ================== **/
