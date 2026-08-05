@@ -88,6 +88,9 @@ public class AccountDetailActivity extends AppCompatActivity {
     private Long startTimestamp = null;
     private Long endTimestamp = null;
 
+    // 🔴 标记是否是首次加载
+    private boolean isFirstLoad = true;
+
     // 🔴 删除对话框
     private DeleteAccountDialogFragment deleteDialog;
 
@@ -426,6 +429,14 @@ public class AccountDetailActivity extends AppCompatActivity {
             addSystemBills(allBills);
             filteredBills = new ArrayList<>(allBills);
 
+            // 🚀 优化加载逻辑：如果数据量很少 (<=2条)，直接显示内容，跳过动画
+            if (isFirstLoad && filteredBills.size() <= 20) {
+                isFirstLoad = false;
+                binding.loadingLayout.setVisibility(android.view.View.GONE);
+                binding.rvTransactions.setVisibility(android.view.View.VISIBLE);
+                binding.rvTransactions.setAlpha(1f);
+            }
+
             // 无论数据是否为空，都尝试刷新 UI (addSystemBills 保证了 allBills 不为空)
             if (!allBills.isEmpty()) {
                 calculateStatistics(filteredBills);
@@ -445,20 +456,31 @@ public class AccountDetailActivity extends AppCompatActivity {
     private void refreshBillList() {
         if (currentAccount == null) return;
         
+        // 🚀 快速返回机制：检查数据指纹是否变化
+        if (accountViewModel.isDataUnchanged(filteredBills, currentAccount, collapsedMonths, showingExpense)) {
+            Log.d(TAG, "⚡ 数据未变化，跳过映射与刷新");
+            return;
+        }
+
         final long version = ++mRefreshVersion;
         final List<Bill> billsToMap = new ArrayList<>(filteredBills);
         final Account account = currentAccount;
         final java.util.Set<String> collapsed = new java.util.HashSet<>(collapsedMonths);
+        final boolean isShowingExpense = showingExpense;
+        final double in = totalIncome;
+        final double out = totalExpense;
+        final double tIn = transferIn;
+        final double tOut = transferOut;
 
         mMapperExecutor.execute(() -> {
             List<AccountBillUiModel> billUiModels = accountViewModel.mapAccountBillsToUiModels(billsToMap, account, collapsed);
-            List<AccountDetailUiModel> uiModels = new ArrayList<>();
+            List<AccountDetailUiModel> uiModels = new ArrayList<>(billUiModels.size() + 1);
 
-            // 1. Header with Chart Data
+            // 1. Header with Chart Data (这部分也可以在后台计算)
             List<PieEntry> entries = new ArrayList<>();
             Map<String, Double> categoryMap = new HashMap<>();
             for (Bill bill : billsToMap) {
-                if ((showingExpense && bill.getType() == 0) || (!showingExpense && bill.getType() == 1)) {
+                if ((isShowingExpense && bill.getType() == 0) || (!isShowingExpense && bill.getType() == 1)) {
                     String cat = bill.getCategoryName();
                     if (cat == null || cat.isEmpty()) cat = "其他";
                     Double oldVal = categoryMap.get(cat);
@@ -470,7 +492,7 @@ public class AccountDetailActivity extends AppCompatActivity {
             }
             int[] colors = {0xFFF47670, 0xFFFBA24F, 0xFFFFD05B, 0xFF4DBBDD, 0xFF6B76F1, 0xFFBC76F4, 0xFFF48FB1, 0xFFA1E59C};
 
-            uiModels.add(new AccountDetailUiModel(account, totalIncome, totalExpense, transferIn, transferOut, entries, colors, showingExpense));
+            uiModels.add(new AccountDetailUiModel(account, in, out, tIn, tOut, entries, colors, isShowingExpense));
 
             // 2. Bills
             for (int i = 0; i < billUiModels.size(); i++) {
@@ -486,10 +508,32 @@ public class AccountDetailActivity extends AppCompatActivity {
             // 回到主线程提交，校验版本
             runOnUiThread(() -> {
                 if (version == mRefreshVersion && billAdapter != null) {
-                    billAdapter.submitList(uiModels);
+                    billAdapter.submitList(uiModels, () -> {
+                        // 🚀 列表数据加载并渲染完成后，隐藏加载动画
+                        if (isFirstLoad) {
+                            hideLoading();
+                            isFirstLoad = false;
+                        }
+                    });
                 }
             });
         });
+    }
+
+    private void hideLoading() {
+        if (binding.loadingLayout.getVisibility() == android.view.View.GONE) return;
+
+        // 渐隐动画
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .withEndAction(() -> {
+                    binding.loadingLayout.setVisibility(android.view.View.GONE);
+                    binding.rvTransactions.setVisibility(android.view.View.VISIBLE);
+                    // 给列表一个轻微的淡入
+                    binding.rvTransactions.setAlpha(0f);
+                    binding.rvTransactions.animate().alpha(1f).setDuration(300).start();
+                }).start();
     }
 
     private void addSystemBills(List<Bill> bills) {

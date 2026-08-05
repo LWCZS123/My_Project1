@@ -70,6 +70,19 @@ public class AccountViewModel extends AndroidViewModel {
     private LiveData<List<AccountGroup>> allGroups;
     private LiveData<List<Account>> allAccount;
 
+    // 🔴 缓存与指纹优化相关
+    private final Map<String, AccountBillUiModel> billUiModelCache = new HashMap<>();
+    private String lastDataFingerprint = "";
+
+    // 🔴 预分配格式化工具，避免循环中重复创建
+    private static final SimpleDateFormat MONTH_KEY_FMT = new SimpleDateFormat("yyyy-MM", Locale.getDefault());
+    private static final SimpleDateFormat DAY_KEY_FMT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    private static final SimpleDateFormat TITLE_FMT = new SimpleDateFormat("yyyy年MM月", Locale.getDefault());
+    private static final SimpleDateFormat RANGE_FMT = new SimpleDateFormat("MM月dd日", Locale.getDefault());
+    private static final SimpleDateFormat DAY_TITLE_FMT = new SimpleDateFormat("MM月dd日 EEEE", Locale.getDefault());
+    private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+    private static final DecimalFormat MONEY_FMT = new DecimalFormat("#,##0.00");
+
     // 🔴 新增：用于通知特定组的账户更新
     private final MutableLiveData<Map<String, List<Account>>> _groupAccountsUpdate = new MutableLiveData<>();
     public LiveData<Map<String, List<Account>>> groupAccountsUpdate = _groupAccountsUpdate;
@@ -614,113 +627,167 @@ public class AccountViewModel extends AndroidViewModel {
     // ===================== 🔹 云同步 =====================
 
     /**
-     * ✅ UiModel 映射 (账户账单版)
+     * ✅ UiModel 映射 (优化版：引入缓存与增量比对)
      */
     public List<AccountBillUiModel> mapAccountBillsToUiModels(List<Bill> bills, Account currentAccount, Set<String> collapsedMonths) {
-        List<AccountBillUiModel> uiModels = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return uiModels;
+        if (bills == null || bills.isEmpty()) {
+            billUiModelCache.clear();
+            return new ArrayList<>();
+        }
+
+        List<AccountBillUiModel> uiModels = new ArrayList<>(bills.size() + 20); // 预分配容量
 
         String currentAccountId = currentAccount != null ? currentAccount.getObjectId() : null;
         long currentLocalAccountId = currentAccount != null ? currentAccount.getId() : -1;
         boolean isCredit = currentAccount != null && currentAccount.isCredit();
 
-        // 1. 计算每笔交易发生后的余额
-        Map<Long, Double> billBalanceMap = new HashMap<>();
+        // 1. 计算每笔交易后的余额（这部分逻辑较重，暂保持，但优化计算开销）
+        Map<Long, Double> billBalanceMap = new HashMap<>(bills.size());
         double runningBalance = currentAccount != null ? currentAccount.getBalance() : 0;
         for (Bill bill : bills) {
             billBalanceMap.put(bill.getId(), runningBalance);
             boolean isPositive = isPositiveImpact(bill, currentAccountId, currentLocalAccountId);
-            double impact = isPositive ? bill.getAmount() : -bill.getAmount();
-            runningBalance -= impact;
+            runningBalance -= (isPositive ? bill.getAmount() : -bill.getAmount());
         }
 
-        // 2. 按月和日分组
-        SimpleDateFormat monthKeyFormat = new SimpleDateFormat("yyyy-MM", Locale.getDefault());
-        SimpleDateFormat dayKeyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        // 2. 按月和日分组 (LinkedHashMap 保证顺序)
         Map<String, MonthGroup> monthGroupsMap = new LinkedHashMap<>();
-
         for (Bill bill : bills) {
-            if (bill.getBillTime() == null) continue;
-            String monthKey = monthKeyFormat.format(bill.getBillTime());
-            String dayKey = dayKeyFormat.format(bill.getBillTime());
+            Date time = bill.getBillTime();
+            if (time == null) continue;
 
+            String monthKey = MONTH_KEY_FMT.format(time);
             MonthGroup mGroup = monthGroupsMap.get(monthKey);
             if (mGroup == null) {
-                mGroup = new MonthGroup(monthKey, bill.getBillTime());
+                mGroup = new MonthGroup(monthKey, time);
                 monthGroupsMap.put(monthKey, mGroup);
             }
+            
+            String dayKey = DAY_KEY_FMT.format(time);
             mGroup.addBill(bill, dayKey, isPositiveImpact(bill, currentAccountId, currentLocalAccountId));
         }
 
-        // 3. 构建显示列表
-        DecimalFormat df = new DecimalFormat("#,##0.00");
-        SimpleDateFormat titleFmt = new SimpleDateFormat("yyyy年MM月", Locale.getDefault());
-        SimpleDateFormat rangeFmt = new SimpleDateFormat("MM月dd日", Locale.getDefault());
-        SimpleDateFormat dayFmt = new SimpleDateFormat("MM月dd日 EEEE", Locale.getDefault());
-        SimpleDateFormat timeFmt = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-
+        // 3. 构建显示列表，利用缓存复用对象
+        Calendar cal = Calendar.getInstance();
         for (MonthGroup mGroup : monthGroupsMap.values()) {
-            // Month Header
-            Calendar cal = Calendar.getInstance();
-            cal.setTime(mGroup.date);
-            cal.set(Calendar.DAY_OF_MONTH, 1);
-            Date start = cal.getTime();
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
-            Date end = cal.getTime();
-
             boolean isCollapsed = collapsedMonths.contains(mGroup.key);
-            uiModels.add(new AccountBillUiModel(
-                    AccountBillUiModel.TYPE_MONTH_HEADER,
-                    titleFmt.format(mGroup.date),
-                    rangeFmt.format(start) + " - " + rangeFmt.format(end),
-                    "流入: ¥" + df.format(mGroup.totalInflow),
-                    "流出: ¥" + df.format(mGroup.totalOutflow),
-                    isCollapsed,
-                    mGroup.key
-            ));
+            
+            // Month Header (尝试缓存或复用)
+            String monthHeaderKey = "M_" + mGroup.key + "_" + mGroup.totalInflow + "_" + mGroup.totalOutflow + "_" + isCollapsed;
+            AccountBillUiModel monthModel = billUiModelCache.get(monthHeaderKey);
+            if (monthModel == null) {
+                cal.setTime(mGroup.date);
+                cal.set(Calendar.DAY_OF_MONTH, 1);
+                String startStr = RANGE_FMT.format(cal.getTime());
+                cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
+                String endStr = RANGE_FMT.format(cal.getTime());
+
+                monthModel = new AccountBillUiModel(
+                        AccountBillUiModel.TYPE_MONTH_HEADER,
+                        TITLE_FMT.format(mGroup.date),
+                        startStr + " - " + endStr,
+                        "流入: ¥" + MONEY_FMT.format(mGroup.totalInflow),
+                        "流出: ¥" + MONEY_FMT.format(mGroup.totalOutflow),
+                        isCollapsed,
+                        mGroup.key
+                );
+                billUiModelCache.put(monthHeaderKey, monthModel);
+            }
+            uiModels.add(monthModel);
 
             if (!isCollapsed) {
                 for (DayGroup dGroup : mGroup.dayGroups.values()) {
                     // Day Header
-                    uiModels.add(new AccountBillUiModel(
-                            AccountBillUiModel.TYPE_DAY_HEADER,
-                            dayFmt.format(dGroup.date),
-                            "流出: ¥" + df.format(dGroup.totalOutflow) + " 流入: ¥" + df.format(dGroup.totalInflow),
-                            null, null, false, dGroup.key
-                    ));
+                    String dayHeaderKey = "D_" + dGroup.key + "_" + dGroup.totalInflow + "_" + dGroup.totalOutflow;
+                    AccountBillUiModel dayModel = billUiModelCache.get(dayHeaderKey);
+                    if (dayModel == null) {
+                        dayModel = new AccountBillUiModel(
+                                AccountBillUiModel.TYPE_DAY_HEADER,
+                                DAY_TITLE_FMT.format(dGroup.date),
+                                "流出: ¥" + MONEY_FMT.format(dGroup.totalOutflow) + " 流入: ¥" + MONEY_FMT.format(dGroup.totalInflow),
+                                null, null, false, dGroup.key
+                        );
+                        billUiModelCache.put(dayHeaderKey, dayModel);
+                    }
+                    uiModels.add(dayModel);
 
                     // Bill Items
                     for (Bill bill : dGroup.bills) {
+                        // 唯一标识符：ID + 更新时间 + 余额（余额受后面账单影响，所以也要计入指纹）
+                        Double balanceAfter = billBalanceMap.get(bill.getId());
+                        if (balanceAfter == null) balanceAfter = 0.0;
+                        
+                        String billKey = "B_" + bill.getId() + "_" + 
+                                       (bill.getUpdatedAt() != null ? bill.getUpdatedAt().getTime() : 0) + "_" + 
+                                       balanceAfter;
+                        
+                        AccountBillUiModel cachedBill = billUiModelCache.get(billKey);
+                        if (cachedBill != null) {
+                            uiModels.add(cachedBill);
+                            continue;
+                        }
+
+                        // 创建新对象并缓存
                         boolean isIncome = isPositiveImpact(bill, currentAccountId, currentLocalAccountId);
                         String prefix = isIncome ? "+" : "-";
                         int amountColor = isIncome ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B");
                         
-                        Double balanceAfter = billBalanceMap.get(bill.getId());
-                        if (balanceAfter == null) balanceAfter = 0.0;
                         String balanceLabel = isCredit ? "欠款: " : "余额: ";
                         double displayBalance = isCredit ? Math.abs(balanceAfter) : balanceAfter;
 
-                        String timeNote = timeFmt.format(bill.getBillTime());
+                        StringBuilder timeNote = new StringBuilder(TIME_FMT.format(bill.getBillTime()));
                         if (bill.getRemark() != null && !bill.getRemark().isEmpty()) {
-                            timeNote += " · " + bill.getRemark();
+                            timeNote.append(" · ").append(bill.getRemark());
                         }
 
-                        uiModels.add(new AccountBillUiModel(
+                        AccountBillUiModel newBillModel = new AccountBillUiModel(
                                 bill.getId(),
                                 bill.getObjectId(),
                                 bill.getCategoryName(),
                                 bill.getCategoryIconUrl(),
-                                timeNote,
-                                prefix + "¥" + df.format(bill.getAmount()),
+                                timeNote.toString(),
+                                prefix + "¥" + MONEY_FMT.format(bill.getAmount()),
                                 amountColor,
-                                balanceLabel + "¥" + df.format(displayBalance),
+                                balanceLabel + "¥" + MONEY_FMT.format(displayBalance),
                                 bill
-                        ));
+                        );
+                        billUiModelCache.put(billKey, newBillModel);
+                        uiModels.add(newBillModel);
                     }
                 }
             }
         }
+        
+        // 清理过期的缓存（简单的 LRU 或定期清理可在此实现，这里先保持内存一致性）
+        if (billUiModelCache.size() > 500) billUiModelCache.clear(); 
+        
         return uiModels;
+    }
+
+    /**
+     * 快速判断数据是否发生实质性变化（首尾 ID、数量、账户余额）
+     */
+    public boolean isDataUnchanged(List<Bill> bills, Account account, Set<String> collapsedMonths, boolean showingExpense) {
+        if (bills == null || account == null) return false;
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append(bills.size()).append("_");
+        if (!bills.isEmpty()) {
+            Bill first = bills.get(0);
+            Bill last = bills.get(bills.size() - 1);
+            sb.append(first.getId()).append("_").append(first.getUpdatedAt() != null ? first.getUpdatedAt().getTime() : 0).append("_");
+            sb.append(last.getId()).append("_").append(last.getUpdatedAt() != null ? last.getUpdatedAt().getTime() : 0).append("_");
+        }
+        sb.append(account.getBalance()).append("_");
+        sb.append(collapsedMonths.size()).append("_");
+        sb.append(showingExpense);
+        
+        String newFingerprint = sb.toString();
+        if (newFingerprint.equals(lastDataFingerprint)) {
+            return true;
+        }
+        lastDataFingerprint = newFingerprint;
+        return false;
     }
 
     private boolean isPositiveImpact(Bill bill, String currentAccountId, long currentLocalAccountId) {
