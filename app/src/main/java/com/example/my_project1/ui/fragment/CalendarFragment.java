@@ -2,8 +2,6 @@ package com.example.my_project1.ui.fragment;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +24,7 @@ import com.example.my_project1.ui.adapter.bill.BillListAdapter;
 import com.example.my_project1.ui.adapter.calendar.CalendarInfoAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.HolidayUtil;
 import com.haibin.calendarview.Calendar;
 import com.haibin.calendarview.CalendarView;
@@ -35,8 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class CalendarFragment extends Fragment implements
         CalendarView.OnCalendarSelectListener,
@@ -51,8 +48,6 @@ public class CalendarFragment extends Fragment implements
     // 缓存已生成的日历 Scheme Map，避免重复生成
     private Map<String, Calendar> mFullSchemeMap = new HashMap<>();
     private String mLastStatsFingerprint = ""; // 🚀 渲染拦截指纹
-    private final ExecutorService mExecutor = Executors.newSingleThreadExecutor();
-    private final Handler mMainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
     @Override
@@ -133,7 +128,7 @@ public class CalendarFragment extends Fragment implements
         }
         mLastStatsFingerprint = fingerprint;
 
-        mExecutor.execute(() -> {
+        AppExecutors.get().computation().execute(() -> {
             Map<String, Calendar> schemeMap = new HashMap<>();
             
             // 1. 将账单统计转换为日历 Scheme
@@ -158,7 +153,7 @@ public class CalendarFragment extends Fragment implements
             // 2. 补全可见范围内的节假日（即使没账单也要显示“休/班”）
             addVisibleHolidays(schemeMap);
 
-            mMainHandler.post(() -> {
+            AppExecutors.get().mainThread().execute(() -> {
                 if (binding == null) return;
                 mFullSchemeMap = schemeMap;
                 binding.calendarView.setSchemeDate(schemeMap);
@@ -226,7 +221,7 @@ public class CalendarFragment extends Fragment implements
         binding.tvYearMonth.setText(String.format(Locale.getDefault(), "%d / %d", calendar.getYear(), calendar.getMonth()));
         
         // 计算相对时间（今天/x天前）
-        mExecutor.execute(() -> {
+        AppExecutors.get().computation().execute(() -> {
             java.util.Calendar today = java.util.Calendar.getInstance();
             today.set(java.util.Calendar.HOUR_OF_DAY, 0); today.set(java.util.Calendar.MINUTE, 0);
             today.set(java.util.Calendar.SECOND, 0); today.set(java.util.Calendar.MILLISECOND, 0);
@@ -239,7 +234,7 @@ public class CalendarFragment extends Fragment implements
             long diff = (target.getTimeInMillis() - today.getTimeInMillis()) / (1000 * 60 * 60 * 24);
             String text = diff == 0 ? "今天" : (diff > 0 ? diff + "天后" : Math.abs(diff) + "天前");
             
-            mMainHandler.post(() -> {
+            AppExecutors.get().mainThread().execute(() -> {
                 if (binding != null) binding.tvRelativeTime.setText(text);
             });
         });
