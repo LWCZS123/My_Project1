@@ -5,10 +5,12 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -16,18 +18,17 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.Category;
 import com.example.my_project1.data.model.CategoryWithSubCategories;
 import com.example.my_project1.data.model.SubCategory;
+import com.example.my_project1.ui.activity.IconSelectionActivity;
 import com.example.my_project1.ui.adapter.CategoryAdapter;
 import com.example.my_project1.ui.viewmodel.CategoryViewModel;
 import com.example.my_project1.ui.viewmodel.SubCategoryViewModel;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
-import org.jetbrains.annotations.Nullable;
-
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import cn.bmob.v3.BmobUser;
-import io.reactivex.annotations.NonNull;
 
 public class IncomeCategoryFragment extends Fragment {
 
@@ -39,6 +40,8 @@ public class IncomeCategoryFragment extends Fragment {
     private SubCategoryViewModel subCategoryViewModel;
     private String userId;
     private boolean isFirstLoad = true;
+    private List<Category> currentList = new ArrayList<>();
+    private boolean isSorting = false;
 
     @Nullable
     @Override
@@ -52,6 +55,8 @@ public class IncomeCategoryFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new CategoryAdapter(requireContext());
         recyclerView.setAdapter(adapter);
+
+        setupDragToSort();
 
         categoryViewModel = new ViewModelProvider(requireActivity())
                 .get(CategoryViewModel.class);
@@ -70,6 +75,10 @@ public class IncomeCategoryFragment extends Fragment {
 
         // 监听收入分类数据
         categoryViewModel.getIncomeCategories(userId).observe(getViewLifecycleOwner(), categoryWithSubsList -> {
+            if (isSorting) {
+                Log.d("IncomeFragment", "正在排序中，忽略回调更新");
+                return;
+            }
             Log.d("IncomeFragment", "收到分类数量：" + (categoryWithSubsList == null ? 0 : categoryWithSubsList.size()));
             if (categoryWithSubsList != null) {
                 for (CategoryWithSubCategories cw : categoryWithSubsList) {
@@ -87,7 +96,8 @@ public class IncomeCategoryFragment extends Fragment {
         adapter.setOnCategoryClickListener(new CategoryAdapter.OnCategoryClickListener() {
             @Override
             public void onCategoryClick(Category category) {
-                // 可根据需要实现
+                CategoryDetailBottomSheetFragment dialog = CategoryDetailBottomSheetFragment.newInstance(category);
+                dialog.show(getParentFragmentManager(), "category_detail");
             }
 
             @Override
@@ -118,33 +128,80 @@ public class IncomeCategoryFragment extends Fragment {
             recyclerView.setVisibility(View.VISIBLE);
 
             // 转换成 Category 列表，带上子分类
-            List<Category> categories = new ArrayList<>();
+            List<Category> newList = new ArrayList<>();
             for (CategoryWithSubCategories cw : categoriesWithSubs) {
                 Category c = cw.category;
-                c.setSubCategories(cw.subCategories);
-                categories.add(c);
+                List<SubCategory> subs = cw.subCategories;
+                if (subs != null) {
+                    // 手动按 sortIndex 排序子分类
+                    Collections.sort(subs, (o1, o2) -> Integer.compare(o1.getSortIndex(), o2.getSortIndex()));
+                }
+                c.setSubCategories(subs);
+                newList.add(c);
             }
-            adapter.submitList(categories);
+            adapter.submitList(newList);
         }
     }
 
-    private void showAddSubCategoryDialog(Category category) {
-        CategoryAddBottomSheetFragment dialog = new CategoryAddBottomSheetFragment();
-        // 设置标题为二级分类标题
-        Bundle args = new Bundle();
-        args.putString("title", "新建二级分类");
-        dialog.setArguments(args);
+    private void setupDragToSort() {
+        ItemTouchHelper touchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                int fromPos = viewHolder.getBindingAdapterPosition();
+                int toPos = target.getBindingAdapterPosition();
 
-        // 设置子分类回调
-        dialog.setOnCategoryAddedListener((name, excludeBudget, iconUrl) -> {
-            long parentId = category.getId();
-            String parentCloudId = category.getCloudId();
-            SubCategory subCategory = new SubCategory(parentId, userId, name, iconUrl,parentCloudId);
-            subCategoryViewModel.insert(subCategory);
-            Toast.makeText(getActivity(), "已添加子分类，后台自动同步中...", Toast.LENGTH_SHORT).show();
+                if (fromPos < 0 || toPos < 0 || fromPos >= adapter.getItemCount() || toPos >= adapter.getItemCount()) {
+                    return false;
+                }
+
+                // 同步移动数据源
+                adapter.moveItem(fromPos, toPos);
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+
+            @Override
+            public void onSelectedChanged(@Nullable RecyclerView.ViewHolder viewHolder, int actionState) {
+                super.onSelectedChanged(viewHolder, actionState);
+                if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                    isSorting = true;
+                }
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                
+                // 松手即定，持久化
+                saveOrder();
+                
+                // 延长屏蔽时间
+                recyclerView.postDelayed(() -> isSorting = false, 1000);
+            }
         });
+        touchHelper.attachToRecyclerView(recyclerView);
+    }
 
-        dialog.show(getParentFragmentManager(), "sub_category_add");
+    private void saveOrder() {
+        List<Category> list = adapter.getCurrentList();
+        for (int i = 0; i < list.size(); i++) {
+            list.get(i).setSortIndex(i);
+        }
+        categoryViewModel.updateCategoryOrder(new ArrayList<>(list));
+    }
+
+    private void showAddSubCategoryDialog(Category category) {
+        android.content.Intent intent = new android.content.Intent(getActivity(), IconSelectionActivity.class);
+        intent.putExtra(IconSelectionActivity.EXTRA_MODE, "add");
+        intent.putExtra(IconSelectionActivity.EXTRA_TYPE, "subcategory");
+        intent.putExtra(IconSelectionActivity.EXTRA_TITLE, "新建二级分类");
+        intent.putExtra(IconSelectionActivity.EXTRA_PARENT_ID, category.getId());
+        intent.putExtra(IconSelectionActivity.EXTRA_PARENT_CLOUD_ID, category.getCloudId());
+        startActivity(intent);
     }
 
     private void showMoreSubCategoryDialog(SubCategory subCategory) {
@@ -156,6 +213,8 @@ public class IncomeCategoryFragment extends Fragment {
         args.putString("categoryIconUrl", subCategory.getIconUri());
         args.putLong("subcategoryId", subCategory.getId());
         args.putString("type", "subcategory");
+        args.putString("categoryCloudId", subCategory.getCloudId());
+        args.putString("categoryType", "income");
 
         Log.d("IncomeCategoryFragment", subCategory.getIconUri());
         Log.d("IncomeCategoryFragment", subCategory.getName());
@@ -173,6 +232,8 @@ public class IncomeCategoryFragment extends Fragment {
         args.putString("categoryIconUrl", category.getIconUri());
         args.putString("type", "category");
         args.putLong("categoryId", category.getId());
+        args.putString("categoryCloudId", category.getCloudId());
+        args.putString("categoryType", category.getType());
 
         dialog.setArguments(args);
         dialog.show(getParentFragmentManager(), "category_more");

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet1"
+    android:orientation="vertical"
+    android:paddingBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/iv_category_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_default_category"/>
+
+        <TextView
+            android:id="@+id/tv_category_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="分类名称"
+            android:textColor="#333333"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_modify"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="修改"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_sort"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="排序"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_promote"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="调整为一级分类"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:visibility="gone"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:id="@+id/divider_promote" android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE" android:visibility="gone"/>
+
+    <TextView
+        android:id="@+id/btn_migrate"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="迁移数据"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_belong_to"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="归属到其它分类"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_view_bills"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="查看账单"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_archive"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="归档"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+
+    <TextView
+        android:id="@+id/btn_delete"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="删除分类"
+        android:textColor="#F44336"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+    <View android:layout_width="match_parent" android:layout_height="8dp" android:background="#F8F8F8"/>
+
+    <TextView
+        android:id="@+id/btn_cancel"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center"
+        android:text="取消"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"/>
+
+</LinearLayout>

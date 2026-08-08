@@ -8,6 +8,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.my_project1.R;
@@ -31,7 +32,6 @@ import java.util.Locale;
 import java.util.Map;
 
 import cn.bmob.v3.BmobUser;
-import androidx.lifecycle.ViewModelProvider;
 
 /**
  * 分类账单明细页
@@ -48,6 +48,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
 
     public static final String EXTRA_CATEGORY_NAME   = "category_name";
     public static final String EXTRA_CATEGORY_ICON   = "category_icon";
+    public static final String EXTRA_CATEGORY_ID     = "category_id";
     public static final String EXTRA_BILL_COUNT      = "bill_count";
     public static final String EXTRA_PERIOD_START_MS = "period_start_ms";
     public static final String EXTRA_PERIOD_END_MS   = "period_end_ms";
@@ -90,6 +91,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
 
         String categoryName = getIntent().getStringExtra(EXTRA_CATEGORY_NAME);
         String categoryIcon = getIntent().getStringExtra(EXTRA_CATEGORY_ICON);
+        String categoryId   = getIntent().getStringExtra(EXTRA_CATEGORY_ID);
         int    billCount    = getIntent().getIntExtra(EXTRA_BILL_COUNT, 0);
         long   startMs      = getIntent().getLongExtra(EXTRA_PERIOD_START_MS, 0L);
         long   endMs        = getIntent().getLongExtra(EXTRA_PERIOD_END_MS, Long.MAX_VALUE);
@@ -103,7 +105,33 @@ public class CategoryBillsActivity extends AppCompatActivity {
         binding.rvBills.setAdapter(adapter);
         binding.rvBills.setNestedScrollingEnabled(false);
 
-        loadBills(categoryName, billType, startMs, endMs);
+        if (categoryId != null && !categoryId.isEmpty()) {
+            observeBillsByCategory(categoryId);
+        } else {
+            loadBills(categoryName, billType, startMs, endMs);
+        }
+    }
+
+    private void observeBillsByCategory(String categoryId) {
+        billViewModel.getBillsByCategory(categoryId).observe(this, bills -> {
+            if (bills == null) return;
+            
+            // 更新笔数
+            binding.tvBillCount.setText(bills.size() + "笔账单");
+            
+            // 按时间降序
+            Collections.sort(bills, (a, b) -> {
+                if (a.getBillTime() == null) return 1;
+                if (b.getBillTime() == null) return -1;
+                return b.getBillTime().compareTo(a.getBillTime());
+            });
+
+            List<BillListAdapter.ListItem> listItems = buildGroupedList(bills);
+            boolean empty = listItems.isEmpty();
+            binding.rvBills.setVisibility(empty ? View.GONE : View.VISIBLE);
+            binding.layoutEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            adapter.setData(listItems);
+        });
     }
 
     @Override

@@ -68,20 +68,23 @@ public class BmobUserApiImpl {
                             Log.d(TAG, "✅ 云端更新成功: " + profile.getUsername());
 
                             // 🔑 关键：更新本地数据库状态
-                            try {
-                                profile.setSyncState(SyncState.SYNCED);
-                                profile.setUpdatedAt(new Date());
-                                db.userProfileDao().update(profile);
-                                Log.d(TAG, "   ✅ 本地状态已更新为SYNCED");
-                                success[0] = true;
-                            } catch (Exception ex) {
-                                Log.e(TAG, "   ❌ 更新本地状态失败: " + ex.getMessage());
-                            }
+                            com.example.my_project1.utils.AppExecutors.get().diskIO().execute(() -> {
+                                try {
+                                    profile.setSyncState(SyncState.SYNCED);
+                                    profile.setUpdatedAt(new Date());
+                                    db.userProfileDao().update(profile);
+                                    Log.d(TAG, "   ✅ 本地状态已更新为SYNCED");
+                                    success[0] = true;
+                                } catch (Exception ex) {
+                                    Log.e(TAG, "   ❌ 更新本地状态失败: " + ex.getMessage());
+                                }
+                                latch.countDown();
+                            });
                         } else {
                             Log.e(TAG, "❌ 云端更新失败: " + e.getMessage() +
                                     " (错误码: " + e.getErrorCode() + ")");
+                            latch.countDown();
                         }
-                        latch.countDown();
                     }
                 });
 

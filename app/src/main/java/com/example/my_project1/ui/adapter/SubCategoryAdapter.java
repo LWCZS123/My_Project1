@@ -52,7 +52,7 @@ public class SubCategoryAdapter extends ListAdapter<SubCategory, SubCategoryAdap
             Glide.with(context)
                     .load(R.drawable.ic_add_circle)
                     .into(holder.ivIcon);
-            holder.cardView.setOnClickListener(v -> {
+            holder.layoutIcon.setOnClickListener(v -> {
                 if (listener != null) listener.onAddSubCategoryClick();
             });
         } else {
@@ -63,7 +63,7 @@ public class SubCategoryAdapter extends ListAdapter<SubCategory, SubCategoryAdap
                     .error(R.drawable.ic_default_category)
                     .into(holder.ivIcon);
 
-            holder.cardView.setOnClickListener(v -> {
+            holder.layoutIcon.setOnClickListener(v -> {
                 if (listener != null) listener.onSubCategoryClick(sub);
             });
         }
@@ -72,13 +72,13 @@ public class SubCategoryAdapter extends ListAdapter<SubCategory, SubCategoryAdap
     static class SubViewHolder extends RecyclerView.ViewHolder {
         ImageView ivIcon;
         TextView tvName;
-        CardView cardView;
+        View layoutIcon;
 
         SubViewHolder(View itemView) {
             super(itemView);
             ivIcon = itemView.findViewById(R.id.iv_icon);
             tvName = itemView.findViewById(R.id.tv_name);
-            cardView = itemView.findViewById(R.id.cardView);
+            layoutIcon = itemView.findViewById(R.id.layoutIconContainer);
         }
     }
 

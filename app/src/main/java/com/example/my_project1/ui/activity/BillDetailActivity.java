@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -253,6 +254,21 @@ public class BillDetailActivity extends AppCompatActivity {
         // 2. 分类信息
         binding.tvCategory.setText(bill.getCategoryName());
         ImageLoaderUtils.loadThumbnail(this, bill.getCategoryIconUrl(), binding.ivCategoryIcon);
+
+        // 🎨 设置图标背景色
+        if (bill.getCategoryIconBackgroundColor() != null && !bill.getCategoryIconBackgroundColor().isEmpty()) {
+            try {
+                int color = Color.parseColor(bill.getCategoryIconBackgroundColor());
+                GradientDrawable gd = new GradientDrawable();
+                gd.setShape(GradientDrawable.OVAL);
+                gd.setColor(color);
+                binding.ivCategoryIcon.setBackground(gd);
+            } catch (Exception e) {
+                binding.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+            }
+        } else {
+            binding.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+        }
 
         // 3. 类型和金额
         if (bill.getType() == 0) {

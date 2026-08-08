@@ -40,6 +40,9 @@ public interface CategoryDao {
     @Update
     void update(Category category);
 
+    @Update
+    void updateCategories(List<Category> categories);
+
     @Delete
     void delete(Category category);
 
@@ -65,7 +68,7 @@ public interface CategoryDao {
     long[] insertCategories(List<Category> categories);
 
     @Transaction
-    @Query("SELECT * FROM categories WHERE owner_id = :userId AND type = :type ORDER BY `order` ASC")
+    @Query("SELECT * FROM categories WHERE owner_id = :userId AND type = :type ORDER BY sort_index ASC")
     LiveData<List<CategoryWithSubCategories>> getCategoriesWithSubs(String userId, String type);
 
     @Query("SELECT * FROM categories WHERE sync_state != 0")

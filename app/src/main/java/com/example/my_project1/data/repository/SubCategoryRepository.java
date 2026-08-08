@@ -207,7 +207,7 @@ public class SubCategoryRepository {
                                     if (!equalsSubCategory(local, cloud)) {
                                         local.setName(cloud.getName());
                                         local.setIconUri(cloud.getIconUri());
-                                        local.setOrder(cloud.getOrder());
+                                        local.setSortIndex(cloud.getOrder());
                                         local.setOwnerId(cloud.getOwnerId() != null
                                                 ? cloud.getOwnerId().getObjectId() : null);
                                         // ★ 更新时也同步 parentCloudId
@@ -276,7 +276,7 @@ public class SubCategoryRepository {
     private boolean equalsSubCategory(SubCategory local, CloudSubCategory cloud) {
         return safeEquals(local.getName(), cloud.getName())
                 && safeEquals(local.getIconUri(), cloud.getIconUri())
-                && local.getOrder() == cloud.getOrder();
+                && local.getSortIndex() == cloud.getOrder();
     }
 
     private boolean safeEquals(Object a, Object b) {

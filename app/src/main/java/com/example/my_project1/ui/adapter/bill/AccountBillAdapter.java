@@ -2,6 +2,7 @@ package com.example.my_project1.ui.adapter.bill;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -340,6 +341,21 @@ public class AccountBillAdapter extends ListAdapter<AccountDetailUiModel, Recycl
                 ImageLoaderUtils.loadThumbnail(context, m.categoryIconUrl, binding.ivCategoryIcon);
             } else {
                 binding.ivCategoryIcon.setImageResource(R.drawable.ic_category);
+            }
+
+            // 🎨 设置图标背景色
+            if (m.originalBill != null && m.originalBill.getCategoryIconBackgroundColor() != null && !m.originalBill.getCategoryIconBackgroundColor().isEmpty()) {
+                try {
+                    int color = Color.parseColor(m.originalBill.getCategoryIconBackgroundColor());
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    binding.ivCategoryIcon.setBackground(gd);
+                } catch (Exception e) {
+                    binding.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+                }
+            } else {
+                binding.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
             }
             
             binding.tvCategoryName.setText(m.categoryName);

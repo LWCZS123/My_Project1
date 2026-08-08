@@ -18,7 +18,7 @@ import java.util.List;
 public class IconSelectionColorAdapter extends RecyclerView.Adapter<IconSelectionColorAdapter.VH> {
 
     private List<String> colors = new ArrayList<>();
-    private String selectedColor;
+    private String selectedColor = null; // 默认不选中
     private final OnColorClickListener listener;
 
     public interface OnColorClickListener {
@@ -31,6 +31,7 @@ public class IconSelectionColorAdapter extends RecyclerView.Adapter<IconSelectio
     }
 
     private void initDefaultColors() {
+        colors.add(null); // Add "None" option
         colors.add("#EF5350"); // Red
         colors.add("#FF7043"); // Orange
         colors.add("#FFCA28"); // Yellow
@@ -59,17 +60,34 @@ public class IconSelectionColorAdapter extends RecyclerView.Adapter<IconSelectio
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         String colorStr = colors.get(position);
-        try {
-            int color = Color.parseColor(colorStr);
-            GradientDrawable gd = new GradientDrawable();
-            gd.setShape(GradientDrawable.OVAL);
-            gd.setColor(color);
-            holder.vColor.setBackground(gd);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
-        holder.ivSelected.setVisibility(colorStr.equalsIgnoreCase(selectedColor) ? View.VISIBLE : View.GONE);
+        if (colorStr == null) {
+            // "None" option
+            holder.vColor.setBackgroundResource(R.drawable.bg_circle_grey);
+            holder.ivSelected.setImageResource(R.drawable.ic_close);
+            holder.ivSelected.setColorFilter(Color.parseColor("#999999"));
+            holder.ivSelected.setVisibility(View.VISIBLE);
+            
+            // If currently selected is null, show check instead of close? 
+            // Or just highlight the border. Let's show check if selected.
+            if (selectedColor == null) {
+                holder.ivSelected.setImageResource(R.drawable.ic_check);
+                holder.ivSelected.setColorFilter(Color.WHITE);
+            }
+        } else {
+            try {
+                int color = Color.parseColor(colorStr);
+                GradientDrawable gd = new GradientDrawable();
+                gd.setShape(GradientDrawable.OVAL);
+                gd.setColor(color);
+                holder.vColor.setBackground(gd);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            holder.ivSelected.setImageResource(R.drawable.ic_check);
+            holder.ivSelected.setColorFilter(Color.WHITE);
+            holder.ivSelected.setVisibility(colorStr.equalsIgnoreCase(selectedColor) ? View.VISIBLE : View.GONE);
+        }
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onColorClick(colorStr);

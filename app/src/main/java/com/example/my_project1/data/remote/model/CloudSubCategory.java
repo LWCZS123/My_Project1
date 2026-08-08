@@ -46,6 +46,12 @@ public class CloudSubCategory extends BmobObject {
     /** 图标地址或资源标识 */
     private String iconUri;
 
+    /** 图标背景色 */
+    private String iconBackgroundColor;
+
+    /** 是否计入预算 */
+    private boolean excludeBudget;
+
     /** 可选颜色 */
     private String color;
 
@@ -70,6 +76,12 @@ public class CloudSubCategory extends BmobObject {
 
     public String getIconUri() { return iconUri; }
     public void setIconUri(String iconUri) { this.iconUri = iconUri; }
+
+    public String getIconBackgroundColor() { return iconBackgroundColor; }
+    public void setIconBackgroundColor(String iconBackgroundColor) { this.iconBackgroundColor = iconBackgroundColor; }
+
+    public boolean isExcludeBudget() { return excludeBudget; }
+    public void setExcludeBudget(boolean excludeBudget) { this.excludeBudget = excludeBudget; }
 
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
@@ -101,11 +113,13 @@ public class CloudSubCategory extends BmobObject {
         local.setOwnerId(ownerId != null ? ownerId.getObjectId() : null);
         local.setName(name);
         local.setIconUri(iconUri);
+        local.setIconBackgroundColor(iconBackgroundColor);
         local.setColor(color);
-        local.setOrder(order);
+        local.setSortIndex(order);
         local.setUpdatedAt(System.currentTimeMillis());
         local.setSyncState(SyncState.SYNCED.getValue());
         local.setSystemPreset(false);
+        local.setExcludeBudget(excludeBudget);
         return local;
     }
 
@@ -144,8 +158,10 @@ public class CloudSubCategory extends BmobObject {
         // 基本字段
         cloud.setName(local.getName());
         cloud.setIconUri(local.getIconUri());
+        cloud.setIconBackgroundColor(local.getIconBackgroundColor());
+        cloud.setExcludeBudget(local.isExcludeBudget());
         cloud.setColor(local.getColor());
-        cloud.setOrder(local.getOrder());
+        cloud.setOrder(local.getSortIndex());
 
         return cloud;
     }

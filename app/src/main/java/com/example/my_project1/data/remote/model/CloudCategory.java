@@ -26,9 +26,11 @@ public class CloudCategory extends BmobObject {
     private String type;     // "支出" 或 "收入"
     private String name;     // 分类名
     private String iconUri;  // 图标URI
+    private String iconBackgroundColor; // 图标背景色
     private String color;    // 可选颜色
     private int order;       // 排序序号
     private boolean isSystemPreset = false; //系统预设分类
+    private boolean excludeBudget = false; // 是否计入预算
 
     // ----- Getter and Setter -----
 
@@ -72,6 +74,22 @@ public class CloudCategory extends BmobObject {
         this.iconUri = iconUri;
     }
 
+    public String getIconBackgroundColor() {
+        return iconBackgroundColor;
+    }
+
+    public void setIconBackgroundColor(String iconBackgroundColor) {
+        this.iconBackgroundColor = iconBackgroundColor;
+    }
+
+    public boolean isExcludeBudget() {
+        return excludeBudget;
+    }
+
+    public void setExcludeBudget(boolean excludeBudget) {
+        this.excludeBudget = excludeBudget;
+    }
+
     public String getColor() {
         return color;
     }
@@ -103,12 +121,13 @@ public class CloudCategory extends BmobObject {
         local.setType(type);
         local.setName(name);
         local.setIconUri(iconUri);
+        local.setIconBackgroundColor(iconBackgroundColor);
         local.setColor(color);
-        local.setOrder(order);
+        local.setSortIndex(order);
         local.setUpdatedAt(System.currentTimeMillis());
         local.setSyncState(SyncState.SYNCED.getValue()); // 标记为已同步
         local.setSystemPreset(false); // 默认不是系统预设
-        local.setExcludeBudget(false);
+        local.setExcludeBudget(excludeBudget);
         return local;
     }
     public static CloudCategory fromLocalCategory(Category local) {
@@ -120,8 +139,10 @@ public class CloudCategory extends BmobObject {
         cloud.setType(local.getType());
         cloud.setName(local.getName());
         cloud.setIconUri(local.getIconUri());
+        cloud.setIconBackgroundColor(local.getIconBackgroundColor());
+        cloud.setExcludeBudget(local.isExcludeBudget());
         cloud.setColor(local.getColor());
-        cloud.setOrder(local.getOrder());
+        cloud.setOrder(local.getSortIndex());
 
         // 创建时间、更新时间由 Bmob 维护
         return cloud;

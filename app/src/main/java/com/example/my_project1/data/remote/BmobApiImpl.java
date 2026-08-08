@@ -74,7 +74,7 @@ public class BmobApiImpl {
         cloud.setName(localCategory.getName());
         cloud.setIconUri(localCategory.getIconUri());
         cloud.setColor(localCategory.getColor());
-        cloud.setOrder(localCategory.getOrder());
+        cloud.setOrder(localCategory.getSortIndex());
 
         cloud.save(new SaveListener<String>() {
             @Override
@@ -103,7 +103,7 @@ public class BmobApiImpl {
         cloud.setName(localCategory.getName());
         cloud.setIconUri(localCategory.getIconUri());
         cloud.setColor(localCategory.getColor());
-        cloud.setOrder(localCategory.getOrder());
+        cloud.setOrder(localCategory.getSortIndex());
         cloud.setLocalId(localCategory.getId());
 
         cloud.update(localCategory.getCloudId(), new UpdateListener() {
@@ -369,8 +369,10 @@ public class BmobApiImpl {
                     public void done(BmobException e) {
                         if (e == null) {
                             localCat.setSyncState(SyncState.SYNCED.getValue());
-                            db.categoryDao().update(localCat);
-                            Log.d(TAG, "🔄 更新父分类成功: " + localCat.getName());
+                            com.example.my_project1.utils.AppExecutors.get().diskIO().execute(() -> {
+                                db.categoryDao().update(localCat);
+                                Log.d(TAG, "🔄 更新父分类成功: " + localCat.getName());
+                            });
                         } else {
                             Log.e(TAG, "❌ 更新父分类失败: " + e.getMessage());
                         }
@@ -398,7 +400,7 @@ public class BmobApiImpl {
 
                     // 设置其他字段
                     cloudSub.setColor(sub.getColor());
-                    cloudSub.setOrder(sub.getOrder());
+                    cloudSub.setOrder(sub.getSortIndex());
 
                     // 🔧 核心修复: 确保 cloudId 正确保存到本地
                     if (sub.getCloudId() == null || sub.getCloudId().isEmpty()) {
@@ -442,8 +444,10 @@ public class BmobApiImpl {
                             public void done(BmobException e) {
                                 if (e == null) {
                                     sub.setSyncState(SyncState.SYNCED.getValue());
-                                    db.subCategoryDao().update(sub);
-                                    Log.d(TAG, "🔄 更新子分类成功: " + sub.getName());
+                                    com.example.my_project1.utils.AppExecutors.get().diskIO().execute(() -> {
+                                        db.subCategoryDao().update(sub);
+                                        Log.d(TAG, "🔄 更新子分类成功: " + sub.getName());
+                                    });
                                 } else {
                                     Log.e(TAG, "❌ 更新子分类失败: " + sub.getName() + " - " + e.getMessage());
                                 }

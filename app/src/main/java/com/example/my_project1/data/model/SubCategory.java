@@ -74,9 +74,16 @@ public class SubCategory {
     @ColumnInfo(name = "icon_uri")
     public String iconUri;
 
+    @ColumnInfo(name = "icon_background_color")
+    public String iconBackgroundColor;
+
+    @ColumnInfo(name = "exclude_budget")
+    private boolean excludeBudget;
+
     public String color;
 
-    public int order;
+    @ColumnInfo(name = "sort_index")
+    public int sortIndex;
 
     @ColumnInfo(name = "updated_at")
     public long updatedAt;
@@ -117,7 +124,7 @@ public class SubCategory {
         this.iconUri = iconUri;
         this.updatedAt = System.currentTimeMillis();
         this.syncState = SyncState.TO_CREATE.getValue();
-        this.order = 0;
+        this.sortIndex = 0;
     }
 
     // -------------------------------------------------------------------------
@@ -158,11 +165,17 @@ public class SubCategory {
     public String getIconUri() { return iconUri; }
     public void setIconUri(String iconUri) { this.iconUri = iconUri; }
 
+    public String getIconBackgroundColor() { return iconBackgroundColor; }
+    public void setIconBackgroundColor(String iconBackgroundColor) { this.iconBackgroundColor = iconBackgroundColor; }
+
+    public boolean isExcludeBudget() { return excludeBudget; }
+    public void setExcludeBudget(boolean excludeBudget) { this.excludeBudget = excludeBudget; }
+
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
 
-    public int getOrder() { return order; }
-    public void setOrder(int order) { this.order = order; }
+    public int getSortIndex() { return sortIndex; }
+    public void setSortIndex(int sortIndex) { this.sortIndex = sortIndex; }
 
     public long getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(long updatedAt) { this.updatedAt = updatedAt; }
@@ -198,6 +211,33 @@ public class SubCategory {
      */
     public boolean isReadyToUpload() {
         return parentCloudId != null && !parentCloudId.isEmpty();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SubCategory that = (SubCategory) o;
+        return id == that.id &&
+                parentCategoryId == that.parentCategoryId &&
+                sortIndex == that.sortIndex &&
+                updatedAt == that.updatedAt &&
+                syncState == that.syncState &&
+                isSystemPreset == that.isSystemPreset &&
+                isAddButton == that.isAddButton &&
+                excludeBudget == that.excludeBudget &&
+                java.util.Objects.equals(parentCloudId, that.parentCloudId) &&
+                java.util.Objects.equals(cloudId, that.cloudId) &&
+                java.util.Objects.equals(ownerId, that.ownerId) &&
+                java.util.Objects.equals(name, that.name) &&
+                java.util.Objects.equals(iconUri, that.iconUri) &&
+                java.util.Objects.equals(iconBackgroundColor, that.iconBackgroundColor) &&
+                java.util.Objects.equals(color, that.color);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id, parentCategoryId, parentCloudId, cloudId, ownerId, name, iconUri, iconBackgroundColor, color, sortIndex, updatedAt, syncState, isSystemPreset, isAddButton, excludeBudget);
     }
 
     @Override

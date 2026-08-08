@@ -98,7 +98,29 @@ public class CategoryViewModel extends AndroidViewModel {
 
     public void deleteCategoryById(long categoryId) { repository.deleteCategoryById(categoryId); }
 
-    public void updateCategorySafe(long id, String newName, String newIconUri, boolean excludeBudget) {
+    public void updateSortIndex(long id, int index) {
+        AppExecutors.get().diskIO().execute(() -> {
+            Category cat = repository.getCategoryById(id);
+            if (cat != null && cat.getSortIndex() != index) {
+                cat.setSortIndex(index);
+                cat.markUpdatedForSync();
+                repository.update(cat);
+            }
+        });
+    }
+
+    public void updateCategoryOrder(List<Category> categories) {
+        AppExecutors.get().diskIO().execute(() -> {
+            for (int i = 0; i < categories.size(); i++) {
+                Category cat = categories.get(i);
+                cat.setSortIndex(i);
+                cat.markUpdatedForSync();
+            }
+            repository.updateAll(categories);
+        });
+    }
+
+    public void updateCategorySafe(long id, String newName, String newIconUri, String newIconBgColor, boolean excludeBudget) {
         AppExecutors.get().diskIO().execute(() -> {
             Category existing = repository.getCategoryById(id); // 或直接调用 DAO
             if (existing == null) {
@@ -109,6 +131,7 @@ public class CategoryViewModel extends AndroidViewModel {
             // 只修改需要改动的字段（保留 cloudId / ownerId / 其它字段）
             existing.setName(newName);
             existing.setIconUri(newIconUri);
+            existing.setIconBackgroundColor(newIconBgColor);
             existing.setExcludeBudget(excludeBudget);
             existing.markUpdatedForSync(); // 更新 updatedAt 并 set syncState = TO_UPDATE
 

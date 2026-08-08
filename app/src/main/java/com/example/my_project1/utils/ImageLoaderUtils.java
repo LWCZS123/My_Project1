@@ -50,9 +50,10 @@ public class ImageLoaderUtils {
                 .placeholder(placeholder)
                 .error(errorImage)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .skipMemoryCache(false);
+                .skipMemoryCache(false)
+                .dontAnimate(); // 🔑 统一关闭动画，防止UI图标闪烁
 
-        Glide.with(context.getApplicationContext())
+        Glide.with(context)
                 .load(url)
                 .apply(options)
                 .into(imageView);
@@ -60,36 +61,24 @@ public class ImageLoaderUtils {
 
     /**
      * 🚀 新增：加载缩略图（用于列表中的小图标）
-     * 适用场景：分类图标、账户图标
-     * 优化：先加载10%大小的缩略图，再加载完整图
+     * 优化：移除 thumbnail(0.1f) 因为对于小图它会造成二次闪烁；增加 dontAnimate()。
      */
     public static void loadThumbnail(Context context, String url, ImageView imageView) {
-
         if (context == null || imageView == null) return;
-        RequestOptions options = new RequestOptions ()
 
-                .placeholder (R.drawable.ic_placeholder)
+        RequestOptions options = new RequestOptions()
+                .placeholder(R.drawable.ic_placeholder)
+                .error(R.drawable.ic_load_error)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .skipMemoryCache(false)
+                .priority(Priority.HIGH)
+                .dontAnimate() // 🔑 关闭动画，防止闪烁
+                .centerCrop();
 
-                .error (R.drawable.ic_load_error)
-
-                .diskCacheStrategy (DiskCacheStrategy.ALL)
-
-                .skipMemoryCache (false)
-
-                .priority (Priority.HIGH)  // 高优先级
-
-                .centerCrop ();
-
-        Glide.with (context.getApplicationContext ())
-
-                .load (url)
-
-                .apply (options)
-
-                .thumbnail (0.1f)  // 🔑 先加载 10% 大小的缩略图
-
-                .into (imageView);
-
+        Glide.with(context)
+                .load(url)
+                .apply(options)
+                .into(imageView);
     }
 
     /**
@@ -313,10 +302,27 @@ public class ImageLoaderUtils {
     // ==================== 便捷方法（向后兼容）====================
 
     /**
-     * 加载分类图标（便捷方法）
+     * 🚀 新增：加载分类图标（优化版）
+     * 1. dontAnimate(): 彻底关闭渐变动画，防止由于"占位图->目标图"切换导致的闪烁。
+     * 2. diskCacheStrategy(ALL): 确保对于已下载图标能瞬间从磁盘/内存返回。
+     * 3. 去掉 thumbnail(0.1f): 对于列表小图标，分级加载反而会造成肉眼可见的二次刷新（闪烁）。
      */
-    public static void loadCategoryIcon(Context context, String iconUrl, ImageView imageView) {
-        loadThumbnail(context, iconUrl, imageView);
+    public static void loadCategoryIcon(Context context, String url, ImageView imageView) {
+        if (context == null || imageView == null) return;
+
+        RequestOptions options = new RequestOptions()
+                .placeholder(R.drawable.ic_default_category)
+                .error(R.drawable.ic_default_category)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .skipMemoryCache(false)
+                .priority(Priority.HIGH)
+                .dontAnimate() // 🔑 核心：关闭动画，防止闪烁
+                .centerCrop();
+
+        Glide.with(context)
+                .load(url)
+                .apply(options)
+                .into(imageView);
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.example.my_project1.ui.adapter.bill;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.my_project1.R;
 import com.example.my_project1.databinding.ItemBillBinding;
 import com.example.my_project1.ui.adapter.photo.PhotoAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
@@ -85,6 +88,21 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
             }
 
             ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, b.ivCategoryIcon);
+
+            // 🎨 设置图标背景色
+            if (bill.categoryIconBackgroundColor != null && !bill.categoryIconBackgroundColor.isEmpty()) {
+                try {
+                    int color = Color.parseColor(bill.categoryIconBackgroundColor);
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    b.ivCategoryIcon.setBackground(gd);
+                } catch (Exception e) {
+                    b.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+                }
+            } else {
+                b.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+            }
 
             if (bill.imageUrls != null && !bill.imageUrls.isEmpty()) {
                 b.ivBillImage.setVisibility(View.VISIBLE);

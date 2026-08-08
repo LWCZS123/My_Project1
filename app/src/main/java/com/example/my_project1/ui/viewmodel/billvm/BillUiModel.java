@@ -21,6 +21,7 @@ public class BillUiModel {
     public final String timeText;          // "14:30"
     public final String categoryName;      // "餐饮"
     public final String categoryIconUrl;   // Glide 加载 URL
+    public final String categoryIconBackgroundColor; // 图标背景色
     public final String amountText;        // "-¥21.00" / "+¥500.00"
     public final int    amountColor;       // 红/绿颜色 int（已 resolve）
     public final String accountName;       // 账户名称，如 "微信支付"
@@ -47,6 +48,7 @@ public class BillUiModel {
         this.timeText       = b.timeText;
         this.categoryName   = b.categoryName;
         this.categoryIconUrl= b.categoryIconUrl;
+        this.categoryIconBackgroundColor = b.categoryIconBackgroundColor;
         this.amountText     = b.amountText;
         this.amountColor    = b.amountColor;
         this.accountName    = b.accountName;
@@ -76,6 +78,7 @@ public class BillUiModel {
                 java.util.Objects.equals(timeText, that.timeText) &&
                 java.util.Objects.equals(categoryName, that.categoryName) &&
                 java.util.Objects.equals(categoryIconUrl, that.categoryIconUrl) &&
+                java.util.Objects.equals(categoryIconBackgroundColor, that.categoryIconBackgroundColor) &&
                 java.util.Objects.equals(amountText, that.amountText) &&
                 java.util.Objects.equals(accountName, that.accountName) &&
                 java.util.Objects.equals(toAccountName, that.toAccountName) &&
@@ -88,8 +91,8 @@ public class BillUiModel {
     @Override
     public int hashCode() {
         return java.util.Objects.hash(localId, objectId, timeText, categoryName, categoryIconUrl,
-                amountText, amountColor, accountName, toAccountName, accountIconUrl, billType,
-                remarkText, locationText, imageUrls, isFirstOfDay, isLastOfDay);
+                categoryIconBackgroundColor, amountText, amountColor, accountName, toAccountName,
+                accountIconUrl, billType, remarkText, locationText, imageUrls, isFirstOfDay, isLastOfDay);
     }
 
     public static Builder builder() { return new Builder(); }
@@ -100,6 +103,7 @@ public class BillUiModel {
         String timeText       = "";
         String categoryName   = "";
         String categoryIconUrl= "";
+        String categoryIconBackgroundColor = null;
         String amountText     = "";
         int    amountColor;
         String accountName    = "";
@@ -117,6 +121,7 @@ public class BillUiModel {
         public Builder timeText(String v)     { timeText = v; return this; }
         public Builder categoryName(String v) { categoryName = v; return this; }
         public Builder categoryIconUrl(String v){ categoryIconUrl = v; return this; }
+        public Builder categoryIconBackgroundColor(String v) { categoryIconBackgroundColor = v; return this; }
         public Builder amountText(String v)   { amountText = v; return this; }
         public Builder amountColor(int v)     { amountColor = v; return this; }
         public Builder accountName(String v)  { accountName = v != null ? v : ""; return this; }

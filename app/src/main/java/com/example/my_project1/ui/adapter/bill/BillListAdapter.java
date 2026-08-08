@@ -1,6 +1,8 @@
 package com.example.my_project1.ui.adapter.bill;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -108,6 +110,22 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
                 } else {
                     b.ivCategoryIcon.setImageResource(R.drawable.ic_wechat);
                 }
+
+                // 🎨 设置图标背景色
+                if (bill.categoryIconBackgroundColor != null && !bill.categoryIconBackgroundColor.isEmpty()) {
+                    try {
+                        int color = Color.parseColor(bill.categoryIconBackgroundColor);
+                        GradientDrawable gd = new GradientDrawable();
+                        gd.setShape(GradientDrawable.OVAL);
+                        gd.setColor(color);
+                        b.flIconWrap.setBackground(gd);
+                    } catch (Exception e) {
+                        b.flIconWrap.setBackgroundResource(R.drawable.bg_circle_gray);
+                    }
+                } else {
+                    b.flIconWrap.setBackgroundResource(R.drawable.bg_circle_gray);
+                }
+
                 b.tvCategoryName.setText(bill.categoryName);
                 
                 // Bind note
@@ -184,6 +202,21 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
                 ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, binding.ivCategoryIcon);
             } else {
                 binding.ivCategoryIcon.setImageResource(R.drawable.ic_wechat);
+            }
+
+            // 🎨 设置图标背景色
+            if (bill.categoryIconBackgroundColor != null && !bill.categoryIconBackgroundColor.isEmpty()) {
+                try {
+                    int color = Color.parseColor(bill.categoryIconBackgroundColor);
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    binding.flIconWrap.setBackground(gd);
+                } catch (Exception e) {
+                    binding.flIconWrap.setBackgroundResource(R.drawable.bg_circle_gray);
+                }
+            } else {
+                binding.flIconWrap.setBackgroundResource(R.drawable.bg_circle_gray);
             }
 
             // 分类名

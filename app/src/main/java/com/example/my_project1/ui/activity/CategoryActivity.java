@@ -15,7 +15,7 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.Category;
 import com.example.my_project1.databinding.ActivityCategoryBinding;
 import com.example.my_project1.ui.adapter.CategoryPagerAdapter;
-import com.example.my_project1.ui.fragment.CategoryAddBottomSheetFragment;
+import com.example.my_project1.ui.activity.IconSelectionActivity;
 import com.example.my_project1.ui.viewmodel.CategoryViewModel;
 
 import org.jetbrains.annotations.Nullable;
@@ -85,18 +85,12 @@ public class CategoryActivity extends AppCompatActivity {
             int position = binding.viewPager.getCurrentItem();
             String type = position == 0 ? "expense" : "income";
 
-            CategoryAddBottomSheetFragment fragment = new CategoryAddBottomSheetFragment();
-            Bundle args = new Bundle();
-            args.putString("title", "新建一级分类");
-            fragment.setArguments(args);
-
-            fragment.setOnCategoryAddedListener((name, excludeBudget, iconUrl) -> {
-                Category category = new Category(userId, type, name, iconUrl, excludeBudget);
-                categoryViewModel.insert(category);
-                Toast.makeText(this, "已添加分类，后台自动同步中...", Toast.LENGTH_SHORT).show();
-            });
-
-            fragment.show(getSupportFragmentManager(), "category_add");
+            android.content.Intent intent = new android.content.Intent(this, IconSelectionActivity.class);
+            intent.putExtra(IconSelectionActivity.EXTRA_MODE, "add");
+            intent.putExtra(IconSelectionActivity.EXTRA_TYPE, "category");
+            intent.putExtra(IconSelectionActivity.EXTRA_TITLE, "新建一级分类");
+            intent.putExtra(IconSelectionActivity.EXTRA_CATEGORY_TYPE, type);
+            startActivity(intent);
         });
     }
 

@@ -32,8 +32,20 @@ public class IconSelectionViewModel extends AndroidViewModel {
     private final MutableLiveData<IconItem> _selectedIcon = new MutableLiveData<>();
     public final LiveData<IconItem> selectedIcon = _selectedIcon;
 
-    private final MutableLiveData<String> _selectedColor = new MutableLiveData<>("#EF5350");
+    private final MutableLiveData<String> _selectedColor = new MutableLiveData<>(null);
     public final LiveData<String> selectedColor = _selectedColor;
+
+    private final MutableLiveData<Boolean> _includeInBudget = new MutableLiveData<>(true);
+    public final LiveData<Boolean> includeInBudget = _includeInBudget;
+
+    private final MutableLiveData<String> _mode = new MutableLiveData<>("add"); // "add" or "modify"
+    public final LiveData<String> mode = _mode;
+
+    private final MutableLiveData<String> _targetType = new MutableLiveData<>("category"); // "category" or "subcategory"
+    public final LiveData<String> targetType = _targetType;
+
+    private final MutableLiveData<Long> _targetId = new MutableLiveData<>(-1L);
+    public final LiveData<Long> targetId = _targetId;
 
     private final MutableLiveData<Boolean> _loading = new MutableLiveData<>(false);
     public final LiveData<Boolean> loading = _loading;
@@ -146,6 +158,16 @@ public class IconSelectionViewModel extends AndroidViewModel {
 
     public void selectColor(String color) {
         _selectedColor.setValue(color);
+    }
+
+    public void setIncludeInBudget(boolean include) {
+        _includeInBudget.setValue(include);
+    }
+
+    public void setMode(String mode, String targetType, long targetId) {
+        _mode.setValue(mode);
+        _targetType.setValue(targetType);
+        _targetId.setValue(targetId);
     }
 
     public void search(String keyword) {

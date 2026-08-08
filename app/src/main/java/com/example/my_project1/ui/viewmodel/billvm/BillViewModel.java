@@ -32,6 +32,7 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -295,13 +296,16 @@ public class BillViewModel extends AndroidViewModel {
             if (bills == null || isCleared) return;
             
             // 🚀 性能优化：日历数据指纹校验
-            StringBuilder sb = new StringBuilder();
-            sb.append(bills.size()).append("_");
-            if (!bills.isEmpty()) {
-                Bill first = bills.get(0);
-                sb.append(first.getId()).append("_").append(first.getUpdatedAt() != null ? first.getUpdatedAt().getTime() : 0);
+            // 🔴 修复：同样改进日历指纹，确保所有账单的变化都能反映在日历统计中
+            long billChecksum = 0;
+            for (Bill b : bills) {
+                billChecksum += b.getId();
+                if (b.getUpdatedAt() != null) {
+                    billChecksum += b.getUpdatedAt().getTime();
+                }
             }
-            String fingerprint = sb.toString();
+            
+            String fingerprint = bills.size() + "_" + billChecksum;
             if (fingerprint.equals(lastCalendarFingerprint)) {
                 return;
             }
@@ -371,27 +375,35 @@ public class BillViewModel extends AndroidViewModel {
 
     /**
      * 快速判断首页数据指纹是否变化
+     * -------------------------------------------------------
+     * 🔴 修复：原逻辑只比对首尾账单，导致中间账单被修改（如备注、分类）时 UI 不刷新。
+     * 现在通过累加所有账单的更新时间戳来生成更可靠的指纹。
      */
     public boolean isHomeDataUnchanged(List<Bill> bills, List<Account> accounts) {
         if (bills == null) return false;
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append(bills.size()).append("_");
-        if (!bills.isEmpty()) {
-            Bill first = bills.get(0);
-            Bill last = bills.get(bills.size() - 1);
-            sb.append(first.getId()).append("_").append(first.getUpdatedAt() != null ? first.getUpdatedAt().getTime() : 0).append("_");
-            sb.append(last.getId()).append("_").append(last.getUpdatedAt() != null ? last.getUpdatedAt().getTime() : 0).append("_");
+
+        // 🔑 核心改进：累加所有账单的 ID 和更新时间，确保中间项修改也能被感知
+        long billChecksum = 0;
+        for (Bill b : bills) {
+            billChecksum += b.getId();
+            if (b.getUpdatedAt() != null) {
+                billChecksum += b.getUpdatedAt().getTime();
+            }
         }
-        
+        sb.append(billChecksum).append("_");
+
         // 加入账户指纹 (比对所有账户的余额变化)
         if (accounts != null) {
             sb.append(accounts.size()).append("_");
             for (Account acc : accounts) {
-                sb.append(acc.getBalance()).append(",");
+                // 余额是关键，但也包含同步状态以捕捉标记删除等变化
+                sb.append(acc.getBalance()).append(acc.getSyncState()).append(",");
             }
         }
-        
+
         String newFingerprint = sb.toString();
         if (newFingerprint.equals(lastHomeFingerprint)) {
             return true;
@@ -527,6 +539,7 @@ public class BillViewModel extends AndroidViewModel {
                     .timeText(TIME_FMT.format(bill.getBillTime()))
                     .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
                     .categoryIconUrl(categoryIcon)
+                    .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
                     .amountText(amountText)
                     .amountColor(amountColor)
                     .accountName(account != null ? account.getName() : "")
@@ -549,6 +562,23 @@ public class BillViewModel extends AndroidViewModel {
     private List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills, Map<String, Account> accountMap) {
         if (bills == null || bills.isEmpty()) return new ArrayList<>();
 
+        // 🔴 修复：显式强制按时间降序排列，防止由于数据库返回乱序（或相同时间戳导致的不稳定性）
+        // 从而引起同一天的账单被分到多个卡片的 Bug。
+        List<Bill> sortedBills = new ArrayList<>(bills);
+        Collections.sort(sortedBills, (b1, b2) -> {
+            Date t1 = b1.getBillTime();
+            Date t2 = b2.getBillTime();
+            if (t1 == null && t2 == null) return 0;
+            if (t1 == null) return 1;
+            if (t2 == null) return -1;
+            int res = t2.compareTo(t1);
+            if (res == 0) {
+                // 如果时间完全一致，按 ID 降序，保证排序稳定性
+                return Long.compare(b2.getId(), b1.getId());
+            }
+            return res;
+        });
+
         List<BillAdapter.BillGroup> groups = new ArrayList<>(10);
         String  prevDateKey = null;
         double  dayExpense  = 0;
@@ -556,8 +586,8 @@ public class BillViewModel extends AndroidViewModel {
         List<BillUiModel> currentDayBills = new ArrayList<>();
         BillAdapter.DateHeader currentHeader = null;
 
-        for (int i = 0; i < bills.size(); i++) {
-            Bill   bill    = bills.get(i);
+        for (int i = 0; i < sortedBills.size(); i++) {
+            Bill   bill    = sortedBills.get(i);
             Date billTime = bill.getBillTime();
             if (billTime == null) continue;
             
@@ -627,6 +657,7 @@ public class BillViewModel extends AndroidViewModel {
                         .timeText(TIME_FMT.format(bill.getBillTime()))
                         .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
                         .categoryIconUrl(categoryIcon)
+                        .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
                         .amountText(amountText)
                         .amountColor(amountColor)
                         .accountName(account != null ? account.getName() : "")
@@ -864,6 +895,11 @@ public class BillViewModel extends AndroidViewModel {
         
         mActiveAccountLiveDatas.put(cacheKey, result);
         return result;
+    }
+
+    public LiveData<List<Bill>> getBillsByCategory(String categoryId) {
+        if (currentUserId == null) return new MutableLiveData<>(new ArrayList<>());
+        return repository.getBillsByCategory(currentUserId, categoryId);
     }
 
     public void refreshData() {
@@ -1152,6 +1188,10 @@ public class BillViewModel extends AndroidViewModel {
     public void checkAndAutoSync() {
         checkUserSwitch();
         if (currentUserId == null) return;
+
+        // 🔑 修复：每次检查同步时，也触发一次本地数据刷新逻辑，
+        // 确保从其他 Activity 返回首页时，UI 状态（如月份范围、触发器）是最新的。
+        refreshData();
 
         long now = System.currentTimeMillis();
         // 如果是首次初始化，或者距离上次同步超过阈值，则触发静默同步

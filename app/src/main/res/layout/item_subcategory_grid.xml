@@ -8,6 +8,7 @@
 
     <!-- 圆形背景容器 -->
     <RelativeLayout
+        android:id="@+id/rl_icon_container"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:background="@drawable/bg_category_round"

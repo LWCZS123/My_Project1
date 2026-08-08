@@ -111,6 +111,18 @@ public class CategoryRepository {
         });
     }
 
+    /** 批量更新分类 */
+    public void updateAll(List<Category> categories) {
+        if (categories == null || categories.isEmpty()) return;
+        AppExecutors.get().diskIO().execute(() -> {
+            for (Category cat : categories) {
+                cat.setSyncState(SyncState.TO_UPDATE.getValue());
+            }
+            categoryDao.updateCategories(categories);
+            enqueueSync();
+        });
+    }
+
     /** 删除分类（标记删除，由 Worker 同步云端） */
     public void delete(Category category) {
         AppExecutors.get().diskIO().execute(() -> {
@@ -208,7 +220,7 @@ public class CategoryRepository {
                                         local.setType(cloud.getType());
                                         local.setColor(cloud.getColor());
                                         local.setIconUri(cloud.getIconUri());
-                                        local.setOrder(cloud.getOrder());
+                                        local.setSortIndex(cloud.getOrder());
                                         local.setUpdatedAt(System.currentTimeMillis());
                                         local.setSyncState(SyncState.SYNCED.getValue());
                                         categoryDao.update(local);
@@ -239,7 +251,7 @@ public class CategoryRepository {
                 && safeEquals(local.getType(), cloud.getType())
                 && safeEquals(local.getColor(), cloud.getColor())
                 && safeEquals(local.getIconUri(), cloud.getIconUri())
-                && local.getOrder() == cloud.getOrder()
+                && local.getSortIndex() == cloud.getOrder()
                 && safeEquals(local.getOwnerId(), cloud.getOwnerId());
     }
 

@@ -341,7 +341,7 @@ public class IconMarketViewModel extends AndroidViewModel {
                 cat.setIconUri(item.getUrl());
                 cat.setType(type);
                 cat.setOwnerId(currentUserId);
-                cat.setOrder(0);
+                cat.setSortIndex(0);
                 cat.setSystemPreset(false);
                 cat.setUpdatedAt(System.currentTimeMillis());
                 // ★ 修复①：明确设置 TO_CREATE，不用 markUpdatedForSync
@@ -439,7 +439,7 @@ public class IconMarketViewModel extends AndroidViewModel {
                 sub.setIconUri(item.getUrl());
                 sub.setParentCategoryId(parentCategoryId);
                 sub.setOwnerId(currentUserId);
-                sub.setOrder(0);
+                sub.setSortIndex(0);
                 sub.setUpdatedAt(System.currentTimeMillis());
                 // ★ 修复②：填充 parentCloudId，SubCategorySyncWorker 依赖此字段判断是否可上传
                 sub.setParentCloudId(parentCloudId); // 若父类未同步则为 null，Worker 稍后会补全

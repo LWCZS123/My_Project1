@@ -45,14 +45,20 @@ public class Category {
 
     public String name;
 
+    public String note;
+
     @ColumnInfo(name = "icon_uri")
     public String iconUri;
+
+    @ColumnInfo(name = "icon_background_color")
+    public String iconBackgroundColor;
 
     /** 可选颜色，如 "#FF6B6B" */
     public String color;
 
     /** 排序权重，越小越靠前 */
-    public int order;
+    @ColumnInfo(name = "sort_index")
+    public int sortIndex;
 
     /** 本地修改时间戳（ms），用于多端冲突解决 */
     @ColumnInfo(name = "updated_at")
@@ -89,11 +95,12 @@ public class Category {
         this.type = type;
         this.name = name;
         this.iconUri = iconUri;
+        this.note = "";
         this.excludeBudget = excludeBudget != null && excludeBudget;
         this.updatedAt = System.currentTimeMillis();
         this.syncState = SyncState.TO_CREATE.getValue();
         this.subCategories = new ArrayList<>();
-        this.order = 0;
+        this.sortIndex = 0;
     }
 
     // -------------------------------------------------------------------------
@@ -115,14 +122,20 @@ public class Category {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
+
     public String getIconUri() { return iconUri; }
     public void setIconUri(String iconUri) { this.iconUri = iconUri; }
+
+    public String getIconBackgroundColor() { return iconBackgroundColor; }
+    public void setIconBackgroundColor(String iconBackgroundColor) { this.iconBackgroundColor = iconBackgroundColor; }
 
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
 
-    public int getOrder() { return order; }
-    public void setOrder(int order) { this.order = order; }
+    public int getSortIndex() { return sortIndex; }
+    public void setSortIndex(int sortIndex) { this.sortIndex = sortIndex; }
 
     public long getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(long updatedAt) { this.updatedAt = updatedAt; }
@@ -153,6 +166,33 @@ public class Category {
     public void markDeletedForSync() {
         this.updatedAt = System.currentTimeMillis();
         this.syncState = SyncState.TO_DELETE.getValue();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Category category = (Category) o;
+        return id == category.id &&
+                sortIndex == category.sortIndex &&
+                updatedAt == category.updatedAt &&
+                syncState == category.syncState &&
+                isSystemPreset == category.isSystemPreset &&
+                excludeBudget == category.excludeBudget &&
+                java.util.Objects.equals(cloudId, category.cloudId) &&
+                java.util.Objects.equals(ownerId, category.ownerId) &&
+                java.util.Objects.equals(type, category.type) &&
+                java.util.Objects.equals(name, category.name) &&
+                java.util.Objects.equals(note, category.note) &&
+                java.util.Objects.equals(iconUri, category.iconUri) &&
+                java.util.Objects.equals(iconBackgroundColor, category.iconBackgroundColor) &&
+                java.util.Objects.equals(color, category.color) &&
+                java.util.Objects.equals(subCategories, category.subCategories);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id, cloudId, ownerId, type, name, note, iconUri, iconBackgroundColor, color, sortIndex, updatedAt, syncState, isSystemPreset, excludeBudget, subCategories);
     }
 
     @Override

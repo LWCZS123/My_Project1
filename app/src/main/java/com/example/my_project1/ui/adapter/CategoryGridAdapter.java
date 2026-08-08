@@ -1,6 +1,8 @@
 package com.example.my_project1.ui.adapter;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,8 +20,6 @@ import com.example.my_project1.databinding.ItemCategoryGridBinding;
 import com.example.my_project1.ui.dialog.SubCategoryDialog;
 import com.example.my_project1.utils.ImageLoaderUtils;
 
-import java.net.URI;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +30,12 @@ import io.reactivex.annotations.NonNull;
 /**
  * CategoryGridAdapter - 分类网格适配器（支持编辑模式选中）
  * -------------------------------------------------------
- * ✅ 原有功能：显示分类、选中状态、子分类弹窗
- * ✅ ⭐ 新增功能：支持通过categoryId设置选中状态（编辑模式使用）
+ * ⭐ 修复闪烁：
+ * 1. preSelectedCategoryId 通过构造函数传入，第一次 onBindViewHolder 就能
+ *    直接绑定出正确的选中态，不再是"先绑定未选中 -> 再notify一次改成选中"。
+ * 2. updateData() 去掉 postDelayed(100)，改为在 submitList 的回调
+ *    (commitCallback) 里同步执行 findAndSelectCategory，这个回调本身就是
+ *    "diff计算完成、已应用到RecyclerView"之后的时机，不需要再猜测延迟时间。
  */
 public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, CategoryGridAdapter.ViewHolder> {
 
@@ -46,14 +50,24 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
     // 🔹 记录每个一级分类对应的选中二级分类
     private Map<Long, SubCategory> selectedSubCategoryMap = new HashMap<>();
 
-    // ⭐ 新增：记录要选中的分类ID（用于编辑模式）
-    private String preSelectedCategoryId = null;
+    // ⭐ 预选中的分类ID（编辑模式）。首次数据到达时会用它直接计算出selectedPosition，
+    // 不再有"先渲染未选中，后台再notify改成选中"的中间态。
+    private String preSelectedCategoryId;
 
     public interface OnCategorySelectedListener {
-        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl);
+        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor);
     }
 
     public CategoryGridAdapter(Context context) {
+        this(context, null);
+    }
+
+    /**
+     * ⭐ 新增构造函数：创建Adapter时就传入预选中分类ID。
+     * Fragment/Activity 在编辑模式下应使用此构造函数，从源头上避免"先创建
+     * 未选中的Adapter，再事后调用setSelectedCategory"的两阶段流程。
+     */
+    public CategoryGridAdapter(Context context, String preSelectedCategoryId) {
         super(new DiffUtil.ItemCallback<CategoryWithSubCategories>() {
             @Override
             public boolean areItemsTheSame(@NonNull CategoryWithSubCategories oldItem, @NonNull CategoryWithSubCategories newItem) {
@@ -67,6 +81,7 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
             }
         });
         this.context = context;
+        this.preSelectedCategoryId = preSelectedCategoryId;
     }
 
     public void setOnCategorySelectedListener(OnCategorySelectedListener listener) {
@@ -74,79 +89,82 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
     }
 
     /**
-     * ⭐ 新增：设置选中的分类（编辑模式使用）
-     * @param categoryId 要选中的分类的cloudId
+     * ⭐ 设置选中的分类（编辑模式使用）。
+     * 若此时数据已经加载完成（getItemCount() > 0），立即同步查找并选中；
+     * 若数据尚未到达，记录下来，交给 updateData() 的 submitList 回调处理，
+     * 不使用任何 postDelayed。
      */
     public void setSelectedCategory(String categoryId) {
-        Log.d(TAG, "⭐ setSelectedCategory: " + categoryId);
         this.preSelectedCategoryId = categoryId;
-
-        // 查找对应的位置并选中
-        findAndSelectCategory(categoryId);
+        if (getItemCount() > 0) {
+            findAndSelectCategory(categoryId, getCurrentList(), /*notify=*/true);
+        }
+        // getItemCount()==0 时，等 updateData() 会处理
     }
 
     /**
-     * ⭐ 新增：根据categoryId查找并选中分类
+     * @param notify 是否需要用 notifyItemChanged 触发局部刷新。
+     *               当这次选中计算发生在“数据首次绑定之前”（例如构造函数传入、
+     *               或 submitList 之前），不需要notify，
+     *               因为 onBindViewHolder 会直接读取 selectedPosition 完成正确绘制。
      */
-    private void findAndSelectCategory(String categoryId) {
-        if (categoryId == null) {
-            return;
-        }
+    private void findAndSelectCategory(String categoryId, List<CategoryWithSubCategories> data, boolean notify) {
+        if (categoryId == null || data == null) return;
 
-        // 遍历所有分类查找匹配的categoryId
-        for (int i = 0; i < getItemCount(); i++) {
-            CategoryWithSubCategories item = getItem(i);
+        for (int i = 0; i < data.size(); i++) {
+            CategoryWithSubCategories item = data.get(i);
 
-            // 1. 检查一级分类是否匹配
+            // 1. 一级分类匹配
             if (categoryId.equals(item.category.getCloudId())) {
-                int oldSelected = selectedPosition;
-                selectedPosition = i;
-                selectedSubCategoryMap.remove(item.category.getId());
-
-                if (oldSelected != -1) {
-                    notifyItemChanged(oldSelected);
-                }
-                notifyItemChanged(selectedPosition);
-
-                Log.d(TAG, "✅ 找到并选中一级分类: " + item.category.getName() + ", position=" + i);
+                applySelection(i, null, notify, data);
+                Log.d(TAG, "✅ 选中一级分类: " + item.category.getName() + ", position=" + i);
                 return;
             }
 
-            // 2. 检查二级分类是否匹配
-            if (item.subCategories != null && !item.subCategories.isEmpty()) {
+            // 2. 二级分类匹配
+            if (item.subCategories != null) {
                 for (SubCategory subCategory : item.subCategories) {
                     if (categoryId.equals(subCategory.getCloudId())) {
-                        int oldSelected = selectedPosition;
-                        selectedPosition = i;
-                        selectedSubCategoryMap.put(item.category.getId(), subCategory);
-
-                        if (oldSelected != -1) {
-                            notifyItemChanged(oldSelected);
-                        }
-                        notifyItemChanged(selectedPosition);
-
-                        Log.d(TAG, "✅ 找到并选中二级分类: " + item.category.getName() + "." +
-                                subCategory.getName() + ", position=" + i);
+                        applySelection(i, subCategory, notify, data);
+                        Log.d(TAG, "✅ 选中二级分类: " + item.category.getName() + "." + subCategory.getName());
                         return;
                     }
                 }
             }
         }
-
         Log.w(TAG, "⚠️ 未找到匹配的分类: " + categoryId);
     }
 
-    public void updateData(List<CategoryWithSubCategories> newCategories) {
-        submitList(newCategories);
+    private void applySelection(int position, SubCategory subCategory, boolean notify, List<CategoryWithSubCategories> currentData) {
+        int oldSelected = selectedPosition;
+        selectedPosition = position;
 
-        // ⭐ 数据更新后，如果有预选中的分类ID，重新查找并选中
-        if (preSelectedCategoryId != null) {
-            Log.d(TAG, "⭐ 数据更新后重新查找选中分类: " + preSelectedCategoryId);
-            // 🔴 延时一会，等 submitList 完成（ListAdapter 是异步的）
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                findAndSelectCategory(preSelectedCategoryId);
-            }, 100);
+        CategoryWithSubCategories item = currentData.get(position);
+        if (subCategory != null) {
+            selectedSubCategoryMap.put(item.category.getId(), subCategory);
+        } else {
+            selectedSubCategoryMap.remove(item.category.getId());
         }
+
+        if (notify) {
+            if (oldSelected != -1) notifyItemChanged(oldSelected);
+            notifyItemChanged(selectedPosition);
+        }
+    }
+
+    /**
+     * ⭐ 核心修复点：不再依赖 commitCallback 进行二次刷新。
+     * 在调用 submitList 之前，先利用新数据 newCategories 预计算出正确的
+     * selectedPosition。这样当 ListAdapter 开始绑定第一行数据时，
+     * selectedPosition 已经是有意义的值，onBindViewHolder 能一次性
+     * 渲染出正确的选中态，从物理上消除了“先显示未选中再闪烁成选中”的问题。
+     */
+    public void updateData(List<CategoryWithSubCategories> newCategories) {
+        if (preSelectedCategoryId != null && newCategories != null) {
+            // 在提交列表之前，先同步找出位置
+            findAndSelectCategory(preSelectedCategoryId, newCategories, false);
+        }
+        submitList(newCategories);
     }
 
     @NonNull
@@ -172,46 +190,50 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
         }
 
         void bind(CategoryWithSubCategories categoryData, int position) {
-            // 获取当前一级分类选中的二级分类（如果有）
             SubCategory selectedSub = selectedSubCategoryMap.get(categoryData.category.getId());
 
-            // 显示名称和图标
             if (position == selectedPosition && selectedSub != null) {
-                // 显示一级.二级
                 binding.tvCategoryName.setText(categoryData.category.getName() + "." + selectedSub.getName());
                 loadIcon(selectedSub.getIconUri(), binding.ivCategoryIcon);
             } else {
-                // 显示一级分类原始
                 binding.tvCategoryName.setText(categoryData.category.getName());
                 loadIcon(categoryData.category.getIconUri(), binding.ivCategoryIcon);
             }
 
-            // 是否显示三点指示器
             boolean hasSubCategories = categoryData.subCategories != null && !categoryData.subCategories.isEmpty();
             binding.ivDots.setVisibility(hasSubCategories ? android.view.View.VISIBLE : android.view.View.GONE);
 
-            // ⭐ 设置选中状态UI
             if (position == selectedPosition) {
-                binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round_selected); // 点亮圆形背景
-                binding.tvCategoryName.setTextColor(context.getColor(R.color.accent_color)); // 选中字变亮
+                binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round_selected);
+                binding.tvCategoryName.setTextColor(context.getColor(R.color.accent_color));
             } else {
-                binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round); // 恢复默认圆形
+                // 🎨 设置图标背景色
+                String bgColor = (selectedSub != null) ? selectedSub.getIconBackgroundColor() : categoryData.category.getIconBackgroundColor();
+                if (bgColor != null && !bgColor.isEmpty()) {
+                    try {
+                        int color = Color.parseColor(bgColor);
+                        GradientDrawable gd = new GradientDrawable();
+                        gd.setShape(GradientDrawable.OVAL);
+                        gd.setColor(color);
+                        binding.rlIconContainer.setBackground(gd);
+                    } catch (Exception e) {
+                        binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+                    }
+                } else {
+                    binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+                }
                 binding.tvCategoryName.setTextColor(context.getColor(R.color.black));
             }
 
-            // 点击事件
             itemView.setOnClickListener(v -> {
                 if (hasSubCategories) {
                     showSubCategoryDialog(categoryData, position);
                 } else {
-                    // 点击一级分类，重置之前的选中项
                     int oldSelected = selectedPosition;
                     selectedPosition = position;
                     selectedSubCategoryMap.remove(categoryData.category.getId());
 
-                    if (oldSelected != -1) {
-                        notifyItemChanged(oldSelected);
-                    }
+                    if (oldSelected != -1) notifyItemChanged(oldSelected);
                     notifyItemChanged(selectedPosition);
 
                     binding.tvCategoryName.setText(categoryData.category.getName());
@@ -221,7 +243,8 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
                         listener.onCategorySelected(
                                 categoryData.category.getName(),
                                 categoryData.category.getCloudId(),
-                                categoryData.category.getIconUri()
+                                categoryData.category.getIconUri(),
+                                categoryData.category.getIconBackgroundColor()
                         );
                     }
                 }
@@ -231,18 +254,13 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
         private void showSubCategoryDialog(CategoryWithSubCategories categoryData, int position) {
             SubCategoryDialog dialog = new SubCategoryDialog(context, categoryData, itemView);
             dialog.setOnSubCategorySelectedListener(subCategory -> {
-                // 设置当前选中状态
                 int oldSelected = selectedPosition;
                 selectedPosition = position;
                 selectedSubCategoryMap.put(categoryData.category.getId(), subCategory);
 
-                // 刷新上一个选中和当前选中
-                if (oldSelected != -1) {
-                    notifyItemChanged(oldSelected);
-                }
+                if (oldSelected != -1) notifyItemChanged(oldSelected);
                 notifyItemChanged(selectedPosition);
 
-                // 更新当前 item 显示
                 binding.tvCategoryName.setText(categoryData.category.getName() + "." + subCategory.getName());
                 loadIcon(subCategory.getIconUri(), binding.ivCategoryIcon);
 
@@ -250,7 +268,8 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
                     listener.onCategorySelected(
                             categoryData.category.getName() + "." + subCategory.getName(),
                             subCategory.getCloudId(),
-                            subCategory.getIconUri()
+                            subCategory.getIconUri(),
+                            subCategory.getIconBackgroundColor()
                     );
                 }
             });
@@ -261,16 +280,14 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
             Object iconSource = ImageLoaderUtils.getGlideSource(context, iconUri);
 
             if (iconSource instanceof String) {
-                String url = (String) iconSource;
-                try {
-                    url = new URI(url).toASCIIString();
-                } catch (Exception ignored) {}
-                ImageLoaderUtils.load(context, url, imageView,
-                        R.drawable.ic_default_category, R.drawable.ic_default_category);
+                // ⭐ 使用优化后的 loadCategoryIcon，关闭 dontAnimate，防止图片加载闪烁
+                ImageLoaderUtils.loadCategoryIcon(context, (String) iconSource, imageView);
 
             } else if (iconSource instanceof Uri) {
                 Glide.with(context)
                         .load((Uri) iconSource)
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                        .dontAnimate() // 🔑 同样关闭动画
                         .placeholder(R.drawable.ic_default_category)
                         .error(R.drawable.ic_default_category)
                         .into(imageView);

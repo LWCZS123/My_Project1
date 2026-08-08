@@ -48,7 +48,19 @@ public class SubCategoryViewModel extends AndroidViewModel {
     public void update(SubCategory subCategory) { repository.update(subCategory); }
 
     public void deleteSubCategoryById(long subCategoryId) { repository.deleteSubCategoryById(subCategoryId); }
-    public void updateSubCategorySafe(long id, String newName, String newIconUri, boolean excludeBudget) {
+
+    public void updateSortIndex(long id, int index) {
+        AppExecutors.get().diskIO().execute(() -> {
+            SubCategory sub = repository.getSubCategoryById(id);
+            if (sub != null && sub.getSortIndex() != index) {
+                sub.setSortIndex(index);
+                sub.markUpdatedForSync();
+                repository.update(sub);
+            }
+        });
+    }
+
+    public void updateSubCategorySafe(long id, String newName, String newIconUri, String newIconBgColor, boolean excludeBudget) {
         AppExecutors.get().diskIO().execute(() -> {
             SubCategory existing = repository.getSubCategoryById(id); // 或直接调用 DAO
             if (existing == null) {
@@ -59,7 +71,8 @@ public class SubCategoryViewModel extends AndroidViewModel {
             // 只修改需要改动的字段（保留 cloudId / ownerId / 其它字段）
             existing.setName(newName);
             existing.setIconUri(newIconUri);
-            //existing.setExcludeBudget(excludeBudget);
+            existing.setIconBackgroundColor(newIconBgColor);
+            existing.setExcludeBudget(excludeBudget);
             existing.markUpdatedForSync(); // 更新 updatedAt 并 set syncState = TO_UPDATE
 
             // 保存到本地（会触发 LiveData -> UI 更新）

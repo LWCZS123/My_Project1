@@ -24,6 +24,8 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -111,8 +113,20 @@ public class SearchViewModel extends AndroidViewModel {
      * ✅ UiModel 映射 (聚合版)
      */
     public List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills) {
-        List<BillAdapter.BillGroup> groups = new ArrayList<>();
-        if (bills == null || bills.isEmpty()) return groups;
+        if (bills == null || bills.isEmpty()) return new ArrayList<>();
+
+        // 🔴 修复：显式强制按时间降序排列，防止同一天的账单被分到多个卡片
+        List<Bill> sortedBills = new ArrayList<>(bills);
+        Collections.sort(sortedBills, (b1, b2) -> {
+            Date t1 = b1.getBillTime();
+            Date t2 = b2.getBillTime();
+            if (t1 == null && t2 == null) return 0;
+            if (t1 == null) return 1;
+            if (t2 == null) return -1;
+            int res = t2.compareTo(t1);
+            if (res == 0) return Long.compare(b2.getId(), b1.getId());
+            return res;
+        });
 
         Map<String, Account> accountMap = _accountMap.getValue();
         SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -127,8 +141,9 @@ public class SearchViewModel extends AndroidViewModel {
         List<BillUiModel> currentDayBills = new ArrayList<>();
         BillAdapter.DateHeader currentHeader = null;
 
-        for (int i = 0; i < bills.size(); i++) {
-            Bill   bill    = bills.get(i);
+        List<BillAdapter.BillGroup> groups = new ArrayList<>();
+        for (int i = 0; i < sortedBills.size(); i++) {
+            Bill   bill    = sortedBills.get(i);
             if (bill.getBillTime() == null) continue;
             
             String dateKey = dateKeyFmt.format(bill.getBillTime());
@@ -185,6 +200,7 @@ public class SearchViewModel extends AndroidViewModel {
                     .timeText(timeFmt.format(bill.getBillTime()))
                     .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
                     .categoryIconUrl(categoryIcon)
+                    .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
                     .amountText(amountText)
                     .amountColor(amountColor)
                     .accountName(account != null ? account.getName() : "")

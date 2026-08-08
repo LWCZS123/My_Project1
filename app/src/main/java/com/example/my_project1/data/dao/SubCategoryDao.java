@@ -112,8 +112,11 @@ public interface SubCategoryDao {
     @Query("SELECT * FROM sub_categories WHERE parent_category_id = :parentId")
     List<SubCategory> getByParentCategoryId(long parentId);
 
-    @Query("SELECT * FROM sub_categories WHERE parent_category_id = :parentId ORDER BY `order` ASC")
+    @Query("SELECT * FROM sub_categories WHERE parent_category_id = :parentId ORDER BY sort_index ASC")
     LiveData<List<SubCategory>> getSubCategoriesByParent(long parentId);
+
+    @Query("UPDATE sub_categories SET sort_index = :index WHERE id = :id")
+    void updateSortIndex(long id, int index);
 
     /** 所有待同步（syncState != SYNCED）的子分类 */
     @Query("SELECT * FROM sub_categories WHERE sync_state != 0")

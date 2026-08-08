@@ -16,41 +16,56 @@ import com.example.my_project1.ui.viewmodel.CategoryViewModel;
 
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-
 import io.reactivex.annotations.NonNull;
 
 /**
  * 分类网格 Fragment（ViewBinding版 + 编辑模式支持）
  * -------------------------------------------------------
- * 用于在 ViewPager2 中显示支出或收入分类
- * ✅ ⭐ 新增：支持设置选中分类（编辑模式使用）
+ * ⭐ 修复闪烁：
+ * newInstance() 新增 preSelectedCategoryId 参数，通过 Bundle 带入。
+ * onCreateView() 创建 Adapter 时直接用 preSelectedCategoryId 构造
+ * （见 CategoryGridAdapter 的双参数构造函数），这样 Adapter 从第一次
+ * onBindViewHolder 开始就知道该选中谁，不再需要"创建后setSelectedCategory
+ * 再notify一次"的两阶段流程。
  */
 public class CategoryGridFragment extends Fragment {
 
     private static final String TAG = "CategoryGridFragment";
     private static final String ARG_TYPE = "type";
     private static final String ARG_USER_ID = "user_id";
+    private static final String ARG_PRESELECTED_CATEGORY_ID = "preselected_category_id"; // ⭐ 新增
 
-    private String categoryType; // "expense" 或 "income"
+    private String categoryType;
     private String userId;
     private FragmentCategoryGridBinding binding;
     private CategoryGridAdapter adapter;
     private CategoryViewModel viewModel;
     private OnCategorySelectedListener listener;
 
-    // ⭐ 新增：预选中的分类ID（用于编辑模式）
+    // ⭐ 预选中的分类ID：优先来自newInstance的构造参数（编辑模式打开页面时的首选路径），
+    // 也允许运行时通过setSelectedCategory()动态覆盖（比如滑动切换类型时保持选择）。
     private String preSelectedCategoryId = null;
 
     public interface OnCategorySelectedListener {
-        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl);
+        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor);
     }
 
+    /** 保留原有2参数签名，非编辑模式或无需预选中时使用 */
     public static CategoryGridFragment newInstance(String type, String userId) {
+        return newInstance(type, userId, null);
+    }
+
+    /**
+     * ⭐ 新增：创建Fragment时就带上预选中分类ID。
+     * 编辑模式下，CategoryIconPagerAdapter.createFragment() 应调用此重载，
+     * 从源头保证Fragment/Adapter一创建出来就知道正确的选中态。
+     */
+    public static CategoryGridFragment newInstance(String type, String userId, @Nullable String preSelectedCategoryId) {
         CategoryGridFragment fragment = new CategoryGridFragment();
         Bundle args = new Bundle();
         args.putString(ARG_TYPE, type);
         args.putString(ARG_USER_ID, userId);
+        args.putString(ARG_PRESELECTED_CATEGORY_ID, preSelectedCategoryId);
         fragment.setArguments(args);
         return fragment;
     }
@@ -60,19 +75,14 @@ public class CategoryGridFragment extends Fragment {
     }
 
     /**
-     * ⭐ 新增：设置选中的分类（供AddBillActivity编辑模式调用）
+     * 设置选中的分类（供AddBillActivity在Fragment已存在时调用，例如
+     * 滑动切换tab后想强制回到原分类）。若adapter已创建，同步下发；
+     * 若尚未创建，记录下来，onCreateView时会用它构造Adapter。
      */
     public void setSelectedCategory(String categoryId) {
-        Log.d(TAG, "⭐ CategoryGridFragment.setSelectedCategory: " + categoryId +
-                " (type=" + categoryType + ")");
         this.preSelectedCategoryId = categoryId;
-
-        // 如果adapter已经初始化，立即设置
         if (adapter != null) {
             adapter.setSelectedCategory(categoryId);
-            Log.d(TAG, "✅ Adapter已存在，直接设置选中");
-        } else {
-            Log.d(TAG, "⚠️ Adapter未初始化，保存待设置的值");
         }
     }
 
@@ -82,6 +92,8 @@ public class CategoryGridFragment extends Fragment {
         if (getArguments() != null) {
             categoryType = getArguments().getString(ARG_TYPE);
             userId = getArguments().getString(ARG_USER_ID);
+            // ⭐ 从Bundle恢复预选中ID，构造Adapter时直接使用
+            preSelectedCategoryId = getArguments().getString(ARG_PRESELECTED_CATEGORY_ID);
         }
     }
 
@@ -91,33 +103,25 @@ public class CategoryGridFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         binding = FragmentCategoryGridBinding.inflate(inflater, container, false);
 
-        // 设置网格布局，每行5个
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 5);
         binding.recyclerCategory.setLayoutManager(layoutManager);
+        // ⭐ 彻底关闭 ItemAnimator，防止数据加载时的闪烁/入场动画
+        binding.recyclerCategory.setItemAnimator(null);
 
-        // 初始化适配器
-        adapter = new CategoryGridAdapter(getContext());
+        // ⭐ 核心修复：用带preSelectedCategoryId的构造函数创建Adapter，
+        // 而不是先new CategoryGridAdapter(context)再事后setSelectedCategory。
+        adapter = new CategoryGridAdapter(getContext(), preSelectedCategoryId);
 
-        // 设置分类选择监听器
-        adapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
-            // 通知Activity分类已选择
+        adapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor) -> {
             if (listener != null) {
-                listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
+                listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl, backgroundColor);
             }
         });
 
-        // ⭐ 关键：如果有预选中的分类ID，设置给adapter
-        if (preSelectedCategoryId != null) {
-            adapter.setSelectedCategory(preSelectedCategoryId);
-            Log.d(TAG, "⭐ onCreateView中设置预选中分类: " + preSelectedCategoryId);
-        }
-
         binding.recyclerCategory.setAdapter(adapter);
 
-        // 初始化 ViewModel
         viewModel = new ViewModelProvider(requireActivity()).get(CategoryViewModel.class);
 
-        // 观察数据变化
         observeCategories();
 
         return binding.getRoot();
@@ -133,24 +137,36 @@ public class CategoryGridFragment extends Fragment {
         if ("expense".equals(categoryType)) {
             viewModel.getExpenseCategories(userId).observe(getViewLifecycleOwner(), categories -> {
                 if (categories != null) {
+                    sortSubCategories(categories);
+                    // ⭐ adapter.updateData 内部通过 submitList 的 commitCallback
+                    // 同步应用 preSelectedCategoryId，不再有额外的postDelayed。
                     adapter.updateData(categories);
-                    Log.d(TAG, "✅ 支出分类数据已更新: " + categories.size() + " 条");
+                    Log.d(TAG, "支出分类数据已更新: " + categories.size() + " 条");
                 }
             });
         } else if ("income".equals(categoryType)) {
             viewModel.getIncomeCategories(userId).observe(getViewLifecycleOwner(), categories -> {
                 if (categories != null) {
+                    sortSubCategories(categories);
                     adapter.updateData(categories);
-                    Log.d(TAG, "✅ 收入分类数据已更新: " + categories.size() + " 条");
+                    Log.d(TAG, "收入分类数据已更新: " + categories.size() + " 条");
                 }
             });
         } else if ("transfer".equals(categoryType)) {
-            // 🔑 转账分类 (可以从 ViewModel 获取，或者使用硬编码的默认分类)
             viewModel.getTransferCategories(userId).observe(getViewLifecycleOwner(), categories -> {
                 if (categories != null) {
+                    sortSubCategories(categories);
                     adapter.updateData(categories);
                 }
             });
+        }
+    }
+
+    private void sortSubCategories(java.util.List<com.example.my_project1.data.model.CategoryWithSubCategories> list) {
+        for (com.example.my_project1.data.model.CategoryWithSubCategories cw : list) {
+            if (cw.subCategories != null) {
+                java.util.Collections.sort(cw.subCategories, (o1, o2) -> Integer.compare(o1.getSortIndex(), o2.getSortIndex()));
+            }
         }
     }
 }

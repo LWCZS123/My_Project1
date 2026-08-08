@@ -88,6 +88,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private String selectedCategoryName = null;
     private String selectedCategoryCloudId = null;
     private String selectedCategoryImageUrl = null;
+    private String selectedCategoryIconBackgroundColor = null;
 
     // 金额
     private double currentAmount = 0;
@@ -228,7 +229,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 }
             }
             updateAmountDisplay();
-            
+
             // 🔑 优化：初始化账户选中逻辑（ Intent 传参 > 上次使用 ）
             initAccountSelection();
         }
@@ -246,12 +247,12 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
 
     private void updateTransferUi() {
         boolean isTransfer = (billType == 2 || billType == 3);
-        
+
         // 🔑 核心重构：在转账模式下，隐藏底部的横向账户选择卡片，改由 Fragment 处理
         binding.cardAccount.setVisibility(isTransfer ? View.GONE : View.VISIBLE);
-        binding.ivTransferArrow.setVisibility(View.GONE); 
-        binding.cardTargetAccount.setVisibility(View.GONE); 
-        
+        binding.ivTransferArrow.setVisibility(View.GONE);
+        binding.cardTargetAccount.setVisibility(View.GONE);
+
         if (isTransfer) {
             syncTransferUi();
         }
@@ -361,6 +362,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         selectedCategoryCloudId = intent.getStringExtra("category_id");
         selectedCategoryName = intent.getStringExtra("category_name");
         selectedCategoryImageUrl = intent.getStringExtra("category_icon");
+        selectedCategoryIconBackgroundColor = intent.getStringExtra("category_icon_bg_color");
 
         // 4. 账户
         String accountId = intent.getStringExtra("account_id");
@@ -445,16 +447,20 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         binding.tvCalendar.setText(sdf.format(selectedBillTime));
         binding.ivCalendar.setVisibility(View.GONE);
 
-        // 11. ⭐ 设置类型并选中分类（延迟执行，确保ViewPager已初始化）
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            binding.viewpagerCategory.setCurrentItem(billType, false);
-            updateTabSelection(billType);
+        // 11. ⭐ 设置类型并选中分类
+        // 修复闪烁：不再用postDelayed(200)猜测ViewPager初始化时机。
+        // pagerAdapter.setSelectedCategory() 内部已经能正确处理两种情况：
+        //  - 若目标Fragment尚未创建（常见于此处，因为loadBillDataForEdit()
+        //    在setupViewPager()之后立即调用，Fragment可能还未createFragment），
+        //    会记录pending信息，createFragment()时随Fragment一起构造出来，
+        //    从而在Fragment/Adapter创建的第一时刻就带着正确选中态，无需二次刷新。
+        //  - 若Fragment已存在，直接同步调用，立即生效。
+        binding.viewpagerCategory.setCurrentItem(billType, false);
+        updateTabSelection(billType);
 
-            // ⭐ 通知Adapter选中指定分类
-            if (pagerAdapter != null && selectedCategoryCloudId != null) {
-                pagerAdapter.setSelectedCategory(billType, selectedCategoryCloudId);
-            }
-        }, 200);
+        if (pagerAdapter != null && selectedCategoryCloudId != null) {
+            pagerAdapter.setSelectedCategory(billType, selectedCategoryCloudId);
+        }
 
         // 更新金额显示
         updateAmountDisplay();
@@ -506,7 +512,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 AppExecutors.get().mainThread().execute(() -> {
                     selectedAccount = finalAccount;
                     updateBaseAccountUi(finalAccount);
-                    
+
                     // 如果已经初始化了 ViewPager 且处于转账模式，同步 UI
                     if (billType == 2 || billType == 3) {
                         syncTransferUi();
@@ -517,7 +523,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     }
 
     private boolean isValidAccount(Account account) {
-        return account != null 
+        return account != null
                 && account.getSyncState() != com.example.my_project1.data.model.SyncState.TO_DELETE
                 && account.isCanBeSelected();
     }
@@ -582,7 +588,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private void setupViewPager() {
         pagerAdapter = new CategoryIconPagerAdapter(this, currentUserId);
         binding.viewpagerCategory.setAdapter(pagerAdapter);
-        
+
         // 🔑 性能优化：预加载所有页面，减少切换时的布局渲染耗时
         binding.viewpagerCategory.setOffscreenPageLimit(3);
 
@@ -590,10 +596,11 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         pagerAdapter.setOnTransferAccountSelectedListener(this);
 
         // 分类选择监听
-        pagerAdapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
+        pagerAdapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor) -> {
             selectedCategoryName = displayName;
             selectedCategoryCloudId = categoryCloudId;
             selectedCategoryImageUrl = categoryImageUrl;
+            selectedCategoryIconBackgroundColor = backgroundColor;
         });
 
         // 页面切换监听
@@ -868,9 +875,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 return false;
             }
 
-            if (selectedAccount != null && selectedTargetAccount != null && 
-                selectedAccount.getObjectId() != null && 
-                selectedAccount.getObjectId().equals(selectedTargetAccount.getObjectId())) {
+            if (selectedAccount != null && selectedTargetAccount != null &&
+                    selectedAccount.getObjectId() != null &&
+                    selectedAccount.getObjectId().equals(selectedTargetAccount.getObjectId())) {
                 showSnackbar("转出账户和转入账户不能相同", SnackbarUtils.Type.WARNING);
                 return false;
             }
@@ -1058,13 +1065,13 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private void handleBillSaveSuccess() {
         isSaving = false;
         uploadViewModel.resetBatchUploadState();
-        
+
         // 保存最后使用的账户ID
         if (selectedAccount != null) {
             getSharedPreferences("bill_prefs", MODE_PRIVATE)
-                .edit()
-                .putString(PREF_LAST_ACCOUNT_ID, selectedAccount.getObjectId())
-                .apply();
+                    .edit()
+                    .putString(PREF_LAST_ACCOUNT_ID, selectedAccount.getObjectId())
+                    .apply();
         }
 
         if (isEditMode) {
@@ -1247,6 +1254,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         bill.setCategoryId(selectedCategoryCloudId);
         bill.setCategoryName(selectedCategoryName);
         bill.setCategoryIconUrl(selectedCategoryImageUrl);
+        bill.setCategoryIconBackgroundColor(selectedCategoryIconBackgroundColor);
         bill.setBillTime(selectedBillTime);
         bill.setRemark(billRemark);
         bill.setExcludeBudget(excludeBudget);
@@ -1266,7 +1274,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         if ((billType == 2 || billType == 3) && selectedTargetAccount != null) {
             bill.setToAccountId(selectedTargetAccount.getObjectId());
             bill.setToLocalAccountId(selectedTargetAccount.getId());
-            
+
             // 转账默认名称和图标 (如果没有选分类)
             if (bill.getCategoryName() == null) {
                 bill.setCategoryName(billType == 3 ? "还款" : "转账");

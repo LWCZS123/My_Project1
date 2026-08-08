@@ -47,6 +47,9 @@ public class Bill implements Serializable {
     @ColumnInfo(name = "category_icon")
     private String categoryIconUrl; // 分类图标（UI展示无需查表）
 
+    @ColumnInfo(name = "category_icon_bg_color")
+    private String categoryIconBackgroundColor;
+
     private double amount;        // 金额
     private int type;             // 0支出 1收入
 
@@ -137,6 +140,9 @@ public class Bill implements Serializable {
     public String getCategoryIconUrl() { return categoryIconUrl; }
     public void setCategoryIconUrl(String categoryIconUrl) { this.categoryIconUrl = categoryIconUrl; }
 
+    public String getCategoryIconBackgroundColor() { return categoryIconBackgroundColor; }
+    public void setCategoryIconBackgroundColor(String categoryIconBackgroundColor) { this.categoryIconBackgroundColor = categoryIconBackgroundColor; }
+
     public double getAmount() { return amount; }
     public void setAmount(double amount) { this.amount = amount; }
 
@@ -206,6 +212,8 @@ public class Bill implements Serializable {
             return false;
         if (categoryIconUrl != null ? !categoryIconUrl.equals(bill.categoryIconUrl) : bill.categoryIconUrl != null)
             return false;
+        if (categoryIconBackgroundColor != null ? !categoryIconBackgroundColor.equals(bill.categoryIconBackgroundColor) : bill.categoryIconBackgroundColor != null)
+            return false;
         if (remark != null ? !remark.equals(bill.remark) : bill.remark != null) return false;
         if (billTime != null ? !billTime.equals(bill.billTime) : bill.billTime != null) return false;
         if (imageUrls != null ? !imageUrls.equals(bill.imageUrls) : bill.imageUrls != null)
@@ -229,6 +237,7 @@ public class Bill implements Serializable {
         result = 31 * result + (categoryId != null ? categoryId.hashCode() : 0);
         result = 31 * result + (categoryName != null ? categoryName.hashCode() : 0);
         result = 31 * result + (categoryIconUrl != null ? categoryIconUrl.hashCode() : 0);
+        result = 31 * result + (categoryIconBackgroundColor != null ? categoryIconBackgroundColor.hashCode() : 0);
         temp = Double.doubleToLongBits(amount);
         result = 31 * result + (int) (temp ^ (temp >>> 32));
         result = 31 * result + type;

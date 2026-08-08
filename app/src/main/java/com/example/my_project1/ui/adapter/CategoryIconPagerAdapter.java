@@ -1,7 +1,5 @@
 package com.example.my_project1.ui.adapter;
 
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 
 import androidx.fragment.app.Fragment;
@@ -15,8 +13,12 @@ import io.reactivex.annotations.NonNull;
 /**
  * CategoryIconPagerAdapter - 分类图标ViewPager适配器（支持编辑模式）
  * -------------------------------------------------------
- * ✅ 原有功能：缓存支出和收入Fragment
- * ✅ ⭐ 新增功能：支持设置选中分类（编辑模式使用）
+ * ⭐ 修复闪烁：
+ * pendingCategoryId/pendingType 不再通过 postDelayed(100) 延迟下发，
+ * 而是在 createFragment() 时，通过 CategoryGridFragment.newInstance()
+ * 直接把预选中ID作为参数传给Fragment（Fragment内部会在adapter构造时
+ * 就带上这个ID，见 CategoryGridFragment 的修改）。
+ * 这样Fragment从创建的第一刻起就知道自己要选中谁，不需要"创建后再补一刀"。
  */
 public class CategoryIconPagerAdapter extends FragmentStateAdapter {
 
@@ -25,16 +27,18 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
     private String userId;
     private CategoryGridFragment expenseFragment;
     private CategoryGridFragment incomeFragment;
-    private com.example.my_project1.ui.fragment.TransferFragment transferFragment; // 🔑 替换为专门的转账 Fragment
+    private com.example.my_project1.ui.fragment.TransferFragment transferFragment;
     private OnCategorySelectedListener listener;
     private com.example.my_project1.ui.fragment.TransferFragment.OnTransferAccountSelectedListener transferListener;
 
-    // ⭐ 新增：保存预选中的分类信息（用于Fragment还未创建的情况）
+    // ⭐ 编辑模式下的预选中信息。必须在 setSelectedCategory() 被调用时就已经
+    // 确定（即在 setupViewPager() 之后、Fragment 尚未创建之前），这样
+    // createFragment() 才能把它一起传给 CategoryGridFragment.newInstance()。
     private String pendingCategoryId = null;
     private int pendingType = -1;
 
     public interface OnCategorySelectedListener {
-        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl);
+        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor);
     }
 
     public CategoryIconPagerAdapter(@NonNull FragmentActivity fragmentActivity, String userId) {
@@ -56,38 +60,35 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
     }
 
     private void setupFragmentListener(CategoryGridFragment fragment) {
-        fragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl) -> {
+        fragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor) -> {
             if (this.listener != null) {
-                this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl);
+                this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl, backgroundColor);
             }
         });
     }
 
     /**
-     * ⭐ 新增：设置指定类型页面的选中分类
-     * @param type 0=支出, 1=收入, 2=转账
-     * @param categoryId 要选中的分类cloudId
+     * ⭐ 设置指定类型页面的选中分类。
+     * - 若对应Fragment已存在（比如 offscreenPageLimit 已经把它创建出来），
+     *   直接同步调用 fragment.setSelectedCategory()，无延迟。
+     * - 若Fragment还没创建，记录 pendingCategoryId/pendingType，
+     *   等 createFragment() 时一起传入构造参数，而不是等创建完再补设置。
      */
     public void setSelectedCategory(int type, String categoryId) {
-        Log.d(TAG, "⭐ setSelectedCategory: type=" + type + ", categoryId=" + categoryId);
+        Log.d(TAG, "setSelectedCategory: type=" + type + ", categoryId=" + categoryId);
 
         if (type == 0 && expenseFragment != null) {
             expenseFragment.setSelectedCategory(categoryId);
         } else if (type == 1 && incomeFragment != null) {
             incomeFragment.setSelectedCategory(categoryId);
-        } else if (type >= 2) {
-            // 转账暂不支持通过此方式选中分类图标，因为已被卡片覆盖
-            pendingCategoryId = categoryId;
-            pendingType = type;
         } else {
+            // Fragment尚未创建（常见于ViewPager2 offscreenPageLimit还没
+            // 触发到该position），记下来，createFragment()会直接用上。
             pendingCategoryId = categoryId;
             pendingType = type;
         }
     }
 
-    /**
-     * ⭐ 获取转账 Fragment 实例
-     */
     public com.example.my_project1.ui.fragment.TransferFragment getTransferFragment() {
         return transferFragment;
     }
@@ -96,14 +97,16 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
     @Override
     public Fragment createFragment(int position) {
         if (position == 0) {
-            expenseFragment = CategoryGridFragment.newInstance("expense", userId);
+            String presetId = (pendingType == 0) ? pendingCategoryId : null;
+            expenseFragment = CategoryGridFragment.newInstance("expense", userId, presetId);
             if (listener != null) setupFragmentListener(expenseFragment);
-            applyPending(expenseFragment, 0);
+            if (presetId != null) { pendingCategoryId = null; pendingType = -1; }
             return expenseFragment;
         } else if (position == 1) {
-            incomeFragment = CategoryGridFragment.newInstance("income", userId);
+            String presetId = (pendingType == 1) ? pendingCategoryId : null;
+            incomeFragment = CategoryGridFragment.newInstance("income", userId, presetId);
             if (listener != null) setupFragmentListener(incomeFragment);
-            applyPending(incomeFragment, 1);
+            if (presetId != null) { pendingCategoryId = null; pendingType = -1; }
             return incomeFragment;
         } else {
             transferFragment = com.example.my_project1.ui.fragment.TransferFragment.newInstance();
@@ -114,25 +117,11 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
         }
     }
 
-    private void applyPending(CategoryGridFragment fragment, int type) {
-        if (pendingType == type && pendingCategoryId != null) {
-            final String cid = pendingCategoryId;
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                fragment.setSelectedCategory(cid);
-                pendingCategoryId = null;
-                pendingType = -1;
-            }, 100);
-        }
-    }
-
     @Override
     public int getItemCount() {
         return 3; // 支出、收入、转账
     }
 
-    /**
-     * ⭐ 新增：清除待设置的选中状态
-     */
     public void clearPendingSelection() {
         pendingCategoryId = null;
         pendingType = -1;

@@ -2,40 +2,34 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="4dp"
- >
+    android:padding="4dp">
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardView"
-
-        android:layout_width="38dp"
-        android:layout_height="38dp"
+    <RelativeLayout
+        android:id="@+id/layoutIconContainer"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_gravity="center"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="0dp"
-        app:cardBackgroundColor="#F5F5F5">
+        android:background="@drawable/bg_category_round">
 
         <ImageView
             android:id="@+id/iv_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:layout_gravity="center"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_centerInParent="true"
             android:scaleType="centerInside"
             android:contentDescription="分类图标" />
-    </androidx.cardview.widget.CardView>
+    </RelativeLayout>
 
     <TextView
         android:id="@+id/tv_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textSize="8sp"
-        android:textColor="#666666"
+        android:textSize="12sp"
+        android:textColor="#333333"
         android:maxLines="1"
-        android:textStyle="bold"
         android:ellipsize="end"
         android:maxWidth="64dp" />
 </LinearLayout>

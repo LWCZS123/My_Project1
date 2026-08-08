@@ -33,6 +33,7 @@ public class CloudBill extends BmobObject {
     private String categoryId;         // 分类ID
     private String categoryName;       // 分类名称（冗余字段）
     private String categoryIconUrl;    // 分类图标URL
+    private String categoryIconBackgroundColor; // 图标背景色
     private Double amount;             // 金额
     private Integer type;              // 0支出 1收入
     private Boolean excludeBudget;     // 是否不计入预算
@@ -60,6 +61,9 @@ public class CloudBill extends BmobObject {
 
     public String getCategoryIconUrl() { return categoryIconUrl; }
     public void setCategoryIconUrl(String categoryIconUrl) { this.categoryIconUrl = categoryIconUrl; }
+
+    public String getCategoryIconBackgroundColor() { return categoryIconBackgroundColor; }
+    public void setCategoryIconBackgroundColor(String categoryIconBackgroundColor) { this.categoryIconBackgroundColor = categoryIconBackgroundColor; }
 
     public Double getAmount() { return amount; }
     public void setAmount(Double amount) { this.amount = amount; }
@@ -165,6 +169,7 @@ public class CloudBill extends BmobObject {
         local.setCategoryId(categoryId);
         local.setCategoryName(categoryName);
         local.setCategoryIconUrl(categoryIconUrl);
+        local.setCategoryIconBackgroundColor(categoryIconBackgroundColor);
         local.setAmount(amount != null ? amount : 0);
         local.setType(type != null ? type : 0);
         local.setExcludeBudget(excludeBudget != null && excludeBudget);
@@ -212,6 +217,7 @@ public class CloudBill extends BmobObject {
         cloud.setCategoryId(local.getCategoryId());
         cloud.setCategoryName(local.getCategoryName());
         cloud.setCategoryIconUrl(local.getCategoryIconUrl());
+        cloud.setCategoryIconBackgroundColor(local.getCategoryIconBackgroundColor());
         cloud.setAmount(local.getAmount());
         cloud.setType(local.getType());
         cloud.setExcludeBudget(local.isExcludeBudget());
