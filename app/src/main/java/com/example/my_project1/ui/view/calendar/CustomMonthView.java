@@ -53,15 +53,16 @@ public class CustomMonthView extends MonthView {
         
         // 预计算尺寸
         mPadding = dipToPx(getContext(), 3);
-        mTagTextSize = dipToPx(getContext(), 8);
+        mTagTextSize = dipToPx(getContext(), 10);
         mTagMarginRight = dipToPx(getContext(), 10);
-        mTagMarginTop = dipToPx(getContext(), 10);
+        mTagMarginTop = dipToPx(getContext(), 11);
         mCapsuleTextSize = dipToPx(getContext(), 9);
         mCapsuleOffset1 = dipToPx(getContext(), 11);
         mCapsuleOffset2 = dipToPx(getContext(), 6);
         mRoundRadius = dipToPx(getContext(), 8);
 
         mTagPaint.setTextSize(mTagTextSize);
+        mTagPaint.setFakeBoldText(true);
         mIncomePaint.setTextSize(mCapsuleTextSize);
         mExpensePaint.setTextSize(mCapsuleTextSize);
 

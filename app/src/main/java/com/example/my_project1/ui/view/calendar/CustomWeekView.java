@@ -41,7 +41,8 @@ public class CustomWeekView extends WeekView {
         mHolidayPaint.setColor(0xFFE3F2FD);
 
         mTagPaint.setAntiAlias(true);
-        mTagPaint.setTextSize(dipToPx(getContext(), 8));
+        mTagPaint.setTextSize(dipToPx(getContext(), 10));
+        mTagPaint.setFakeBoldText(true);
 
         mPadding = dipToPx(getContext(), 3);
 
@@ -90,7 +91,7 @@ public class CustomWeekView extends WeekView {
             } else {
                 mTagPaint.setColor(0xFFFF5252);
             }
-            canvas.drawText(stat.dayTag, x + mItemWidth - dipToPx(getContext(), 10), dipToPx(getContext(), 10), mTagPaint);
+            canvas.drawText(stat.dayTag, x + mItemWidth - dipToPx(getContext(), 10), dipToPx(getContext(), 11), mTagPaint);
         }
 
         float cx = x + mItemWidth / 2f;

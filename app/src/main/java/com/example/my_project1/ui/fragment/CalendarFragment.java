@@ -44,6 +44,7 @@ public class CalendarFragment extends Fragment implements
     private BillListAdapter billAdapter;
     private CalendarInfoAdapter infoAdapter;
     private Calendar mCurrentSelectedDate;
+    private int mVisibleYear, mVisibleMonth;
 
     // 缓存已生成的日历 Scheme Map，避免重复生成
     private Map<String, Calendar> mFullSchemeMap = new HashMap<>();
@@ -81,6 +82,8 @@ public class CalendarFragment extends Fragment implements
         binding.calendarView.setOnCalendarSelectListener(this);
         binding.calendarView.setOnMonthChangeListener(this);
         mCurrentSelectedDate = binding.calendarView.getSelectedCalendar();
+        mVisibleYear = mCurrentSelectedDate.getYear();
+        mVisibleMonth = mCurrentSelectedDate.getMonth();
         updateDateTitle(mCurrentSelectedDate);
         updateTodayButtonVisibility(mCurrentSelectedDate);
     }
@@ -113,7 +116,6 @@ public class CalendarFragment extends Fragment implements
     private void observeData() {
         // 核心优化：观察 ViewModel 预计算好的统计 Map
         billViewModel.dailyStatsMap.observe(getViewLifecycleOwner(), statsMap -> {
-            if (statsMap == null) return;
             updateCalendarSchemes(statsMap);
         });
 
@@ -123,36 +125,44 @@ public class CalendarFragment extends Fragment implements
 
     private void updateCalendarSchemes(Map<String, DailyStat> statsMap) {
         // 🚀 性能拦截：计算指纹，防止重复渲染
-        String fingerprint = statsMap.size() + "_" + statsMap.hashCode();
+        int statsSize = statsMap == null ? 0 : statsMap.size();
+        int statsHash = statsMap == null ? 0 : statsMap.hashCode();
+        String fingerprint = statsSize + "_" + statsHash + "_" + mVisibleYear + "_" + mVisibleMonth;
+        
         if (java.util.Objects.equals(fingerprint, mLastStatsFingerprint)) {
             return;
         }
         mLastStatsFingerprint = fingerprint;
 
+        final int year = mVisibleYear;
+        final int month = mVisibleMonth;
+
         AppExecutors.get().computation().execute(() -> {
             Map<String, Calendar> schemeMap = new HashMap<>();
             
             // 1. 将账单统计转换为日历 Scheme
-            for (Map.Entry<String, DailyStat> entry : statsMap.entrySet()) {
-                String dateKey = entry.getKey(); // yyyy-MM-dd
-                DailyStat stat = entry.getValue();
-                
-                Calendar calendar = parseDateKey(dateKey);
-                if (calendar == null) continue;
+            if (statsMap != null) {
+                for (Map.Entry<String, DailyStat> entry : statsMap.entrySet()) {
+                    String dateKey = entry.getKey(); // yyyy-MM-dd
+                    DailyStat stat = entry.getValue();
+                    
+                    Calendar calendar = parseDateKey(dateKey);
+                    if (calendar == null) continue;
 
-                // 获取并缓存节假日信息
-                stat.dayTag = HolidayUtil.getDayTag(calendar.getYear(), calendar.getMonth(), calendar.getDay());
-                stat.isHoliday = "休".equals(stat.dayTag);
+                    // 获取并缓存节假日信息
+                    stat.dayTag = HolidayUtil.getDayTag(calendar.getYear(), calendar.getMonth(), calendar.getDay());
+                    stat.isHoliday = "休".equals(stat.dayTag);
 
-                Calendar.Scheme scheme = new Calendar.Scheme();
-                scheme.setObj(stat);
-                scheme.setScheme("s");
-                calendar.addScheme(scheme);
-                schemeMap.put(calendar.toString(), calendar);
+                    Calendar.Scheme scheme = new Calendar.Scheme();
+                    scheme.setObj(stat);
+                    scheme.setScheme("s");
+                    calendar.addScheme(scheme);
+                    schemeMap.put(calendar.toString(), calendar);
+                }
             }
 
             // 2. 补全可见范围内的节假日（即使没账单也要显示“休/班”）
-            addVisibleHolidays(schemeMap);
+            addVisibleHolidays(schemeMap, year, month);
 
             AppExecutors.get().mainThread().execute(() -> {
                 if (binding == null) return;
@@ -162,18 +172,13 @@ public class CalendarFragment extends Fragment implements
         });
     }
 
-    private void addVisibleHolidays(Map<String, Calendar> schemeMap) {
+    private void addVisibleHolidays(Map<String, Calendar> schemeMap, int year, int month) {
         // 为了极致性能，我们仅补全当前选中月份中没有账单但有节假日的日期
-        Calendar cur = binding.calendarView.getSelectedCalendar();
-        if (cur == null) return;
-        
         java.util.Calendar c = java.util.Calendar.getInstance();
-        c.set(cur.getYear(), cur.getMonth() - 1, 1);
+        c.set(year, month - 1, 1);
         int maxDays = c.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
         
         for (int d = 1; d <= maxDays; d++) {
-            int year = cur.getYear();
-            int month = cur.getMonth();
             String tag = HolidayUtil.getDayTag(year, month, d);
             if (tag != null) {
                 Calendar calObj = new Calendar();
@@ -289,12 +294,11 @@ public class CalendarFragment extends Fragment implements
 
     @Override
     public void onMonthChange(int year, int month) {
+        mVisibleYear = year;
+        mVisibleMonth = month;
         binding.tvYearMonth.setText(String.format(Locale.getDefault(), "%d / %d", year, month));
         // 月份改变时，补全该月的节假日信息
-        Map<String, DailyStat> stats = billViewModel.dailyStatsMap.getValue();
-        if (stats != null) {
-            updateCalendarSchemes(stats);
-        }
+        updateCalendarSchemes(billViewModel.dailyStatsMap.getValue());
     }
 
     @Override
