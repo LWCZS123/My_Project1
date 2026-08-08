@@ -67,6 +67,19 @@
 
       </LinearLayout>
 
+      <com.google.android.material.button.MaterialButton
+          android:id="@+id/btn_archived"
+          style="@style/Widget.MaterialComponents.Button.TextButton"
+          android:layout_width="wrap_content"
+          android:layout_height="36dp"
+          android:layout_alignParentEnd="true"
+          android:layout_centerVertical="true"
+          android:text="📁 归档"
+          android:textColor="#666666"
+          android:textSize="12sp"
+          app:cornerRadius="18dp"
+          app:rippleColor="#20000000" />
+
     </RelativeLayout>
 
     <!-- ViewPager2 主体内容 -->

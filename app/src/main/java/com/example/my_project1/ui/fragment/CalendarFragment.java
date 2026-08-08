@@ -82,6 +82,7 @@ public class CalendarFragment extends Fragment implements
         binding.calendarView.setOnMonthChangeListener(this);
         mCurrentSelectedDate = binding.calendarView.getSelectedCalendar();
         updateDateTitle(mCurrentSelectedDate);
+        updateTodayButtonVisibility(mCurrentSelectedDate);
     }
 
     private void setupRecyclerView() {
@@ -102,7 +103,7 @@ public class CalendarFragment extends Fragment implements
     }
 
     private void setupListeners() {
-        binding.btnToday.setOnClickListener(v -> binding.calendarView.scrollToCurrent());
+        binding.btnToday.setOnClickListener(v -> binding.calendarView.scrollToCurrent(true));
         binding.ivAddBill.setOnClickListener(v -> {
             if (!isAdded()) return;
             startActivity(new Intent(requireContext(), AddBillActivity.class));
@@ -240,13 +241,47 @@ public class CalendarFragment extends Fragment implements
         });
     }
 
+    /**
+     * 根据当前选中的日期，控制“回到今天”按钮的显示/隐藏
+     * 只有当选中的不是今天时（移动到其他月份或点击其他日期），才显示该按钮。
+     */
+    private void updateTodayButtonVisibility(Calendar calendar) {
+        if (calendar == null || binding == null) return;
+        
+        java.util.Calendar today = java.util.Calendar.getInstance();
+        boolean isToday = calendar.getYear() == today.get(java.util.Calendar.YEAR)
+                && calendar.getMonth() == (today.get(java.util.Calendar.MONTH) + 1)
+                && calendar.getDay() == today.get(java.util.Calendar.DAY_OF_MONTH);
+        
+        if (isToday) {
+            // 如果已经是今天，平滑隐藏按钮
+            if (binding.btnToday.getVisibility() == View.VISIBLE) {
+                binding.btnToday.animate()
+                        .alpha(0f)
+                        .setDuration(200)
+                        .withEndAction(() -> binding.btnToday.setVisibility(View.GONE))
+                        .start();
+            }
+        } else {
+            // 如果不是今天，显示按钮
+            if (binding.btnToday.getVisibility() != View.VISIBLE) {
+                binding.btnToday.setVisibility(View.VISIBLE);
+                binding.btnToday.setAlpha(0f);
+                binding.btnToday.animate()
+                        .alpha(1f)
+                        .setDuration(200)
+                        .start();
+            }
+        }
+    }
+
     @Override
     public void onCalendarSelect(Calendar calendar, boolean isClick) {
         if (calendar == null) return;
-        if (!isClick && mCurrentSelectedDate != null) return; // 翻页不更新列表
         
         mCurrentSelectedDate = calendar;
         updateDateTitle(calendar);
+        updateTodayButtonVisibility(calendar);
         
         // 🚀 按需通知 ViewModel 切换日期，触发 selectedDateBills 观察者
         billViewModel.setSelectedDate(calendar.getYear(), calendar.getMonth(), calendar.getDay());

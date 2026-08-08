@@ -66,6 +66,22 @@ public class ConfirmDialog {
     }
 
     /**
+     * 设置确认按钮文本
+     */
+    public ConfirmDialog setConfirmText(String text) {
+        binding.btnDelete.setText(text);
+        return this;
+    }
+
+    /**
+     * 设置取消按钮文本
+     */
+    public ConfirmDialog setCancelText(String text) {
+        binding.btnCancel.setText(text);
+        return this;
+    }
+
+    /**
      * 设置确认按钮点击事件
      */
     public ConfirmDialog setConfirmListener(Runnable confirmAction) {

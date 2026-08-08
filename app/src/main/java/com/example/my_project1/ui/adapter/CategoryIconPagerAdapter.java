@@ -38,7 +38,7 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
     private int pendingType = -1;
 
     public interface OnCategorySelectedListener {
-        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor);
+        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor, boolean excludeBudget);
     }
 
     public CategoryIconPagerAdapter(@NonNull FragmentActivity fragmentActivity, String userId) {
@@ -60,9 +60,9 @@ public class CategoryIconPagerAdapter extends FragmentStateAdapter {
     }
 
     private void setupFragmentListener(CategoryGridFragment fragment) {
-        fragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor) -> {
+        fragment.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor, excludeBudget) -> {
             if (this.listener != null) {
-                this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl, backgroundColor);
+                this.listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl, backgroundColor, excludeBudget);
             }
         });
     }

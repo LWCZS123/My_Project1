@@ -131,12 +131,23 @@ public class IncomeCategoryFragment extends Fragment {
             List<Category> newList = new ArrayList<>();
             for (CategoryWithSubCategories cw : categoriesWithSubs) {
                 Category c = cw.category;
+                // 过滤已归档一级分类
+                if (c.getArchiveStatus() != null && c.getArchiveStatus() == 1) continue;
+
                 List<SubCategory> subs = cw.subCategories;
+                List<SubCategory> activeSubs = new ArrayList<>();
                 if (subs != null) {
+                    for (SubCategory sub : subs) {
+                        // 过滤已归档或待删除二级分类
+                        if ((sub.getArchiveStatus() == null || sub.getArchiveStatus() == 0)
+                                && sub.getSyncState() != 3) {
+                            activeSubs.add(sub);
+                        }
+                    }
                     // 手动按 sortIndex 排序子分类
-                    Collections.sort(subs, (o1, o2) -> Integer.compare(o1.getSortIndex(), o2.getSortIndex()));
+                    Collections.sort(activeSubs, (o1, o2) -> Integer.compare(o1.getSortIndex(), o2.getSortIndex()));
                 }
-                c.setSubCategories(subs);
+                c.setSubCategories(activeSubs);
                 newList.add(c);
             }
             adapter.submitList(newList);
@@ -211,10 +222,13 @@ public class IncomeCategoryFragment extends Fragment {
         args.putString("title", "二级分类");
         args.putString("categoryName", subCategory.getName());
         args.putString("categoryIconUrl", subCategory.getIconUri());
+        args.putString("categoryIconBg", subCategory.getIconBackgroundColor());
         args.putLong("subcategoryId", subCategory.getId());
+        args.putLong("parentCategoryId", subCategory.getParentCategoryId());
         args.putString("type", "subcategory");
         args.putString("categoryCloudId", subCategory.getCloudId());
         args.putString("categoryType", "income");
+        args.putBoolean("excludeBudget", subCategory.isExcludeBudget());
 
         Log.d("IncomeCategoryFragment", subCategory.getIconUri());
         Log.d("IncomeCategoryFragment", subCategory.getName());
@@ -230,10 +244,13 @@ public class IncomeCategoryFragment extends Fragment {
         args.putString("title", "一级分类");
         args.putString("categoryName", category.getName());
         args.putString("categoryIconUrl", category.getIconUri());
+        args.putString("categoryIconBg", category.getIconBackgroundColor());
         args.putString("type", "category");
         args.putLong("categoryId", category.getId());
         args.putString("categoryCloudId", category.getCloudId());
         args.putString("categoryType", category.getType());
+        args.putBoolean("excludeBudget", category.isExcludeBudget());
+        args.putBoolean("hasChildren", category.getSubCategories() != null && !category.getSubCategories().isEmpty());
 
         dialog.setArguments(args);
         dialog.show(getParentFragmentManager(), "category_more");

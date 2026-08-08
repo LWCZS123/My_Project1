@@ -184,6 +184,11 @@ public class CategorySelectFragment extends BottomSheetDialogFragment {
                     String budgetTag = (b != null) ? String.format(Locale.getDefault(), "¥%.0f", b.getAmount()) : null;
                     boolean isSet = (b != null);
                     
+                    // 🔑 修复：过滤显式排除在预算外的分类
+                    if (cat.category.isExcludeBudget()) {
+                        continue;
+                    }
+
                     // 如果该一级分类下有二级分类，则不允许直接为该一级分类设置预算
                     if (cat.subCategories != null && !cat.subCategories.isEmpty()) {
                         continue;
@@ -202,6 +207,11 @@ public class CategorySelectFragment extends BottomSheetDialogFragment {
             for (CategoryWithSubCategories cat : allCategories) {
                 if (cat.subCategories != null) {
                     for (SubCategory sub : cat.subCategories) {
+                        // 🔑 修复：过滤显式排除在预算外的子分类
+                        if (sub.isExcludeBudget()) {
+                            continue;
+                        }
+
                         String cloudId = sub.getCloudId();
                         Budget b = existingBudgets.get(cloudId);
                         String budgetTag = (b != null) ? String.format(Locale.getDefault(), "¥%.0f", b.getAmount()) : null;

@@ -229,6 +229,7 @@ public class DateTimePickerFragment extends BottomSheetDialogFragment {
             dataEngine.refreshTodayKey(todayDate, key, key, CENTER_POSITION);
             binding.vpCalendar.setCurrentItem(CENTER_POSITION, true);
             updateYearMonthDisplay(CENTER_POSITION);
+            updateTimeDisplay();
         });
         binding.tvTime.setOnClickListener(v -> showCustomTimePicker());
         binding.btnConfirm.setOnClickListener(v -> {

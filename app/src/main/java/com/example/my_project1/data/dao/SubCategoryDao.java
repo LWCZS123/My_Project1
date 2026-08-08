@@ -112,7 +112,7 @@ public interface SubCategoryDao {
     @Query("SELECT * FROM sub_categories WHERE parent_category_id = :parentId")
     List<SubCategory> getByParentCategoryId(long parentId);
 
-    @Query("SELECT * FROM sub_categories WHERE parent_category_id = :parentId ORDER BY sort_index ASC")
+    @Query("SELECT * FROM sub_categories WHERE parent_category_id = :parentId AND sync_state != 3 ORDER BY sort_index ASC")
     LiveData<List<SubCategory>> getSubCategoriesByParent(long parentId);
 
     @Query("UPDATE sub_categories SET sort_index = :index WHERE id = :id")

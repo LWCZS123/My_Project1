@@ -232,12 +232,12 @@ public class BudgetViewModel extends AndroidViewModel {
             List<CategorySelectorItem> unallocated = new ArrayList<>();
             for (CategoryWithSubCategories cws : allCategories) {
                 if (cws.subCategories == null || cws.subCategories.isEmpty()) {
-                    if (cws.category != null && !existingIds.contains(cws.category.getCloudId())) {
+                    if (cws.category != null && !cws.category.isExcludeBudget() && !existingIds.contains(cws.category.getCloudId())) {
                         unallocated.add(new CategorySelectorItem(cws.category.getCloudId(), cws.category.getName(), cws.category.getIconUri()));
                     }
                 } else {
                     for (SubCategory sub : cws.subCategories) {
-                        if (!existingIds.contains(sub.getCloudId())) {
+                        if (!sub.isExcludeBudget() && !existingIds.contains(sub.getCloudId())) {
                             unallocated.add(new CategorySelectorItem(sub.getCloudId(), sub.getName(), sub.getIconUri()));
                         }
                     }

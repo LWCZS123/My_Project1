@@ -10,6 +10,8 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
 
+import java.util.List;
+import com.example.my_project1.data.model.CategoryWithSubCategories;
 import com.example.my_project1.databinding.FragmentCategoryGridBinding;
 import com.example.my_project1.ui.adapter.CategoryGridAdapter;
 import com.example.my_project1.ui.viewmodel.CategoryViewModel;
@@ -47,7 +49,7 @@ public class CategoryGridFragment extends Fragment {
     private String preSelectedCategoryId = null;
 
     public interface OnCategorySelectedListener {
-        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor);
+        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor, boolean excludeBudget);
     }
 
     /** 保留原有2参数签名，非编辑模式或无需预选中时使用 */
@@ -112,15 +114,25 @@ public class CategoryGridFragment extends Fragment {
         // 而不是先new CategoryGridAdapter(context)再事后setSelectedCategory。
         adapter = new CategoryGridAdapter(getContext(), preSelectedCategoryId);
 
-        adapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor) -> {
+        adapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor, excludeBudget) -> {
             if (listener != null) {
-                listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl, backgroundColor);
+                listener.onCategorySelected(displayName, categoryCloudId, categoryImageUrl, backgroundColor, excludeBudget);
             }
         });
 
         binding.recyclerCategory.setAdapter(adapter);
 
         viewModel = new ViewModelProvider(requireActivity()).get(CategoryViewModel.class);
+
+        // ⚡ 核心：立即从 Repository 获取内存/磁盘快照，消除首屏白屏和闪烁
+        List<CategoryWithSubCategories> snapshot =
+                "expense".equals(categoryType) ? viewModel.getExpenseSnapshot() : viewModel.getIncomeSnapshot();
+        
+        if (snapshot != null && !snapshot.isEmpty()) {
+            sortSubCategories(snapshot);
+            adapter.updateData(snapshot);
+            Log.d(TAG, "⚡ 已应用快照数据，消除闪烁: " + snapshot.size() + " 条");
+        }
 
         observeCategories();
 

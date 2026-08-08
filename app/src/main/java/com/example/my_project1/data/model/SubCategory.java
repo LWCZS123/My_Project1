@@ -80,6 +80,18 @@ public class SubCategory {
     @ColumnInfo(name = "exclude_budget")
     private boolean excludeBudget;
 
+    /**
+     * 归档状态：0 = 正常，1 = 已归档
+     */
+    @ColumnInfo(name = "archive_status", defaultValue = "0")
+    private Integer archiveStatus = 0;
+
+    /**
+     * 归档时间
+     */
+    @ColumnInfo(name = "archive_time")
+    private Long archiveTime;
+
     public String color;
 
     @ColumnInfo(name = "sort_index")
@@ -171,6 +183,12 @@ public class SubCategory {
     public boolean isExcludeBudget() { return excludeBudget; }
     public void setExcludeBudget(boolean excludeBudget) { this.excludeBudget = excludeBudget; }
 
+    public Integer getArchiveStatus() { return archiveStatus; }
+    public void setArchiveStatus(Integer archiveStatus) { this.archiveStatus = archiveStatus; }
+
+    public Long getArchiveTime() { return archiveTime; }
+    public void setArchiveTime(Long archiveTime) { this.archiveTime = archiveTime; }
+
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
 
@@ -226,6 +244,8 @@ public class SubCategory {
                 isSystemPreset == that.isSystemPreset &&
                 isAddButton == that.isAddButton &&
                 excludeBudget == that.excludeBudget &&
+                java.util.Objects.equals(archiveStatus, that.archiveStatus) &&
+                java.util.Objects.equals(archiveTime, that.archiveTime) &&
                 java.util.Objects.equals(parentCloudId, that.parentCloudId) &&
                 java.util.Objects.equals(cloudId, that.cloudId) &&
                 java.util.Objects.equals(ownerId, that.ownerId) &&
@@ -237,7 +257,7 @@ public class SubCategory {
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(id, parentCategoryId, parentCloudId, cloudId, ownerId, name, iconUri, iconBackgroundColor, color, sortIndex, updatedAt, syncState, isSystemPreset, isAddButton, excludeBudget);
+        return java.util.Objects.hash(id, parentCategoryId, parentCloudId, cloudId, ownerId, name, iconUri, iconBackgroundColor, color, sortIndex, updatedAt, syncState, isSystemPreset, isAddButton, excludeBudget, archiveStatus, archiveTime);
     }
 
     @Override

@@ -5,13 +5,18 @@ import android.util.Log;
 
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
 
 import com.example.my_project1.data.model.Category;
 import com.example.my_project1.data.model.CategoryWithSubCategories;
+import com.example.my_project1.data.model.SubCategory;
+import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.CategoryRepository;
 import com.example.my_project1.utils.AppExecutors;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import io.reactivex.annotations.NonNull;
 
@@ -26,6 +31,9 @@ public class CategoryViewModel extends AndroidViewModel {
     private final CategoryRepository repository;
     private LiveData<List<CategoryWithSubCategories>> incomeCategories;
     private LiveData<List<CategoryWithSubCategories>> expenseCategories;
+
+    private final MutableLiveData<ApiResponse<String>> _operationState = new MutableLiveData<>(ApiResponse.idle());
+    public final LiveData<ApiResponse<String>> operationState = _operationState;
 
     public CategoryViewModel(@NonNull Application application) {
         super(application);
@@ -49,11 +57,18 @@ public class CategoryViewModel extends AndroidViewModel {
         return expenseCategories;
     }
 
+    public List<CategoryWithSubCategories> getExpenseSnapshot() {
+        return repository.getCategoriesSnapshot("expense");
+    }
 
     /** 获取收入分类 */
     public LiveData<List<CategoryWithSubCategories>> getIncomeCategories(String userId) {
         incomeCategories = repository.getCategoriesWithSubs(userId, "income");
         return incomeCategories;
+    }
+
+    public List<CategoryWithSubCategories> getIncomeSnapshot() {
+        return repository.getCategoriesSnapshot("income");
     }
 
     public LiveData<List<CategoryWithSubCategories>> getTransferCategories(String userId) {
@@ -98,6 +113,10 @@ public class CategoryViewModel extends AndroidViewModel {
 
     public void deleteCategoryById(long categoryId) { repository.deleteCategoryById(categoryId); }
 
+    public void checkCategoryBills(String userId, String cloudId, java.util.function.Consumer<Integer> callback) {
+        repository.checkBillsCount(userId, cloudId, callback);
+    }
+
     public void updateSortIndex(long id, int index) {
         AppExecutors.get().diskIO().execute(() -> {
             Category cat = repository.getCategoryById(id);
@@ -139,5 +158,110 @@ public class CategoryViewModel extends AndroidViewModel {
             repository.update(existing);
             // repository.update() 应该会执行 diskIO().execute(() -> dao.update(existing));
         });
+    }
+
+    public void archiveCategory(long id, boolean archiveChildren) {
+        _operationState.setValue(ApiResponse.loading("正在归档..."));
+        repository.archiveCategory(id, archiveChildren);
+        _operationState.postValue(ApiResponse.success("已归档"));
+    }
+
+    public void archiveSubCategory(long id) {
+        _operationState.setValue(ApiResponse.loading("正在归档..."));
+        repository.archiveSubCategory(id);
+        _operationState.postValue(ApiResponse.success("已归档"));
+    }
+
+    public void restoreCategory(long id, boolean isSub) {
+        _operationState.setValue(ApiResponse.loading("正在恢复..."));
+        repository.restoreCategory(id, isSub);
+        _operationState.postValue(ApiResponse.success("已恢复"));
+    }
+
+    public void migrateCategoryData(String userId, String sourceId, Category target) {
+        _operationState.setValue(ApiResponse.loading("正在迁移账单..."));
+        repository.migrateBills(userId, sourceId, target, count -> {
+            if (count > 0) {
+                _operationState.postValue(ApiResponse.success("成功迁移 " + count + " 条账单"));
+            } else {
+                _operationState.postValue(ApiResponse.error("该分类下暂无账单，无需迁移"));
+            }
+        });
+    }
+
+    public void changeParentCategory(long subId, Category newParent) {
+        _operationState.setValue(ApiResponse.loading("正在调整归属..."));
+        repository.changeSubCategoryParent(subId, newParent);
+        _operationState.postValue(ApiResponse.success("已调整"));
+    }
+
+    public void promoteToMainCategory(long subId, String categoryType) {
+        _operationState.setValue(ApiResponse.loading("正在晋升为一级分类..."));
+        repository.promoteSubCategory(subId, categoryType, success -> {
+            if (success) {
+                _operationState.postValue(ApiResponse.success("已晋升为一级分类"));
+            } else {
+                _operationState.postValue(ApiResponse.error("晋升失败，请检查网络"));
+            }
+        });
+    }
+
+    public void resetOperationState() {
+        _operationState.setValue(ApiResponse.idle());
+    }
+
+    /** 获取归档分类 */
+    public LiveData<List<CategoryWithSubCategories>> getArchivedCategories(String userId) {
+        if (userId == null) return new MutableLiveData<>(new ArrayList<>());
+
+        androidx.lifecycle.MediatorLiveData<List<CategoryWithSubCategories>> result = new androidx.lifecycle.MediatorLiveData<>();
+        LiveData<List<CategoryWithSubCategories>> expenseSource = repository.getCategoriesWithSubs(userId, "expense");
+        LiveData<List<CategoryWithSubCategories>> incomeSource = repository.getCategoriesWithSubs(userId, "income");
+
+        result.addSource(expenseSource, categories -> {
+            combineAndFilterArchived(result, categories, incomeSource.getValue());
+        });
+        result.addSource(incomeSource, categories -> {
+            combineAndFilterArchived(result, expenseSource.getValue(), categories);
+        });
+        return result;
+    }
+
+    private void combineAndFilterArchived(androidx.lifecycle.MediatorLiveData<List<CategoryWithSubCategories>> result,
+                                         List<CategoryWithSubCategories> exp, List<CategoryWithSubCategories> inc) {
+        List<CategoryWithSubCategories> archived = new ArrayList<>();
+
+        processArchivedList(exp, archived);
+        processArchivedList(inc, archived);
+
+        result.setValue(archived);
+    }
+
+    private void processArchivedList(List<CategoryWithSubCategories> list, List<CategoryWithSubCategories> archived) {
+        if (list == null) return;
+        for (CategoryWithSubCategories cw : list) {
+            if (cw == null || cw.category == null) continue;
+
+            // 1. 如果一级分类已归档
+            if (cw.category.getArchiveStatus() != null && cw.category.getArchiveStatus() == 1) {
+                archived.add(cw);
+            } else {
+                // 2. 如果一级分类未归档，但包含已归档的二级分类
+                if (cw.subCategories != null) {
+                    List<SubCategory> archivedSubs = new ArrayList<>();
+                    for (SubCategory sub : cw.subCategories) {
+                        if (sub.getArchiveStatus() != null && sub.getArchiveStatus() == 1) {
+                            archivedSubs.add(sub);
+                        }
+                    }
+                    if (!archivedSubs.isEmpty()) {
+                        CategoryWithSubCategories partial = new CategoryWithSubCategories();
+                        partial.category = cw.category;
+                        partial.subCategories = archivedSubs;
+                        archived.add(partial);
+                    }
+                }
+            }
+        }
     }
 }

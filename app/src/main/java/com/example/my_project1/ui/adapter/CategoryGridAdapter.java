@@ -55,7 +55,7 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
     private String preSelectedCategoryId;
 
     public interface OnCategorySelectedListener {
-        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor);
+        void onCategorySelected(String displayName, String categoryCloudId, String categoryImageUrl, String backgroundColor, boolean excludeBudget);
     }
 
     public CategoryGridAdapter(Context context) {
@@ -244,7 +244,8 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
                                 categoryData.category.getName(),
                                 categoryData.category.getCloudId(),
                                 categoryData.category.getIconUri(),
-                                categoryData.category.getIconBackgroundColor()
+                                categoryData.category.getIconBackgroundColor(),
+                                categoryData.category.isExcludeBudget()
                         );
                     }
                 }
@@ -269,7 +270,8 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
                             categoryData.category.getName() + "." + subCategory.getName(),
                             subCategory.getCloudId(),
                             subCategory.getIconUri(),
-                            subCategory.getIconBackgroundColor()
+                            subCategory.getIconBackgroundColor(),
+                            subCategory.isExcludeBudget()
                     );
                 }
             });

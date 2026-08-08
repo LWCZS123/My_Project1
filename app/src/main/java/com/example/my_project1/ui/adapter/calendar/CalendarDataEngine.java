@@ -47,7 +47,7 @@ public final class CalendarDataEngine {
         }
     }
 
-    private final Calendar baseCalendar;
+    private Calendar baseCalendar;
     private final int centerIndex;
 
     private final HandlerThread workerThread;
@@ -129,6 +129,7 @@ public final class CalendarDataEngine {
     public void refreshTodayKey(Calendar today, String newTodayKey,
                                 String newSelectedKey, int centerPage) {
 
+        this.baseCalendar = (Calendar) today.clone();
         this.todayKey    = newTodayKey;
         this.selectedKey = newSelectedKey;
 

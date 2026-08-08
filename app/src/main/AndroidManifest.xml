@@ -193,6 +193,10 @@
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar" />
         <activity
+            android:name=".ui.activity.ArchivedCategoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
             android:name=".ui.activity.HiddenAccountsActivity"
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar" />

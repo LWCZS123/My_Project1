@@ -182,10 +182,16 @@ public class CategoryDetailBottomSheetFragment extends BottomSheetDialogFragment
     private void observeSubCategories() {
         subCategoryViewModel.getSubCategoriesByParent(category.getId())
                 .observe(getViewLifecycleOwner(), subCategories -> {
-                    if (isSorting) return;
-                    List<SubCategory> list = new ArrayList<>(subCategories);
-                    list.add(SubCategory.createAddButton());
-                    adapter.submitList(list);
+                    if (isSorting || subCategories == null) return;
+                    List<SubCategory> activeList = new ArrayList<>();
+                    for (SubCategory sub : subCategories) {
+                        if ((sub.getArchiveStatus() == null || sub.getArchiveStatus() == 0)
+                                && sub.getSyncState() != 3) {
+                            activeList.add(sub);
+                        }
+                    }
+                    activeList.add(SubCategory.createAddButton());
+                    adapter.submitList(activeList);
                 });
     }
 

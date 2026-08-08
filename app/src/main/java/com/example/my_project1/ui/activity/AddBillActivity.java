@@ -596,11 +596,12 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         pagerAdapter.setOnTransferAccountSelectedListener(this);
 
         // 分类选择监听
-        pagerAdapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor) -> {
+        pagerAdapter.setOnCategorySelectedListener((displayName, categoryCloudId, categoryImageUrl, backgroundColor, excludeBudget) -> {
             selectedCategoryName = displayName;
             selectedCategoryCloudId = categoryCloudId;
             selectedCategoryImageUrl = categoryImageUrl;
             selectedCategoryIconBackgroundColor = backgroundColor;
+            this.excludeBudget = excludeBudget; // 🔑 修复：继承分类的预算排除状态
         });
 
         // 页面切换监听
@@ -1106,9 +1107,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         existingImageUrls.clear();
         updateImageDisplay();
         billRemark = "";
-        binding.tvRemarkHint.setText("添加备注");
+        binding.tvRemarkHint.setText("填写备注信息");
         selectedLocationName = null;
-        binding.tvRecord.setText("记录");
+        binding.tvRecord.setText("地点");
         binding.ivRecord.setVisibility(View.VISIBLE);
     }
 
@@ -1162,8 +1163,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 binding.tvAlbumBadge.setVisibility(View.GONE);
             }
         } else {
+            Glide.with(this).clear(binding.ivAlbum);
             binding.ivAlbum.setImageResource(R.drawable.ic_album);
-            binding.ivAlbum.setScaleType(ImageView.ScaleType.CENTER);
+            binding.ivAlbum.setScaleType(ImageView.ScaleType.CENTER_CROP);
             binding.tvAlbumBadge.setVisibility(View.GONE);
         }
     }

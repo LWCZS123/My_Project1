@@ -91,7 +91,7 @@
         android:textSize="16sp"
         android:background="?attr/selectableItemBackground"/>
 
-    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
+    <View android:id="@+id/divider_belong_to" android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#EEEEEE"/>
 
     <TextView
         android:id="@+id/btn_view_bills"

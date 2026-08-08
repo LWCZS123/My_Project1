@@ -50,6 +50,7 @@ public class BudgetActivity extends AppCompatActivity {
 
     private final Map<String, String> categoryNameCache = new HashMap<>();
     private final Map<String, String> categoryIconCache = new HashMap<>();
+    private final Map<String, Boolean> categoryExcludeCache = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -254,11 +255,13 @@ public class BudgetActivity extends AppCompatActivity {
                 if (cws.category != null) {
                     categoryNameCache.put(cws.category.getCloudId(), cws.category.getName());
                     categoryIconCache.put(cws.category.getCloudId(), cws.category.getIconUri());
+                    categoryExcludeCache.put(cws.category.getCloudId(), cws.category.isExcludeBudget());
                 }
                 if (cws.subCategories != null) {
                     for (SubCategory sub : cws.subCategories) {
                         categoryNameCache.put(sub.getCloudId(), sub.getName());
                         categoryIconCache.put(sub.getCloudId(), sub.getIconUri());
+                        categoryExcludeCache.put(sub.getCloudId(), sub.isExcludeBudget());
                     }
                 }
             }
@@ -550,6 +553,12 @@ public class BudgetActivity extends AppCompatActivity {
             int startDay = BudgetConfig.getStartDay(this);
             
             for (Budget b : budgets) {
+                // 🔑 修复：如果该分类已被设置为“不计入预算”，则在预算管理列表中隐藏
+                Boolean isExcluded = categoryExcludeCache.get(b.getTargetId());
+                if (isExcluded != null && isExcluded) {
+                    continue;
+                }
+
                 // Base statistics on year/month rather than stored startTime/endTime
                 Calendar bCal = Calendar.getInstance();
                 bCal.setFirstDayOfWeek(Calendar.SUNDAY);

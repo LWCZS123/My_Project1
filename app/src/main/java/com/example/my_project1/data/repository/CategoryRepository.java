@@ -7,17 +7,23 @@ import androidx.lifecycle.LiveData;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 
+import com.example.my_project1.data.dao.BillDao;
 import com.example.my_project1.data.dao.CategoryDao;
 import com.example.my_project1.data.dao.SubCategoryDao;
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.Category;
 import com.example.my_project1.data.model.CategoryWithSubCategories;
+import com.example.my_project1.data.model.SubCategory;
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.remote.BmobApiImpl;
 import com.example.my_project1.data.remote.model.CloudCategory;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.work.CategorySyncWorker;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -45,21 +51,43 @@ public class CategoryRepository {
 
     private final CategoryDao    categoryDao;
     private final SubCategoryDao subCategoryDao;
+    private final BillDao        billDao;
     private final WorkManager    workManager;
+    private final Context        context;
+
+    // ────────────────────────────────────────────────────────────────────
+    //  ⚡ 商用级快照缓存 (Memory + Disk)
+    // ────────────────────────────────────────────────────────────────────
+    private static final String SP_NAME = "category_snapshot";
+    private static final String KEY_EXPENSE = "snapshot_expense";
+    private static final String KEY_INCOME = "snapshot_income";
+    private static final Gson gson = new Gson();
+
+    private static List<CategoryWithSubCategories> sCachedExpense = null;
+    private static List<CategoryWithSubCategories> sCachedIncome = null;
 
     public CategoryRepository(Context context) {
-        AppDatabase db = AppDatabase.getInstance(context);
+        this.context   = context.getApplicationContext();
+        AppDatabase db = AppDatabase.getInstance(this.context);
         categoryDao    = db.categoryDao();
         subCategoryDao = db.subCategoryDao();
-        workManager    = WorkManager.getInstance(context);
+        billDao        = db.billDao();
+        workManager    = WorkManager.getInstance(this.context);
+        
+        loadSnapshotsFromDisk();
     }
 
     public CategoryRepository(CategoryDao categoryDao,
                               SubCategoryDao subCategoryDao,
-                              WorkManager workManager) {
+                              BillDao billDao,
+                              WorkManager workManager,
+                              Context context) {
         this.categoryDao    = categoryDao;
         this.subCategoryDao = subCategoryDao;
+        this.billDao        = billDao;
         this.workManager    = workManager;
+        this.context        = context.getApplicationContext();
+        loadSnapshotsFromDisk();
     }
 
     // =========================================================================
@@ -140,6 +168,12 @@ public class CategoryRepository {
         AppExecutors.get().diskIO().execute(() -> {
             Category category = categoryDao.getCategoryById(categoryId);
             if (category != null) {
+                // 自动处理该分类下的账单
+                int count = billDao.countBillsByCategory(category.getOwnerId(), category.getCloudId());
+                if (count > 0) {
+                    Log.w(TAG, "警告：删除含有账单的分类 (" + category.getName() + "), 账单数: " + count);
+                }
+                
                 category.setSyncState(SyncState.TO_DELETE.getValue());
                 categoryDao.update(category);
                 // 兼容旧数据库版本（无 ForeignKey CASCADE）
@@ -152,38 +186,220 @@ public class CategoryRepository {
         });
     }
 
+    public void checkBillsCount(String userId, String categoryCloudId, Consumer<Integer> callback) {
+        AppExecutors.get().diskIO().execute(() -> {
+            int count = billDao.countBillsByCategory(userId, categoryCloudId);
+            AppExecutors.get().mainThread().execute(() -> callback.accept(count));
+        });
+    }
+
+    /** 归档一级分类 */
+    public void archiveCategory(long categoryId, boolean archiveChildren) {
+        AppExecutors.get().diskIO().execute(() -> {
+            Category cat = categoryDao.getCategoryById(categoryId);
+            if (cat != null) {
+                cat.setArchiveStatus(1);
+                cat.setArchiveTime(System.currentTimeMillis());
+                cat.setSyncState(SyncState.TO_UPDATE.getValue());
+                categoryDao.update(cat);
+
+                if (archiveChildren) {
+                    List<SubCategory> subs = subCategoryDao.getByParentCategoryId(categoryId);
+                    for (SubCategory sub : subs) {
+                        sub.setArchiveStatus(1);
+                        sub.setArchiveTime(System.currentTimeMillis());
+                        sub.setSyncState(SyncState.TO_UPDATE.getValue());
+                        subCategoryDao.update(sub);
+                    }
+                }
+                enqueueSync();
+            }
+        });
+    }
+
+    /** 归档二级分类 */
+    public void archiveSubCategory(long subId) {
+        AppExecutors.get().diskIO().execute(() -> {
+            SubCategory sub = subCategoryDao.getById(subId);
+            if (sub != null) {
+                sub.setArchiveStatus(1);
+                sub.setArchiveTime(System.currentTimeMillis());
+                sub.setSyncState(SyncState.TO_UPDATE.getValue());
+                subCategoryDao.update(sub);
+                enqueueSync();
+            }
+        });
+    }
+
+    /** 恢复分类 */
+    public void restoreCategory(long id, boolean isSub) {
+        AppExecutors.get().diskIO().execute(() -> {
+            if (isSub) {
+                SubCategory sub = subCategoryDao.getById(id);
+                if (sub != null) {
+                    sub.setArchiveStatus(0);
+                    sub.setArchiveTime(null);
+                    sub.setSyncState(SyncState.TO_UPDATE.getValue());
+                    subCategoryDao.update(sub);
+                }
+            } else {
+                Category cat = categoryDao.getCategoryById(id);
+                if (cat != null) {
+                    cat.setArchiveStatus(0);
+                    cat.setArchiveTime(null);
+                    cat.setSyncState(SyncState.TO_UPDATE.getValue());
+                    categoryDao.update(cat);
+                }
+            }
+            enqueueSync();
+        });
+    }
+
+    /** 迁移账单数据 */
+    public void migrateBills(String userId, String sourceId, Category target, Consumer<Integer> resultCallback) {
+        AppExecutors.get().diskIO().execute(() -> {
+            int count = billDao.countBillsByCategory(userId, sourceId);
+            if (count > 0) {
+                billDao.migrateBills(userId, sourceId, target.getCloudId(), target.getName(),
+                        target.getIconUri(), target.getIconBackgroundColor(), System.currentTimeMillis());
+                // 账单迁移由 BillSyncWorker 同步
+                OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(com.example.my_project1.work.BillSyncWorker.class).build();
+                workManager.enqueue(request);
+            }
+            AppExecutors.get().mainThread().execute(() -> resultCallback.accept(count));
+        });
+    }
+
+    /** 调整二级分类归属 */
+    public void changeSubCategoryParent(long subId, Category newParent) {
+        AppExecutors.get().diskIO().execute(() -> {
+            SubCategory sub = subCategoryDao.getById(subId);
+            if (sub != null) {
+                sub.setParentCategoryId(newParent.getId());
+                sub.setParentCloudId(newParent.getCloudId());
+                sub.setSyncState(SyncState.TO_UPDATE.getValue());
+                subCategoryDao.update(sub);
+                enqueueSync();
+            }
+        });
+    }
+
+    /** 将二级分类晋升为一级分类 */
+    public void promoteSubCategory(long subId, String categoryType, Consumer<Boolean> callback) {
+        AppExecutors.get().diskIO().execute(() -> {
+            SubCategory sub = subCategoryDao.getById(subId);
+            if (sub == null || sub.getCloudId() == null) {
+                AppExecutors.get().mainThread().execute(() -> callback.accept(false));
+                return;
+            }
+
+            // 1. 同步上传一级分类以获取 cloudId
+            Category newCat = new Category();
+            newCat.setOwnerId(sub.getOwnerId());
+            newCat.setType(categoryType);
+            newCat.setName(sub.getName());
+            newCat.setIconUri(sub.getIconUri());
+            newCat.setIconBackgroundColor(sub.getIconBackgroundColor());
+            newCat.setColor(sub.getColor());
+            newCat.setExcludeBudget(sub.isExcludeBudget());
+            newCat.setArchiveStatus(sub.getArchiveStatus());
+            newCat.setArchiveTime(sub.getArchiveTime());
+            newCat.setSyncState(SyncState.SYNCED.getValue());
+            newCat.setUpdatedAt(System.currentTimeMillis());
+
+            try {
+                CloudCategory cloud = CloudCategory.fromLocalCategory(newCat);
+                String newCloudId = cloud.saveSync();
+                if (newCloudId != null) {
+                    newCat.setCloudId(newCloudId);
+                    long newLocalId = categoryDao.insert(newCat);
+                    newCat.setId(newLocalId);
+
+                    // 2. 迁移本地账单数据
+                    billDao.migrateBills(sub.getOwnerId(), sub.getCloudId(), newCloudId,
+                            newCat.getName(), newCat.getIconUri(), newCat.getIconBackgroundColor(),
+                            System.currentTimeMillis());
+
+                    // 3. 标记旧子分类为待删除（让 Worker 删除云端数据）
+                    sub.markDeletedForSync();
+                    subCategoryDao.update(sub);
+
+                    enqueueSync(); // 触发子分类删除同步
+                    // 4. 触发账单同步
+                    OneTimeWorkRequest billSyncRequest = new OneTimeWorkRequest.Builder(com.example.my_project1.work.BillSyncWorker.class).build();
+                    workManager.enqueue(billSyncRequest);
+
+                    AppExecutors.get().mainThread().execute(() -> callback.accept(true));
+                } else {
+                    AppExecutors.get().mainThread().execute(() -> callback.accept(false));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "promoteSubCategory failed", e);
+                AppExecutors.get().mainThread().execute(() -> callback.accept(false));
+            }
+        });
+    }
+
     // =========================================================================
     // 读操作
     // =========================================================================
 
-    public List<Category> getUnsyncedCategories() {
-        return categoryDao.getUnsyncedCategories(SyncState.SYNCED.getValue());
-    }
-
     public LiveData<List<CategoryWithSubCategories>> getCategoriesWithSubs(
             String userId, String type) {
-        return categoryDao.getCategoriesWithSubs(userId, type);
+        LiveData<List<CategoryWithSubCategories>> liveData = categoryDao.getCategoriesWithSubs(userId, type);
+        
+        // 自动更新快照
+        androidx.lifecycle.MediatorLiveData<List<CategoryWithSubCategories>> mediator = new androidx.lifecycle.MediatorLiveData<>();
+        mediator.addSource(liveData, categories -> {
+            if (categories != null) {
+                updateCacheAndDisk(type, categories);
+            }
+            mediator.setValue(categories);
+        });
+        
+        return mediator;
+    }
+
+    public List<CategoryWithSubCategories> getCategoriesSnapshot(String type) {
+        if ("expense".equals(type)) return sCachedExpense;
+        if ("income".equals(type)) return sCachedIncome;
+        return null;
+    }
+
+    private void updateCacheAndDisk(String type, List<CategoryWithSubCategories> data) {
+        if ("expense".equals(type)) sCachedExpense = data;
+        else if ("income".equals(type)) sCachedIncome = data;
+
+        AppExecutors.get().diskIO().execute(() -> {
+            context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("expense".equals(type) ? KEY_EXPENSE : KEY_INCOME, gson.toJson(data))
+                    .apply();
+        });
+    }
+
+    private void loadSnapshotsFromDisk() {
+        if (sCachedExpense != null && sCachedIncome != null) return;
+        
+        android.content.SharedPreferences sp = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
+        java.lang.reflect.Type listType = new TypeToken<List<CategoryWithSubCategories>>(){}.getType();
+
+        if (sCachedExpense == null) {
+            String json = sp.getString(KEY_EXPENSE, null);
+            if (json != null) sCachedExpense = gson.fromJson(json, listType);
+        }
+        if (sCachedIncome == null) {
+            String json = sp.getString(KEY_INCOME, null);
+            if (json != null) sCachedIncome = gson.fromJson(json, listType);
+        }
     }
 
     public Category getCategoryById(long id) {
         return categoryDao.getCategoryById(id);
     }
 
-    public List<Category> getPendingSyncCategories() {
-        return categoryDao.getPendingSyncCategories();
-    }
-
-    public boolean hasSystemPresetCategories(String userId) {
-        return categoryDao.countSystemCategoriesByUser(userId) > 0;
-    }
-
     public Category getCategoryByNameAndUser(String name, String userId) {
         return categoryDao.getCategoryByNameAndUser(name, userId);
-    }
-
-    /** ★ 新增：通过 cloudId 查询本地分类，供子分类 Repository 反查父分类 id 使用 */
-    public Category getCategoryByCloudId(String cloudId) {
-        return categoryDao.getCategoryByCloudId(cloudId);
     }
 
     // =========================================================================

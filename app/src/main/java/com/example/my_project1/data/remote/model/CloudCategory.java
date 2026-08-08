@@ -32,6 +32,10 @@ public class CloudCategory extends BmobObject {
     private boolean isSystemPreset = false; //系统预设分类
     private boolean excludeBudget = false; // 是否计入预算
 
+    private Integer archiveStatus = 0; // 0=正常，1=已归档
+    private Long archiveTime;
+    private String parentId; // 父级ID
+
     // ----- Getter and Setter -----
 
     public long getLocalId() {
@@ -114,6 +118,15 @@ public class CloudCategory extends BmobObject {
         isSystemPreset = systemPreset;
     }
 
+    public Integer getArchiveStatus() { return archiveStatus; }
+    public void setArchiveStatus(Integer archiveStatus) { this.archiveStatus = archiveStatus; }
+
+    public Long getArchiveTime() { return archiveTime; }
+    public void setArchiveTime(Long archiveTime) { this.archiveTime = archiveTime; }
+
+    public String getParentId() { return parentId; }
+    public void setParentId(String parentId) { this.parentId = parentId; }
+
     public Category toLocalCategory() {
         Category local = new Category();
         local.setCloudId(getObjectId());
@@ -128,6 +141,9 @@ public class CloudCategory extends BmobObject {
         local.setSyncState(SyncState.SYNCED.getValue()); // 标记为已同步
         local.setSystemPreset(false); // 默认不是系统预设
         local.setExcludeBudget(excludeBudget);
+        local.setArchiveStatus(archiveStatus != null ? archiveStatus : 0);
+        local.setArchiveTime(archiveTime);
+        local.setParentId(parentId != null ? parentId : "0");
         return local;
     }
     public static CloudCategory fromLocalCategory(Category local) {
@@ -143,6 +159,9 @@ public class CloudCategory extends BmobObject {
         cloud.setExcludeBudget(local.isExcludeBudget());
         cloud.setColor(local.getColor());
         cloud.setOrder(local.getSortIndex());
+        cloud.setArchiveStatus(local.getArchiveStatus());
+        cloud.setArchiveTime(local.getArchiveTime());
+        cloud.setParentId(local.getParentId());
 
         // 创建时间、更新时间由 Bmob 维护
         return cloud;

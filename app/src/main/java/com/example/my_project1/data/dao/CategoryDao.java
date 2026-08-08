@@ -68,7 +68,7 @@ public interface CategoryDao {
     long[] insertCategories(List<Category> categories);
 
     @Transaction
-    @Query("SELECT * FROM categories WHERE owner_id = :userId AND type = :type ORDER BY sort_index ASC")
+    @Query("SELECT * FROM categories WHERE owner_id = :userId AND type = :type AND sync_state != 3 ORDER BY sort_index ASC")
     LiveData<List<CategoryWithSubCategories>> getCategoriesWithSubs(String userId, String type);
 
     @Query("SELECT * FROM categories WHERE sync_state != 0")

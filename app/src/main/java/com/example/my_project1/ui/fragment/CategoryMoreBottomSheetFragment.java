@@ -10,20 +10,20 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.cardview.widget.CardView;
-import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.my_project1.R;
 import com.example.my_project1.ui.activity.IconSelectionActivity;
+import com.example.my_project1.ui.dialog.ConfirmDialog;
 import com.example.my_project1.ui.viewmodel.CategoryViewModel;
 import com.example.my_project1.ui.viewmodel.SubCategoryViewModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
+
+import cn.bmob.v3.BmobUser;
 
 
 public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
@@ -90,19 +90,104 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
         if ("subcategory".equals(type)) {
             btnPromote.setVisibility(View.VISIBLE);
             dividerPromote.setVisibility(View.VISIBLE);
+        } else {
+            // 一级分类不显示“归属到其它分类”
+            btnBelongTo.setVisibility(View.GONE);
+            view.findViewById(R.id.divider_belong_to).setVisibility(View.GONE);
         }
 
         btnModify.setOnClickListener(v -> showEditDialog());
         btnSort.setOnClickListener(v -> Toast.makeText(requireContext(), "排序功能开发中", Toast.LENGTH_SHORT).show());
-        btnPromote.setOnClickListener(v -> Toast.makeText(requireContext(), "调整功能开发中", Toast.LENGTH_SHORT).show());
-        btnMigrate.setOnClickListener(v -> Toast.makeText(requireContext(), "迁移功能开发中", Toast.LENGTH_SHORT).show());
-        btnBelongTo.setOnClickListener(v -> Toast.makeText(requireContext(), "归属功能开发中", Toast.LENGTH_SHORT).show());
+        btnPromote.setOnClickListener(v -> showPromoteConfirmDialog());
+        btnMigrate.setOnClickListener(v -> showMigrationDialog());
+        btnBelongTo.setOnClickListener(v -> showBelongToDialog());
         btnViewBills.setOnClickListener(v -> viewBills());
-        btnArchive.setOnClickListener(v -> Toast.makeText(requireContext(), "归档功能开发中", Toast.LENGTH_SHORT).show());
+        btnArchive.setOnClickListener(v -> showArchiveConfirmDialog());
         btnDelete.setOnClickListener(v -> showDeleteDialog());
         btnCancel.setOnClickListener(v -> dismiss());
 
         return view;
+    }
+
+    private void showPromoteConfirmDialog() {
+        new ConfirmDialog(requireContext())
+                .setTitle("晋升分类")
+                .setMessage("确定要将「" + categoryName + "」调整为一级分类吗？此操作将同步迁移所属账单。")
+                .setConfirmText("确定")
+                .setCancelText("取消")
+                .setConfirmListener(() -> {
+                    String catType = argsType();
+                    categoryViewModel.promoteToMainCategory(subcategoryId, catType);
+                    dismiss();
+                })
+                .show();
+    }
+
+    private void showArchiveConfirmDialog() {
+        if ("category".equals(type)) {
+            boolean hasChildren = getArguments() != null && getArguments().getBoolean("hasChildren", false);
+            if (hasChildren) {
+                new ConfirmDialog(requireContext())
+                        .setTitle("归档分类")
+                        .setMessage("该分类包含子分类，是否同时归档？")
+                        .setConfirmText("同时归档")
+                        .setCancelText("仅归档一级")
+                        .setConfirmListener(() -> {
+                            categoryViewModel.archiveCategory(categoryId, true);
+                            dismiss();
+                        })
+                        .setCancelListener(() -> {
+                            categoryViewModel.archiveCategory(categoryId, false);
+                            dismiss();
+                        })
+                        .show();
+            } else {
+                new ConfirmDialog(requireContext())
+                        .setTitle("归档分类")
+                        .setMessage("确定要归档分类「" + categoryName + "」吗？")
+                        .setConfirmText("归档")
+                        .setCancelText("取消")
+                        .setConfirmListener(() -> {
+                            categoryViewModel.archiveCategory(categoryId, false);
+                            dismiss();
+                        })
+                        .show();
+            }
+        } else {
+            new ConfirmDialog(requireContext())
+                    .setTitle("归档分类")
+                    .setMessage("确定要归档子分类「" + categoryName + "」吗？")
+                    .setConfirmText("归档")
+                    .setCancelText("取消")
+                    .setConfirmListener(() -> {
+                        categoryViewModel.archiveSubCategory(subcategoryId);
+                        Toast.makeText(requireContext(), "已归档", Toast.LENGTH_SHORT).show();
+                        dismiss();
+                    })
+                    .show();
+        }
+    }
+
+    private void showMigrationDialog() {
+        String catType = argsType();
+        String sourceIdStr = "category".equals(type) ? String.valueOf(categoryCloudId) : String.valueOf(categoryCloudId);
+        // 实际上 migrateBills 在 ViewModel 中需要的是 String sourceId (CloudId)
+        CategoryMigrationBottomSheetFragment fragment = CategoryMigrationBottomSheetFragment.newInstance("migrate", sourceIdStr, categoryName, catType);
+        fragment.show(getParentFragmentManager(), "category_migration");
+        dismiss();
+    }
+
+    private void showBelongToDialog() {
+        String catType = argsType();
+        String sourceIdStr = String.valueOf(subcategoryId); // 归属调整需要 long id 进行本地更新
+        long currentParentId = getArguments() != null ? getArguments().getLong("parentCategoryId", -1) : -1;
+        CategoryMigrationBottomSheetFragment fragment = CategoryMigrationBottomSheetFragment.newInstance("change_parent", sourceIdStr, categoryName, catType);
+        Bundle extra = fragment.getArguments();
+        if (extra != null) {
+            extra.putLong("currentParentId", currentParentId);
+        }
+        fragment.show(getParentFragmentManager(), "category_belong_to");
+        dismiss();
     }
 
     private void viewBills() {
@@ -124,24 +209,33 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
 
     /**删除分类*/
     private void showDeleteDialog() {
+        String userId = BmobUser.getCurrentUser().getObjectId();
+        categoryViewModel.checkCategoryBills(userId, categoryCloudId, count -> {
+            String message = count > 0 
+                    ? "该分类下关联了 " + count + " 条账单，删除后这些账单将变成未分类。建议先「迁移数据」或选择「归档」。确定要删除吗？"
+                    : "确定要删除该分类吗？";
+            
+            new ConfirmDialog(requireContext())
+                    .setTitle("删除分类")
+                    .setMessage(message)
+                    .setConfirmText("确定删除")
+                    .setCancelText("取消")
+                    .setConfirmListener(() -> executeDelete())
+                    .show();
+        });
+    }
+
+    private void executeDelete() {
         if ("category".equals(type)) {
-            // 删除一级分类（根据 ID）
             if (categoryId != -1) {
                 categoryViewModel.deleteCategoryById(categoryId);
-                Toast.makeText(requireContext(), "分类已删除", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(requireContext(), "分类 ID 无效", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "分类已标记删除", Toast.LENGTH_SHORT).show();
             }
         } else if ("subcategory".equals(type)) {
             if (subcategoryId != -1){
                 subCategoryViewModel.deleteSubCategoryById(subcategoryId);
-                Toast.makeText(requireContext(), "子分类已删除", Toast.LENGTH_SHORT).show();
-            }else {
-                Toast.makeText(requireContext(), "子分类 ID 无效", Toast.LENGTH_SHORT).show();
-
+                Toast.makeText(requireContext(), "子分类已标记删除", Toast.LENGTH_SHORT).show();
             }
-
-
         }
         dismiss();
     }
@@ -155,10 +249,14 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
         intent.putExtra(IconSelectionActivity.EXTRA_NAME, categoryName);
         intent.putExtra(IconSelectionActivity.EXTRA_ICON_URI, categoryIconUrl);
         intent.putExtra(IconSelectionActivity.EXTRA_ID, "category".equals(type) ? categoryId : subcategoryId);
-        // 需要从数据库获取背景色和预算状态，这里如果 fragment 没带，可能需要额外查询或作为参数传进来
-        // 简单处理：如果 model 有缓存，可以从那里取，但此处 arguments 似乎只有这几样。
-        // 为保持功能完整，理想是在这里根据 id 查询完整的 Category/SubCategory。
         
+        if (getArguments() != null) {
+            intent.putExtra(IconSelectionActivity.EXTRA_EXCLUDE_BUDGET, 
+                    getArguments().getBoolean("excludeBudget", false));
+            intent.putExtra(IconSelectionActivity.EXTRA_ICON_BG_COLOR,
+                    getArguments().getString("categoryIconBg"));
+        }
+
         startActivity(intent);
         dismiss();
     }
@@ -169,19 +267,15 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
         bottomSheetDialog.setOnShowListener(dialog -> {
             FrameLayout bottomSheet = bottomSheetDialog.findViewById(
                     com.google.android.material.R.id.design_bottom_sheet);
-                if (bottomSheetDialog != null){
-
-                    bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
-                            R.drawable.bg_bottom_sheet1));
-                    // 默认展开 BottomSheet
-                    BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
-                    behavior.setSkipCollapsed(true);
-                    behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                }
+            if (bottomSheet != null) {
+                bottomSheet.setBackgroundResource(android.R.color.transparent);
+                // 默认展开 BottomSheet
+                BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
+                behavior.setSkipCollapsed(true);
+                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            }
         });
 
-
         return bottomSheetDialog;
-
     }
 }

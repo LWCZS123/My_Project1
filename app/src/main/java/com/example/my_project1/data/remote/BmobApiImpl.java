@@ -75,6 +75,10 @@ public class BmobApiImpl {
         cloud.setIconUri(localCategory.getIconUri());
         cloud.setColor(localCategory.getColor());
         cloud.setOrder(localCategory.getSortIndex());
+        cloud.setArchiveStatus(localCategory.getArchiveStatus());
+        cloud.setArchiveTime(localCategory.getArchiveTime());
+        cloud.setParentId(localCategory.getParentId());
+        cloud.setExcludeBudget(localCategory.isExcludeBudget());
 
         cloud.save(new SaveListener<String>() {
             @Override
@@ -105,6 +109,10 @@ public class BmobApiImpl {
         cloud.setColor(localCategory.getColor());
         cloud.setOrder(localCategory.getSortIndex());
         cloud.setLocalId(localCategory.getId());
+        cloud.setArchiveStatus(localCategory.getArchiveStatus());
+        cloud.setArchiveTime(localCategory.getArchiveTime());
+        cloud.setParentId(localCategory.getParentId());
+        cloud.setExcludeBudget(localCategory.isExcludeBudget());
 
         cloud.update(localCategory.getCloudId(), new UpdateListener() {
             @Override
@@ -168,6 +176,7 @@ public class BmobApiImpl {
 
         CloudSubCategory cloud = CloudSubCategory.fromLocalSubCategory(local, local.getParentCloudId());
         cloud.setOwnerId(user);
+        cloud.setExcludeBudget(local.isExcludeBudget());
 
         // 设置父分类 Pointer
         if (local.getParentCloudId() != null) {
@@ -205,6 +214,7 @@ public class BmobApiImpl {
 
         CloudSubCategory cloud = CloudSubCategory.fromLocalSubCategory(local, local.getParentCloudId());
         cloud.setOwnerId(user);
+        cloud.setExcludeBudget(local.isExcludeBudget());
 
         if (local.getParentCloudId() != null) {
             CloudCategory parent = new CloudCategory();
@@ -401,6 +411,9 @@ public class BmobApiImpl {
                     // 设置其他字段
                     cloudSub.setColor(sub.getColor());
                     cloudSub.setOrder(sub.getSortIndex());
+                    cloudSub.setArchiveStatus(sub.getArchiveStatus());
+                    cloudSub.setArchiveTime(sub.getArchiveTime());
+                    cloudSub.setExcludeBudget(sub.isExcludeBudget());
 
                     // 🔧 核心修复: 确保 cloudId 正确保存到本地
                     if (sub.getCloudId() == null || sub.getCloudId().isEmpty()) {

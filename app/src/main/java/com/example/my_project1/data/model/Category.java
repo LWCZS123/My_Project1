@@ -74,6 +74,24 @@ public class Category {
     @ColumnInfo(name = "exclude_budget")
     private boolean excludeBudget;
 
+    /**
+     * 归档状态：0 = 正常，1 = 已归档
+     */
+    @ColumnInfo(name = "archive_status", defaultValue = "0")
+    private Integer archiveStatus = 0;
+
+    /**
+     * 归档时间
+     */
+    @ColumnInfo(name = "archive_time")
+    private Long archiveTime;
+
+    /**
+     * 父级分类 ID：一级分类 parentId = "0"
+     */
+    @ColumnInfo(name = "parent_id", defaultValue = "0")
+    private String parentId = "0";
+
     /** 非持久化：由 Room @Relation 填充，不写入 categories 表 */
     @Ignore
     private List<SubCategory> subCategories;
@@ -149,6 +167,15 @@ public class Category {
     public boolean isExcludeBudget() { return excludeBudget; }
     public void setExcludeBudget(boolean excludeBudget) { this.excludeBudget = excludeBudget; }
 
+    public Integer getArchiveStatus() { return archiveStatus; }
+    public void setArchiveStatus(Integer archiveStatus) { this.archiveStatus = archiveStatus; }
+
+    public Long getArchiveTime() { return archiveTime; }
+    public void setArchiveTime(Long archiveTime) { this.archiveTime = archiveTime; }
+
+    public String getParentId() { return parentId; }
+    public void setParentId(String parentId) { this.parentId = parentId; }
+
     public List<SubCategory> getSubCategories() { return subCategories; }
     public void setSubCategories(List<SubCategory> subCategories) { this.subCategories = subCategories; }
 
@@ -179,6 +206,9 @@ public class Category {
                 syncState == category.syncState &&
                 isSystemPreset == category.isSystemPreset &&
                 excludeBudget == category.excludeBudget &&
+                java.util.Objects.equals(archiveStatus, category.archiveStatus) &&
+                java.util.Objects.equals(archiveTime, category.archiveTime) &&
+                java.util.Objects.equals(parentId, category.parentId) &&
                 java.util.Objects.equals(cloudId, category.cloudId) &&
                 java.util.Objects.equals(ownerId, category.ownerId) &&
                 java.util.Objects.equals(type, category.type) &&
@@ -192,7 +222,7 @@ public class Category {
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(id, cloudId, ownerId, type, name, note, iconUri, iconBackgroundColor, color, sortIndex, updatedAt, syncState, isSystemPreset, excludeBudget, subCategories);
+        return java.util.Objects.hash(id, cloudId, ownerId, type, name, note, iconUri, iconBackgroundColor, color, sortIndex, updatedAt, syncState, isSystemPreset, excludeBudget, archiveStatus, archiveTime, parentId, subCategories);
     }
 
     @Override

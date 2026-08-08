@@ -92,6 +92,12 @@ public class CategoryActivity extends AppCompatActivity {
             intent.putExtra(IconSelectionActivity.EXTRA_CATEGORY_TYPE, type);
             startActivity(intent);
         });
+
+        // 查看已归档分类
+        binding.btnArchived.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, ArchivedCategoryActivity.class);
+            startActivity(intent);
+        });
     }
 
     // 更新顶部按钮样式

@@ -152,6 +152,19 @@ public interface BillDao {
     @Query("DELETE FROM bills WHERE user_id = :userId AND category_id = :categoryId")
     int deleteBillsByCategory(String userId, String categoryId);
 
+    @Query("SELECT COUNT(*) FROM bills WHERE category_id = :categoryId AND user_id = :userId AND sync_state != 'TO_DELETE'")
+    int countBillsByCategory(String userId, String categoryId);
+
+    /**
+     * 迁移账单到新分类
+     */
+    @Query("UPDATE bills SET category_id = :targetId, category_name = :targetName, " +
+            "category_icon = :targetIcon, category_icon_bg_color = :targetIconBg, " +
+            "sync_state = 'TO_UPDATE', updatedAt = :now " +
+            "WHERE category_id = :sourceId AND user_id = :userId")
+    void migrateBills(String userId, String sourceId, String targetId, String targetName,
+                      String targetIcon, String targetIconBg, long now);
+
 
 
     // 🔴 在 BillDao 接口中新增以下方法

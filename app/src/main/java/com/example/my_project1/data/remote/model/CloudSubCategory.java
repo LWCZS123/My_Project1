@@ -58,6 +58,9 @@ public class CloudSubCategory extends BmobObject {
     /** 排序 */
     private int order;
 
+    private Integer archiveStatus = 0;
+    private Long archiveTime;
+
     // -------------------------------------------------------------------------
     // Getter / Setter
     // -------------------------------------------------------------------------
@@ -88,6 +91,12 @@ public class CloudSubCategory extends BmobObject {
 
     public int getOrder() { return order; }
     public void setOrder(int order) { this.order = order; }
+
+    public Integer getArchiveStatus() { return archiveStatus; }
+    public void setArchiveStatus(Integer archiveStatus) { this.archiveStatus = archiveStatus; }
+
+    public Long getArchiveTime() { return archiveTime; }
+    public void setArchiveTime(Long archiveTime) { this.archiveTime = archiveTime; }
 
     // -------------------------------------------------------------------------
     // 云端 → 本地转换
@@ -120,6 +129,8 @@ public class CloudSubCategory extends BmobObject {
         local.setSyncState(SyncState.SYNCED.getValue());
         local.setSystemPreset(false);
         local.setExcludeBudget(excludeBudget);
+        local.setArchiveStatus(archiveStatus != null ? archiveStatus : 0);
+        local.setArchiveTime(archiveTime);
         return local;
     }
 
@@ -162,6 +173,8 @@ public class CloudSubCategory extends BmobObject {
         cloud.setExcludeBudget(local.isExcludeBudget());
         cloud.setColor(local.getColor());
         cloud.setOrder(local.getSortIndex());
+        cloud.setArchiveStatus(local.getArchiveStatus());
+        cloud.setArchiveTime(local.getArchiveTime());
 
         return cloud;
     }
