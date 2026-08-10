@@ -1,24 +1,25 @@
 package com.example.my_project1.ui.viewmodel.billvm;
 
 import android.app.Application;
-import android.os.Build;
-import android.util.Log;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.my_project1.R;
 import com.example.my_project1.data.dao.AccountDao;
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.bill.SearchFilter;
 import com.example.my_project1.data.model.bill.SearchHistory;
+import com.example.my_project1.data.model.bill.SearchSummary;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.SearchRepository;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
 import com.example.my_project1.utils.AppExecutors;
-import com.example.my_project1.R;
 
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -27,413 +28,242 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import cn.bmob.v3.BmobUser;
-import android.net.Uri;
 import io.reactivex.annotations.NonNull;
 
 /**
- * SearchViewModel - 搜索功能ViewModel (重构版 - 使用 ApiResponse)
- * -------------------------------------------------------
- * ✅ 功能:
- * 1. 关键词搜索
- * 2. 筛选条件搜索
- * 3. 管理搜索历史
- * 4. 状态管理
- *
- * ✅ 重构优化:
- * 1. 使用统一的 ApiResponse 替代 UiState
- * 2. 代码更简洁，状态管理更清晰
- * 3. 减少重复代码
+ * SearchViewModel - 搜索功能ViewModel (完整重构版)
  */
 public class SearchViewModel extends AndroidViewModel {
 
     private static final String TAG = "SearchViewModel";
+    private static final long DEBOUNCE_MS = 300;
 
-    // Repository
     private final SearchRepository repository;
     private final AccountDao accountDao;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable suggestionRunnable;
 
-    // 当前用户ID
     private String currentUserId;
-
-    // 🔥 当前筛选条件
-    private SearchFilter currentFilter;
+    private final SearchFilter currentFilter = new SearchFilter();
 
     // ==================== LiveData ====================
 
-    // 账户映射 (accountId -> Account)
-    private final MutableLiveData<Map<String, Account>> _accountMap = new MutableLiveData<>(new HashMap<>());
-    public final LiveData<Map<String, Account>> accountMap = _accountMap;
-
-    // 搜索结果
     private final MutableLiveData<List<Bill>> _searchResults = new MutableLiveData<>();
     public final LiveData<List<Bill>> searchResults = _searchResults;
 
-    // 搜索历史
-    private LiveData<List<SearchHistory>> searchHistory;
+    private final MutableLiveData<SearchSummary> _searchSummary = new MutableLiveData<>();
+    public final LiveData<SearchSummary> searchSummary = _searchSummary;
 
-    // 搜索状态 (使用 ApiResponse)
+    private final MutableLiveData<List<String>> _suggestions = new MutableLiveData<>();
+    public final LiveData<List<String>> suggestions = _suggestions;
+
     private final MutableLiveData<ApiResponse<String>> _searchState = new MutableLiveData<>(ApiResponse.idle());
     public final LiveData<ApiResponse<String>> searchState = _searchState;
 
-    // Toast消息
+    private final MutableLiveData<Map<String, Account>> _accountMap = new MutableLiveData<>(new HashMap<>());
+    public final LiveData<Map<String, Account>> accountMap = _accountMap;
+
     private final MutableLiveData<String> _toastMessage = new MutableLiveData<>();
     public final LiveData<String> toastMessage = _toastMessage;
+
+    public LiveData<List<SearchHistory>> searchHistory;
 
     // ==================== 构造函数 ====================
 
     public SearchViewModel(@NonNull Application application) {
         super(application);
-
         repository = new SearchRepository(application);
         accountDao = AppDatabase.getInstance(application).accountDao();
 
-        // 加载账户信息
         loadAccounts();
-
-        // 获取当前用户ID
         BmobUser currentUser = BmobUser.getCurrentUser();
         if (currentUser != null) {
             currentUserId = currentUser.getObjectId();
-            // 初始化搜索历史
             searchHistory = repository.getSearchHistory(currentUserId);
-        } else {
-            currentUserId = null;
-            Log.w(TAG, "⚠️ 用户未登录");
+            fetchSuggestions(""); // Fetch default suggestions
         }
     }
 
-    // ==================== 公开方法 ====================
+    // ==================== 搜索逻辑 ====================
 
-    /**
-     * ✅ UiModel 映射 (聚合版)
-     */
+    public void setKeyword(String keyword) {
+        currentFilter.setKeyword(keyword);
+        fetchSuggestions(keyword);
+    }
+
+    public void updateFilter(SearchFilter filter) {
+        if (filter == null) return;
+        currentFilter.setBillType(filter.getBillType());
+        currentFilter.setCategoryId(filter.getCategoryId());
+        currentFilter.setAccountIds(filter.getAccountIds());
+        currentFilter.setStartDate(filter.getStartDate());
+        currentFilter.setEndDate(filter.getEndDate());
+        currentFilter.setMinAmount(filter.getMinAmount());
+        currentFilter.setMaxAmount(filter.getMaxAmount());
+        performSearch();
+    }
+
+    public void performSearch() {
+        if (currentUserId == null) return;
+
+        String keyword = currentFilter.getKeyword();
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            repository.addSearchHistory(currentUserId, keyword.trim());
+        }
+
+        _searchState.setValue(ApiResponse.loading());
+        repository.searchBills(currentUserId, currentFilter, response -> {
+            if (response.isSuccess()) {
+                List<Bill> bills = response.data;
+                _searchResults.setValue(bills);
+                calculateSummary(bills);
+                if (bills == null || bills.isEmpty()) {
+                    _searchState.setValue(ApiResponse.empty("未找到相关账单"));
+                } else {
+                    _searchState.setValue(ApiResponse.success("找到 " + bills.size() + " 条记录"));
+                }
+            } else {
+                _searchState.setValue(ApiResponse.error(response.message));
+            }
+        });
+    }
+
+    private void fetchSuggestions(String keyword) {
+        if (suggestionRunnable != null) handler.removeCallbacks(suggestionRunnable);
+        if (keyword == null || keyword.trim().isEmpty()) {
+            _suggestions.setValue(new ArrayList<>());
+            return;
+        }
+
+        suggestionRunnable = () -> {
+            repository.getSuggestions(currentUserId, keyword, response -> {
+                if (response.isSuccess()) {
+                    _suggestions.setValue(response.data);
+                }
+            });
+        };
+        handler.postDelayed(suggestionRunnable, DEBOUNCE_MS);
+    }
+
+    private void calculateSummary(List<Bill> bills) {
+        if (bills == null || bills.isEmpty()) {
+            _searchSummary.setValue(new SearchSummary(0, 0, 0, 0, 0));
+            return;
+        }
+
+        double income = 0, expense = 0;
+        Set<String> days = new HashSet<>();
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+        for (Bill b : bills) {
+            if (b.getType() == 0) expense += b.getAmount();
+            else if (b.getType() == 1) income += b.getAmount();
+            if (b.getBillTime() != null) days.add(fmt.format(b.getBillTime()));
+        }
+
+        _searchSummary.setValue(new SearchSummary(income, expense, income - expense, bills.size(), days.size()));
+    }
+
+    // ==================== 历史管理 ====================
+
+    public void deleteHistory(SearchHistory history) { repository.deleteSearchHistory(history); }
+    public void clearHistory() { if (currentUserId != null) repository.clearAllHistory(currentUserId); }
+
+    // ==================== UI 映射 ====================
+
     public List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> bills) {
         if (bills == null || bills.isEmpty()) return new ArrayList<>();
 
-        // 🔴 修复：显式强制按时间降序排列，防止同一天的账单被分到多个卡片
-        List<Bill> sortedBills = new ArrayList<>(bills);
-        Collections.sort(sortedBills, (b1, b2) -> {
-            Date t1 = b1.getBillTime();
-            Date t2 = b2.getBillTime();
-            if (t1 == null && t2 == null) return 0;
-            if (t1 == null) return 1;
-            if (t2 == null) return -1;
+        List<Bill> sorted = new ArrayList<>(bills);
+        Collections.sort(sorted, (b1, b2) -> {
+            Date t1 = b1.getBillTime(), t2 = b2.getBillTime();
+            if (t1 == null || t2 == null) return 0;
             int res = t2.compareTo(t1);
-            if (res == 0) return Long.compare(b2.getId(), b1.getId());
-            return res;
+            return res != 0 ? res : Long.compare(b2.getId(), b1.getId());
         });
 
         Map<String, Account> accountMap = _accountMap.getValue();
-        SimpleDateFormat dateKeyFmt  = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        SimpleDateFormat dateKeyFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         SimpleDateFormat dateDispFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
-        SimpleDateFormat timeFmt     = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        DecimalFormat    amtFmt      = new DecimalFormat("#,##0.00");
+        SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        DecimalFormat amtFmt = new DecimalFormat("#,##0.00");
         String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 
-        String  prevDateKey = null;
-        double  dayExpense  = 0;
-        double  dayIncome   = 0;
-        List<BillUiModel> currentDayBills = new ArrayList<>();
-        BillAdapter.DateHeader currentHeader = null;
-
         List<BillAdapter.BillGroup> groups = new ArrayList<>();
-        for (int i = 0; i < sortedBills.size(); i++) {
-            Bill   bill    = sortedBills.get(i);
+        String prevDateKey = null;
+        double dayExp = 0, dayInc = 0;
+        List<BillUiModel> currentDayBills = new ArrayList<>();
+
+        for (Bill bill : sorted) {
             if (bill.getBillTime() == null) continue;
-            
             String dateKey = dateKeyFmt.format(bill.getBillTime());
 
             if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
-                groups.add(new BillAdapter.BillGroup(
-                        new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
-                                String.format(Locale.getDefault(), "支 %.2f", dayExpense),
-                                String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
-                        new ArrayList<>(currentDayBills)
-                ));
-                dayExpense = 0;
-                dayIncome  = 0;
+                addGroup(groups, prevDateKey, dayExp, dayInc, currentDayBills, dateDispFmt, weekDays);
+                dayExp = 0; dayInc = 0;
                 currentDayBills.clear();
             }
 
-            if (bill.getType() == 0) dayExpense += bill.getAmount();
-            else if (bill.getType() == 1) dayIncome  += bill.getAmount();
+            if (bill.getType() == 0) dayExp += bill.getAmount();
+            else if (bill.getType() == 1) dayInc += bill.getAmount();
 
-            if (currentDayBills.isEmpty()) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(bill.getBillTime());
-                String weekDay  = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1];
-                String dateDisp = dateDispFmt.format(bill.getBillTime()) + "（" + weekDay + "）";
-                currentHeader = new BillAdapter.DateHeader(dateKey, dateDisp, "", "");
-            }
-
-            int billType = bill.getType();
-            String prefix = "";
-            int amountColor;
-            String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
-            
-            if (billType == 0) {
-                prefix = "- ¥";
-                amountColor = getApplication().getColor(R.color.red);
-            } else if (billType == 1) {
-                prefix = "+ ¥";
-                amountColor = getApplication().getColor(R.color.green);
-            } else {
-                prefix = "¥";
-                amountColor = getApplication().getColor(R.color.orange_500);
-                Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
-                categoryIcon = uri.toString();
-            }
-            
-            String amountText = prefix + amtFmt.format(bill.getAmount());
-
-            Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
-            Account toAccount = (accountMap != null && (billType == 2 || billType == 3)) ? accountMap.get(bill.getToAccountId()) : null;
-
-            currentDayBills.add(BillUiModel.builder()
-                    .localId(bill.getId())
-                    .objectId(bill.getObjectId())
-                    .timeText(timeFmt.format(bill.getBillTime()))
-                    .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
-                    .categoryIconUrl(categoryIcon)
-                    .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
-                    .amountText(amountText)
-                    .amountColor(amountColor)
-                    .accountName(account != null ? account.getName() : "")
-                    .toAccountName(toAccount != null ? toAccount.getName() : "")
-                    .billType(billType)
-                    .remarkText(bill.getRemark())
-                    .imageUrls(bill.getImageUrls())
-                    .build());
-
+            currentDayBills.add(buildUiModel(bill, accountMap, timeFmt, amtFmt));
             prevDateKey = dateKey;
         }
-
-        if (!currentDayBills.isEmpty() && currentHeader != null) {
-            groups.add(new BillAdapter.BillGroup(
-                    new BillAdapter.DateHeader(prevDateKey, currentHeader.dateText,
-                            String.format(Locale.getDefault(), "支 %.2f", dayExpense),
-                            String.format(Locale.getDefault(), "收 %.2f", dayIncome)),
-                    currentDayBills
-            ));
+        if (!currentDayBills.isEmpty()) {
+            addGroup(groups, prevDateKey, dayExp, dayInc, currentDayBills, dateDispFmt, weekDays);
         }
-
         return groups;
     }
 
-    /**
-     * 获取搜索历史
-     */
-    public LiveData<List<SearchHistory>> getSearchHistory() {
-        return searchHistory;
+    private void addGroup(List<BillAdapter.BillGroup> groups, String dateKey, double exp, double inc,
+                          List<BillUiModel> bills, SimpleDateFormat dispFmt, String[] weekDays) {
+        try {
+            Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateKey);
+            Calendar cal = Calendar.getInstance(); cal.setTime(date);
+            String disp = dispFmt.format(date) + "（" + weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1] + "）";
+            groups.add(new BillAdapter.BillGroup(
+                    new BillAdapter.DateHeader(dateKey, disp, String.format("支 %.2f", exp), String.format("收 %.2f", inc)),
+                    new ArrayList<>(bills)
+            ));
+        } catch (Exception ignored) {}
     }
 
-    /**
-     * 🔍 搜索账单 (关键词搜索)
-     */
-    public void searchBills(String keyword) {
-        if (currentUserId == null) {
-            _toastMessage.setValue("请先登录");
-            return;
-        }
+    private BillUiModel buildUiModel(Bill bill, Map<String, Account> accountMap, SimpleDateFormat timeFmt, DecimalFormat amtFmt) {
+        int type = bill.getType();
+        int color = getApplication().getColor(type == 0 ? R.color.red : (type == 1 ? R.color.green : R.color.orange_500));
+        String amountText = (type == 0 ? "- ¥" : (type == 1 ? "+ ¥" : "¥")) + amtFmt.format(bill.getAmount());
+        
+        Account acc = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
+        Account toAcc = (accountMap != null && type == 2) ? accountMap.get(bill.getToAccountId()) : null;
 
-        if (keyword == null || keyword.trim().isEmpty()) {
-            // 清空搜索结果
-            _searchResults.setValue(null);
-            _searchState.setValue(ApiResponse.idle());
-            return;
-        }
-
-        // 保存搜索历史
-        addSearchHistory(keyword.trim());
-
-        _searchState.setValue(ApiResponse.loading());
-        Log.d(TAG, "🔍 开始搜索: keyword=" + keyword);
-
-        repository.searchBills(currentUserId, keyword, response -> {
-            if (response.isSuccess()) {
-                List<Bill> bills = response.data;
-
-                if (bills == null || bills.isEmpty()) {
-                    _searchResults.setValue(null);
-                    _searchState.setValue(ApiResponse.empty("未找到相关结果"));
-                    Log.d(TAG, "🔍 搜索结果为空");
-                } else {
-                    _searchResults.setValue(bills);
-                    _searchState.setValue(ApiResponse.success("找到 " + bills.size() + " 条结果"));
-                    Log.d(TAG, "✅ 搜索成功: " + bills.size() + " 条结果");
-                }
-            } else {
-                _searchState.setValue(ApiResponse.error(response.message));
-                _toastMessage.setValue("搜索失败: " + response.message);
-                Log.e(TAG, "❌ 搜索失败: " + response.message);
-            }
-        });
+        return BillUiModel.builder()
+                .localId(bill.getId()).objectId(bill.getObjectId())
+                .timeText(timeFmt.format(bill.getBillTime()))
+                .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
+                .categoryIconUrl(bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "")
+                .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
+                .amountText(amountText).amountColor(color)
+                .accountName(acc != null ? acc.getName() : "").toAccountName(toAcc != null ? toAcc.getName() : "")
+                .billType(type).remarkText(bill.getRemark()).imageUrls(bill.getImageUrls())
+                .build();
     }
 
-    /**
-     * 🔍 搜索账单 (带筛选条件)
-     */
-    public void searchBillsWithFilter(String keyword, SearchFilter filter) {
-        if (currentUserId == null) {
-            _toastMessage.setValue("请先登录");
-            return;
-        }
-
-        // 保存筛选条件
-        this.currentFilter = filter;
-
-        // 如果有关键词，保存搜索历史
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            addSearchHistory(keyword.trim());
-        }
-
-        _searchState.setValue(ApiResponse.loading("正在筛选..."));
-        Log.d(TAG, "🔍 开始筛选搜索: keyword=" + keyword + ", filter=" + filter);
-
-        repository.searchBillsWithFilter(currentUserId, keyword, filter, response -> {
-            if (response.isSuccess()) {
-                List<Bill> bills = response.data;
-
-                if (bills == null || bills.isEmpty()) {
-                    _searchResults.setValue(null);
-                    _searchState.setValue(ApiResponse.empty("未找到符合条件的结果"));
-                    Log.d(TAG, "🔍 筛选结果为空");
-                } else {
-                    _searchResults.setValue(bills);
-
-                    // 构建结果提示信息
-                    String message = buildResultMessage(bills.size(), filter);
-                    _searchState.setValue(ApiResponse.success(message));
-                    Log.d(TAG, "✅ 筛选搜索成功: " + bills.size() + " 条结果");
-                }
-            } else {
-                _searchState.setValue(ApiResponse.error(response.message));
-                _toastMessage.setValue("搜索失败: " + response.message);
-                Log.e(TAG, "❌ 筛选搜索失败: " + response.message);
-            }
-        });
-    }
-
-    /**
-     * 🔥 构建搜索结果提示信息
-     */
-    private String buildResultMessage(int count, SearchFilter filter) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("找到 ").append(count).append(" 条结果");
-
-        if (filter != null && filter.hasAnyFilter()) {
-            sb.append(" (");
-
-            List<String> conditions = new ArrayList<>();
-            if (filter.getStartDate() != null || filter.getEndDate() != null) {
-                conditions.add("日期");
-            }
-            if (filter.getMinAmount() != null || filter.getMaxAmount() != null) {
-                conditions.add("金额");
-            }
-            if (filter.getAccountIds() != null && !filter.getAccountIds().isEmpty()) {
-                conditions.add(filter.getAccountIds().size() + "个账户");
-            }
-            if (filter.getRemarkKeyword() != null) {
-                conditions.add("备注");
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                sb.append(String.join(", ", conditions));
-            }
-            sb.append(")");
-        }
-
-        return sb.toString();
-    }
-
-    /**
-     * 🔥 获取当前筛选条件
-     */
-    public SearchFilter getCurrentFilter() {
-        return currentFilter;
-    }
-
-    /**
-     * 添加搜索历史
-     */
-    private void addSearchHistory(String keyword) {
-        repository.addSearchHistory(currentUserId, keyword, response -> {
-            if (response.isSuccess()) {
-                Log.d(TAG, "✅ 保存搜索历史: " + keyword);
-            } else {
-                Log.e(TAG, "❌ 保存搜索历史失败: " + response.message);
-            }
-        });
-    }
-
-    /**
-     * 删除单条搜索历史
-     */
-    public void deleteSearchHistory(SearchHistory history) {
-        repository.deleteSearchHistory(history, response -> {
-            if (response.isSuccess()) {
-                Log.d(TAG, "✅ 删除搜索历史成功");
-            } else {
-                _toastMessage.setValue("删除失败");
-                Log.e(TAG, "❌ 删除搜索历史失败: " + response.message);
-            }
-        });
-    }
-
-    /**
-     * 清空所有搜索历史
-     */
-    public void clearAllHistory() {
-        if (currentUserId == null) {
-            _toastMessage.setValue("请先登录");
-            return;
-        }
-
-        repository.clearAllHistory(currentUserId, response -> {
-            if (response.isSuccess()) {
-                _toastMessage.setValue("已清空搜索历史");
-                Log.d(TAG, "✅ 清空搜索历史成功");
-            } else {
-                _toastMessage.setValue("清空失败");
-                Log.e(TAG, "❌ 清空搜索历史失败: " + response.message);
-            }
-        });
-    }
-
-    /**
-     * 加载账户信息以构建映射
-     */
     private void loadAccounts() {
         AppExecutors.get().diskIO().execute(() -> {
             List<Account> accounts = accountDao.getAllAccountsSync();
             Map<String, Account> map = new HashMap<>();
-            if (accounts != null) {
-                for (Account acc : accounts) {
-                    map.put(acc.getObjectId(), acc);
-                }
-            }
+            if (accounts != null) for (Account a : accounts) map.put(a.getObjectId(), a);
             _accountMap.postValue(map);
         });
     }
 
-    /**
-     * 重置搜索状态
-     */
-    public void resetSearchState() {
-        _searchState.setValue(ApiResponse.idle());
-        _searchResults.setValue(null);
-        currentFilter = null;
-    }
-
-    @Override
-    protected void onCleared() {
-        super.onCleared();
-        Log.d(TAG, "🧹 ViewModel cleared");
-    }
+    public SearchFilter getCurrentFilter() { return currentFilter; }
 }

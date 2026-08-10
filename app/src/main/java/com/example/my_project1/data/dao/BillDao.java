@@ -113,6 +113,36 @@ public interface BillDao {
             "ORDER BY billTime DESC")
     List<Bill> searchBills(String userId, String keyword);
 
+    /**
+     * 🔥 高级搜索：支持多种筛选条件
+     */
+    @Query("SELECT * FROM bills WHERE user_id = :userId " +
+            "AND sync_state != 'TO_DELETE' " +
+            "AND (:keyword IS NULL OR category_name LIKE :keyword OR remark LIKE :keyword OR location LIKE :keyword) " +
+            "AND (:billType = -1 OR type = :billType) " +
+            "AND (:categoryId IS NULL OR category_id = :categoryId) " +
+            "AND (:accountIdsCount = 0 OR account_id IN (:accountIds)) " +
+            "AND (:startTime IS NULL OR billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR billTime <= :endTime) " +
+            "AND (:minAmount IS NULL OR amount >= :minAmount) " +
+            "AND (:maxAmount IS NULL OR amount <= :maxAmount) " +
+            "ORDER BY billTime DESC")
+    List<Bill> searchBillsAdvanced(String userId, String keyword, int billType, String categoryId,
+                                   List<String> accountIds, int accountIdsCount,
+                                   Date startTime, Date endTime, Double minAmount, Double maxAmount);
+
+    /**
+     * 获取搜索建议：备注
+     */
+    @Query("SELECT DISTINCT remark FROM bills WHERE user_id = :userId AND remark LIKE :keyword AND sync_state != 'TO_DELETE' LIMIT 5")
+    List<String> getRemarkSuggestions(String userId, String keyword);
+
+    /**
+     * 获取搜索建议：地点
+     */
+    @Query("SELECT DISTINCT location FROM bills WHERE user_id = :userId AND location LIKE :keyword AND sync_state != 'TO_DELETE' LIMIT 5")
+    List<String> getLocationSuggestions(String userId, String keyword);
+
     // ==================== 同步查询(非LiveData) ====================
 
     /** 同步查询所有账单(Worker使用) */

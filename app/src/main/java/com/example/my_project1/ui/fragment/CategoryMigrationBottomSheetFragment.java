@@ -76,8 +76,14 @@ public class CategoryMigrationBottomSheetFragment extends BottomSheetDialogFragm
             if (bottomSheet != null) {
                 bottomSheet.setBackgroundResource(android.R.color.transparent);
                 BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
-//                behavior.setSkipCollapsed(true);
-//                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                
+                // 增加高度，保持 80% 屏幕高度
+                ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
+                layoutParams.height = (int) (getResources().getDisplayMetrics().heightPixels * 0.8);
+                bottomSheet.setLayoutParams(layoutParams);
+                
+                behavior.setSkipCollapsed(true);
+                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             }
         });
         return dialog;

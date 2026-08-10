@@ -231,4 +231,10 @@
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
+
+    <style name="BlueSwitch" parent="Theme.AppCompat.Light">
+        <item name="colorControlActivated">#3B82F6</item>
+        <item name="colorSwitchThumbNormal">#F1F5F9</item>
+        <item name="android:colorForeground">#E2E8F0</item>
+    </style>
 </resources>

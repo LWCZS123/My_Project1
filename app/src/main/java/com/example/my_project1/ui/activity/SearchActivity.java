@@ -1,381 +1,234 @@
 package com.example.my_project1.ui.activity;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.View;
-import android.widget.Toast;
+import android.view.inputmethod.EditorInfo;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 
 import com.example.my_project1.R;
-import com.example.my_project1.data.model.bill.Bill;
-import com.example.my_project1.data.model.bill.SearchFilter;
 import com.example.my_project1.data.model.bill.SearchHistory;
 import com.example.my_project1.databinding.ActivitySearchBinding;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
-import com.example.my_project1.ui.adapter.search.SearchHistoryAdapter;
+import com.example.my_project1.ui.adapter.search.SearchSummaryAdapter;
 import com.example.my_project1.ui.fragment.SearchFilterBottomSheet;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.SearchViewModel;
-import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.chip.Chip;
 
-import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
-import java.util.Locale;
 
 /**
- * SearchActivity - 搜索功能界面 (完整增强版)
- * -------------------------------------------------------
- * ✅ 功能:
- * 1. 关键词搜索
- * 2. 筛选搜索 (日期/金额/账户/备注)
- * 3. 搜索历史管理
- * 4. 实时搜索提示
- * 5. 修复了 UI 数据模型转换 (List<Bill> -> List<Object>)
+ * SearchActivity - 搜索模块主页面 (直接在 Activity 中实现所有逻辑)
  */
 public class SearchActivity extends AppCompatActivity {
 
-    private static final String TAG = "SearchActivity";
-    private static final long SEARCH_DELAY_MS = 500;
-
     private ActivitySearchBinding binding;
     private SearchViewModel viewModel;
-
-    private SearchHistoryAdapter historyAdapter;
     private BillAdapter billAdapter;
-
-    private final Handler searchHandler = new Handler(Looper.getMainLooper());
-    private Runnable searchRunnable;
-
-    // 当前筛选条件
-    private SearchFilter currentFilter;
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd", Locale.getDefault());
+    private SearchSummaryAdapter summaryAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
-
-
         super.onCreate(savedInstanceState);
         binding = ActivitySearchBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        // 状态栏美化
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
-
             int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-
             v.setPadding(0, top, 0, 0);
-
             return insets;
         });
 
-        // 设置状态栏图标为深色（因为背景是浅色 #F0F4FF）
-        WindowInsetsControllerCompat insetsController =
-                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
 
+        viewModel = new ViewModelProvider(this).get(SearchViewModel.class);
 
-        initViewModel();
         initViews();
-        setupListeners();
         observeData();
+    }
+
+    private void initViews() {
+        billAdapter = new BillAdapter(this, new BillAdapter.OnBillClickListener() {
+            @Override
+            public void onBillClick(long localId, String objectId, View itemView) {
+                openBillDetail(localId, objectId);
+            }
+            @Override public void onPhotoClick(String url, int pos) {}
+            @Override public void onBillDelete(BillUiModel bill) {}
+            @Override public void onBillEdit(BillUiModel bill) {}
+            @Override public void onBillRefund(BillUiModel bill) {}
+        }, true);
+        binding.rvBills.setLayoutManager(new LinearLayoutManager(this));
+        binding.rvBills.setAdapter(billAdapter);
+
+        summaryAdapter = new SearchSummaryAdapter();
+        binding.rvSummary.setAdapter(summaryAdapter);
+        binding.rvSummary.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+
+        binding.etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String keyword = s.toString();
+                viewModel.setKeyword(keyword);
+                binding.btnClearSearch.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
+                
+                if (s.length() == 0) {
+                    binding.layoutResults.setVisibility(View.GONE);
+                    binding.layoutPreSearch.setVisibility(View.VISIBLE);
+                    binding.layoutEmpty.setVisibility(View.GONE);
+                }
+            }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        binding.etSearch.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                viewModel.performSearch();
+                return true;
+            }
+            return false;
+        });
+
+        binding.btnClearSearch.setOnClickListener(v -> binding.etSearch.setText(""));
+        binding.tvCancel.setOnClickListener(v -> finish());
+        binding.tvClearHistory.setOnClickListener(v -> viewModel.clearHistory());
+        binding.fabFilter.setOnClickListener(v -> showFilterBottomSheet());
+    }
+
+    private void observeData() {
+        viewModel.searchHistory.observe(this, this::updateHistoryChips);
+        viewModel.suggestions.observe(this, this::updateSuggestionChips);
+        
+        viewModel.searchResults.observe(this, bills -> {
+            if (bills != null && !bills.isEmpty()) {
+                billAdapter.submitList(viewModel.mapBillsToUiGroups(bills));
+                binding.layoutResults.setVisibility(View.VISIBLE);
+                binding.layoutPreSearch.setVisibility(View.GONE);
+                binding.layoutEmpty.setVisibility(View.GONE);
+                binding.layoutLoading.setVisibility(View.GONE);
+            } else if (bills != null) {
+                 binding.layoutResults.setVisibility(View.GONE);
+                 binding.layoutPreSearch.setVisibility(View.GONE);
+                 binding.layoutEmpty.setVisibility(View.VISIBLE);
+                 binding.layoutLoading.setVisibility(View.GONE);
+                 binding.lottieEmpty.playAnimation();
+            }
+        });
+
+        viewModel.searchSummary.observe(this, summary -> {
+            if (summary != null) {
+                summaryAdapter.setSummary(summary);
+                binding.tvSearchResultCount.setText(String.format("共搜索出%d条明细", summary.getBillCount()));
+            }
+        });
+
+        viewModel.searchState.observe(this, state -> {
+            if (state.isLoading()) {
+                binding.layoutResults.setVisibility(View.GONE);
+                binding.layoutPreSearch.setVisibility(View.GONE);
+                binding.layoutEmpty.setVisibility(View.GONE);
+                binding.layoutLoading.setVisibility(View.VISIBLE);
+                binding.lottieLoading.playAnimation();
+            } else if (state.isEmpty()) {
+                binding.layoutResults.setVisibility(View.GONE);
+                binding.layoutPreSearch.setVisibility(View.GONE);
+                binding.layoutEmpty.setVisibility(View.VISIBLE);
+                binding.layoutLoading.setVisibility(View.GONE);
+                binding.lottieEmpty.playAnimation();
+            } else if (state.isSuccess() || state.isError()) {
+                binding.layoutLoading.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void updateHistoryChips(List<SearchHistory> histories) {
+        binding.chipGroupHistory.removeAllViews();
+        if (histories == null || histories.isEmpty()) {
+            binding.layoutHistoryHeader.setVisibility(View.GONE);
+            binding.chipGroupHistory.setVisibility(View.GONE);
+            return;
+        }
+        binding.layoutHistoryHeader.setVisibility(View.VISIBLE);
+        binding.chipGroupHistory.setVisibility(View.VISIBLE);
+        for (SearchHistory h : histories) {
+            Chip chip = createChip(h.getKeyword());
+            chip.setOnClickListener(v -> {
+                binding.etSearch.setText(h.getKeyword());
+                binding.etSearch.setSelection(h.getKeyword().length());
+                viewModel.performSearch();
+            });
+            binding.chipGroupHistory.addView(chip);
+        }
+    }
+
+    private void updateSuggestionChips(List<String> suggestions) {
+        binding.chipGroupSuggestions.removeAllViews();
+        if (suggestions == null || suggestions.isEmpty()) {
+            binding.chipGroupSuggestions.setVisibility(View.GONE);
+            binding.tvSuggestionTitle.setVisibility(View.GONE);
+            return;
+        }
+        binding.chipGroupSuggestions.setVisibility(View.VISIBLE);
+        binding.tvSuggestionTitle.setVisibility(View.VISIBLE);
+        for (String s : suggestions) {
+            Chip chip = createChip(s);
+            chip.setOnClickListener(v -> {
+                binding.etSearch.setText(s);
+                binding.etSearch.setSelection(s.length());
+                viewModel.performSearch();
+            });
+            binding.chipGroupSuggestions.addView(chip);
+        }
+    }
+
+    private Chip createChip(String text) {
+        Chip chip = new Chip(this);
+        chip.setText(text);
+        chip.setChipBackgroundColorResource(R.color.slate_50);
+        chip.setChipStrokeWidth(0f);
+        chip.setTextColor(Color.parseColor("#64748B"));
+        chip.setTextSize(13f);
+        chip.setPadding(12, 8, 12, 8);
+        return chip;
+    }
+
+    private void showFilterBottomSheet() {
+        SearchFilterBottomSheet bottomSheet = SearchFilterBottomSheet.newInstance(viewModel.getCurrentFilter());
+        bottomSheet.setOnFilterConfirmListener(viewModel::updateFilter);
+        bottomSheet.show(getSupportFragmentManager(), "filter");
+    }
+
+    private void openBillDetail(long localId, String objectId) {
+        Intent intent = new Intent(this, BillDetailActivity.class);
+        if (objectId != null && !objectId.isEmpty()) {
+            intent.putExtra(BillDetailActivity.EXTRA_BILL_ID, objectId);
+        } else {
+            intent.putExtra(BillDetailActivity.EXTRA_BILL_LOCAL_ID, localId);
+        }
+        startActivity(intent);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        searchHandler.removeCallbacks(searchRunnable);
         binding = null;
-    }
-
-    // ==================== 初始化 ====================
-
-    private void initViewModel() {
-        viewModel = new ViewModelProvider(this).get(SearchViewModel.class);
-        Log.d(TAG, "✅ ViewModel初始化完成");
-    }
-
-    private void initViews() {
-        // 初始化搜索历史RecyclerView
-        historyAdapter = new SearchHistoryAdapter(this, new SearchHistoryAdapter.OnHistoryClickListener() {
-            @Override
-            public void onHistoryClick(SearchHistory history) {
-                binding.etSearch.setText(history.getKeyword());
-                binding.etSearch.setSelection(history.getKeyword().length());
-            }
-
-            @Override
-            public void onDeleteClick(SearchHistory history) {
-                viewModel.deleteSearchHistory(history);
-            }
-        });
-
-        StaggeredGridLayoutManager staggeredLayoutManager = new StaggeredGridLayoutManager(
-                4, StaggeredGridLayoutManager.HORIZONTAL);
-        staggeredLayoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
-        binding.rvHistory.setLayoutManager(staggeredLayoutManager);
-        binding.rvHistory.setAdapter(historyAdapter);
-
-        // 初始化搜索结果RecyclerView
-        billAdapter = new BillAdapter(this, new BillAdapter.OnBillClickListener() {
-            @Override
-            public void onBillClick(long localId, String objectId, View itemView) {
-                // 直接使用 adapter 传回的 ID 进行跳转
-                openBillDetailById(localId, objectId);
-            }
-
-            @Override
-            public void onPhotoClick(String imageUrl, int position) {
-                Toast.makeText(SearchActivity.this, "查看图片", Toast.LENGTH_SHORT).show();
-            }
-
-            @Override
-            public void onBillDelete(BillUiModel bill) {
-
-            }
-
-            @Override
-            public void onBillEdit(BillUiModel bill) {
-
-            }
-
-            @Override
-            public void onBillRefund(BillUiModel bill) {
-
-            }
-        });
-
-        binding.rvResult.setLayoutManager(new LinearLayoutManager(this));
-        binding.rvResult.setAdapter(billAdapter);
-
-        binding.tvResultTitle.setVisibility(View.GONE);
-        binding.rvResult.setVisibility(View.GONE);
-        binding.layoutEmpty.setVisibility(View.GONE);
-    }
-
-    private void openBillDetailById(long localId, String objectId) {
-        try {
-            Intent intent = new Intent(SearchActivity.this, BillDetailActivity.class);
-
-            // 根据是否有远程 ID 决定传参
-            if (objectId != null && !objectId.isEmpty()) {
-                intent.putExtra(BillDetailActivity.EXTRA_BILL_ID, objectId);
-            } else {
-                intent.putExtra(BillDetailActivity.EXTRA_BILL_LOCAL_ID, localId);
-            }
-
-            startActivity(intent);
-            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
-            Log.d(TAG, "✅ 跳转到详情页: " + (objectId != null ? objectId : localId));
-        } catch (Exception e) {
-            Log.e(TAG, "❌ 打开详情页失败", e);
-            showSnackbar("打开详情页失败");
-        }
-    }
-
-    // ==================== 监听器设置 ====================
-
-    private void setupListeners() {
-        // 返回按钮
-        binding.btnBack.setOnClickListener(v -> finish());
-
-        // 搜索框输入监听
-        binding.etSearch.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                searchHandler.removeCallbacks(searchRunnable);
-
-                searchRunnable = () -> {
-                    String keyword = s.toString().trim();
-                    performSearch(keyword);
-                };
-
-                searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
-        });
-
-        // 清空历史按钮
-        binding.btnClearHistory.setOnClickListener(v -> {
-            viewModel.clearAllHistory();
-        });
-
-        // 🔥 筛选按钮点击
-        binding.tvFilter.setOnClickListener(v -> showFilterDialog());
-    }
-
-    // ==================== 数据观察 ====================
-
-    private void observeData() {
-        // 观察搜索历史
-        viewModel.getSearchHistory().observe(this, historyList -> {
-            if (historyList != null && !historyList.isEmpty()) {
-                historyAdapter.setHistoryList(historyList);
-                binding.rvHistory.setVisibility(View.VISIBLE);
-                binding.tvRecentTitle.setVisibility(View.VISIBLE);
-                binding.btnClearHistory.setVisibility(View.VISIBLE);
-            } else {
-                binding.rvHistory.setVisibility(View.GONE);
-                binding.tvRecentTitle.setVisibility(View.GONE);
-                binding.btnClearHistory.setVisibility(View.GONE);
-            }
-        });
-
-        // 观察搜索结果
-        viewModel.searchResults.observe(this, bills -> {
-            if (bills != null && !bills.isEmpty()) {
-                List<BillAdapter.BillGroup> uiGroups = viewModel.mapBillsToUiGroups(bills);
-                billAdapter.submitList(uiGroups);
-                showSearchResults();
-            }
-        });
-
-        // 观察搜索状态
-        viewModel.searchState.observe(this, state -> {
-            if (state.isLoading()) {
-                showLoading();
-            } else if (state.isSuccess()) {
-                binding.tvResultTitle.setText(state.data);
-                showSearchResults();
-            } else if (state.isEmpty()) {
-                showEmptyResult();
-            } else if (state.isError()) {
-                Toast.makeText(SearchActivity.this, state.message, Toast.LENGTH_SHORT).show();
-                showSearchResults();
-            } else {
-                hideSearchResults();
-            }
-        });
-
-        // 观察Toast消息
-        viewModel.toastMessage.observe(this, message -> {
-            if (message != null && !message.isEmpty()) {
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-
-    // ==================== 筛选功能 ====================
-
-    private void showFilterDialog() {
-        SearchFilterBottomSheet bottomSheet = SearchFilterBottomSheet.newInstance(currentFilter);
-        if (currentFilter != null) {
-            bottomSheet.setCurrentFilter(currentFilter);
-        }
-        bottomSheet.setOnFilterConfirmListener(filter -> {
-            currentFilter = filter;
-            applyFilter(filter);
-        });
-        bottomSheet.show(getSupportFragmentManager(), "filter");
-    }
-
-    private void applyFilter(SearchFilter filter) {
-        String keyword = binding.etSearch.getText().toString().trim();
-        performSearchWithFilter(keyword, filter);
-        Toast.makeText(this, "已应用筛选条件", Toast.LENGTH_SHORT).show();
-    }
-
-    private void performSearchWithFilter(String keyword, SearchFilter filter) {
-        viewModel.searchBillsWithFilter(keyword, filter);
-    }
-
-    // ==================== 搜索功能 ====================
-
-    private void performSearch(String keyword) {
-        if (keyword.isEmpty()) {
-            if (currentFilter != null && currentFilter.hasAnyFilter()) {
-                performSearchWithFilter(keyword, currentFilter);
-            } else {
-                viewModel.resetSearchState();
-                hideSearchResults();
-            }
-        } else {
-            if (currentFilter != null && currentFilter.hasAnyFilter()) {
-                performSearchWithFilter(keyword, currentFilter);
-            } else {
-                viewModel.searchBills(keyword);
-            }
-        }
-    }
-
-    // ==================== UI状态控制 ====================
-
-    private void showSnackbar(String message) {
-        if (binding != null && binding.getRoot() != null) {
-            Snackbar.make(binding.getRoot(), message, Snackbar.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showLoading() {
-        binding.tvResultTitle.setVisibility(View.VISIBLE);
-        binding.tvResultTitle.setText("搜索中...");
-        binding.rvResult.setVisibility(View.GONE);
-        binding.layoutEmpty.setVisibility(View.GONE);
-    }
-
-    private void showSearchResults() {
-        binding.tvResultTitle.setVisibility(View.VISIBLE);
-        binding.rvResult.setVisibility(View.VISIBLE);
-        binding.layoutEmpty.setVisibility(View.GONE);
-
-        binding.rvHistory.setVisibility(View.GONE);
-        binding.tvRecentTitle.setVisibility(View.GONE);
-        binding.btnClearHistory.setVisibility(View.GONE);
-    }
-
-    private void showEmptyResult() {
-        binding.tvResultTitle.setVisibility(View.VISIBLE);
-        binding.tvResultTitle.setText("未找到相关结果");
-        binding.rvResult.setVisibility(View.GONE);
-        binding.layoutEmpty.setVisibility(View.VISIBLE);
-
-        binding.rvHistory.setVisibility(View.GONE);
-        binding.tvRecentTitle.setVisibility(View.GONE);
-        binding.btnClearHistory.setVisibility(View.GONE);
-
-        binding.lottieEmpty.playAnimation();
-    }
-
-    private void hideSearchResults() {
-        binding.tvResultTitle.setVisibility(View.GONE);
-        binding.rvResult.setVisibility(View.GONE);
-        binding.layoutEmpty.setVisibility(View.GONE);
-
-        List<SearchHistory> historyList = viewModel.getSearchHistory().getValue();
-        if (historyList != null && !historyList.isEmpty()) {
-            binding.rvHistory.setVisibility(View.VISIBLE);
-            binding.tvRecentTitle.setVisibility(View.VISIBLE);
-            binding.btnClearHistory.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
-    public void finish() {
-        super.finish();
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
     }
 }

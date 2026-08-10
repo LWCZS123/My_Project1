@@ -32,6 +32,7 @@ public class BillAdapter extends ListAdapter<BillAdapter.BillGroup, BillAdapter.
 
     private final Context context;
     private OnBillClickListener listener;
+    private boolean isSearchMode = false;
 
     private static final RecyclerView.RecycledViewPool sharedPhotoPool =
             new RecyclerView.RecycledViewPool();
@@ -46,6 +47,10 @@ public class BillAdapter extends ListAdapter<BillAdapter.BillGroup, BillAdapter.
     }
 
     public BillAdapter(Context context, OnBillClickListener listener) {
+        this(context, listener, false);
+    }
+
+    public BillAdapter(Context context, OnBillClickListener listener, boolean isSearchMode) {
         super(new DiffUtil.ItemCallback<BillGroup>() {
             @Override
             public boolean areItemsTheSame(@NonNull BillGroup oldItem, @NonNull BillGroup newItem) {
@@ -59,13 +64,18 @@ public class BillAdapter extends ListAdapter<BillAdapter.BillGroup, BillAdapter.
         });
         this.context = context;
         this.listener = listener;
+        this.isSearchMode = isSearchMode;
     }
 
     @NonNull
     @Override
     public DayGroupVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new DayGroupVH(ItemBillDateHeaderBinding.inflate(
-                LayoutInflater.from(context), parent, false));
+        LayoutInflater inflater = LayoutInflater.from(context);
+        if (isSearchMode) {
+            return new DayGroupVH(ItemBillDateHeaderBinding.bind(
+                    inflater.inflate(R.layout.item_bill_date_header_search, parent, false)));
+        }
+        return new DayGroupVH(ItemBillDateHeaderBinding.inflate(inflater, parent, false));
     }
 
     @Override

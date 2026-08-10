@@ -3,6 +3,7 @@ package com.example.my_project1.data.model.bill;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.Ignore;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 import java.util.Date;
@@ -12,7 +13,10 @@ import java.util.Date;
  * -------------------------------------------------------
  * 用于保存用户的搜索记录
  */
-@Entity(tableName = "search_history")
+@Entity(
+        tableName = "search_history",
+        indices = {@Index(value = {"user_id", "keyword"}, unique = true)}
+)
 public class SearchHistory {
 
     @PrimaryKey(autoGenerate = true)

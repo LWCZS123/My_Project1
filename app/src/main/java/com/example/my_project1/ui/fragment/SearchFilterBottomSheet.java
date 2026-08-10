@@ -1,97 +1,53 @@
 package com.example.my_project1.ui.fragment;
 
 import android.app.Dialog;
+import android.graphics.Color;
 import android.os.Bundle;
-import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.Toast;
 
-import androidx.core.content.ContextCompat;
-import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.StaggeredGridLayoutManager;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.example.my_project1.R;
-import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.SearchFilter;
 import com.example.my_project1.databinding.FragmentSearchFilterBottomSheetBinding;
-import com.example.my_project1.ui.adapter.filter.SelectedAccountAdapter;
-import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
-import io.reactivex.annotations.NonNull;
-import io.reactivex.annotations.Nullable;
-
 /**
- * SearchFilterBottomSheet - 搜索筛选底部弹窗（使用单选模式 - 修复版）
- * -------------------------------------------------------
- * ✅ 功能:
- * 1. 日期范围筛选 (使用DateTimePickerFragment)
- * 2. 金额范围筛选
- * 3. 备注关键词筛选
- * 4. 账户多选筛选 (使用BillChooseAccountFragment单选，每次选一个添加到列表)
- *
- * ✅ 修复:
- * 1. 确保选中账户显示在界面上
- * 2. 修复updateAccountDisplay方法
+ * SearchFilterBottomSheet - 搜索筛选底部弹窗 (截图风格重构版)
  */
 public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
-
-    private static final String TAG = "SearchFilterBottomSheet";
 
     private FragmentSearchFilterBottomSheetBinding binding;
     private SearchFilter filter;
     private OnFilterConfirmListener listener;
-
-    // ViewModel
-    private AccountViewModel accountViewModel;
-
-    // 日期格式
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-
-    // 选中的日期
-    private Date selectedStartDate;
-    private Date selectedEndDate;
-
-    // 🔥 选中的账户列表
-    private List<Account> selectedAccounts = new ArrayList<>();
-
-    // 🔥 已选中账户适配器 (瀑布流显示)
-    private SelectedAccountAdapter selectedAccountAdapter;
-
-    // ==================== 接口 ====================
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy.MM.dd", Locale.getDefault());
 
     public interface OnFilterConfirmListener {
         void onFilterConfirm(SearchFilter filter);
     }
 
-    // ==================== 静态工厂方法 ====================
-
     public static SearchFilterBottomSheet newInstance(SearchFilter currentFilter) {
         SearchFilterBottomSheet fragment = new SearchFilterBottomSheet();
         Bundle args = new Bundle();
+        args.putSerializable("filter", currentFilter);
         fragment.setArguments(args);
         return fragment;
     }
 
-    // ==================== 生命周期 ====================
-
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         binding = FragmentSearchFilterBottomSheetBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -99,443 +55,213 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        filter = (SearchFilter) getArguments().getSerializable("filter");
+        if (filter == null) filter = new SearchFilter();
 
-        initViewModel();
-        initFilter();
         initViews();
         setupListeners();
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        binding = null;
-    }
-
-    // ==================== 初始化 ====================
-
-    /**
-     * 初始化ViewModel
-     */
-    private void initViewModel() {
-        accountViewModel = new ViewModelProvider(requireActivity()).get(AccountViewModel.class);
-    }
-
-    /**
-     * 初始化筛选条件
-     */
-    private void initFilter() {
-        filter = new SearchFilter();
-
-        // 默认设置本月日期范围
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.DAY_OF_MONTH, 1);
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        selectedStartDate = calendar.getTime();
-
-        calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH));
-        calendar.set(Calendar.HOUR_OF_DAY, 23);
-        calendar.set(Calendar.MINUTE, 59);
-        calendar.set(Calendar.SECOND, 59);
-        selectedEndDate = calendar.getTime();
-
-        filter.setStartDate(selectedStartDate);
-        filter.setEndDate(selectedEndDate);
-    }
-
-    /**
-     * 初始化视图
-     */
     private void initViews() {
-        // 设置日期显示
+        // Init Type
+        updateTypeUI(filter.getBillType());
+
+        // Init Dates
         updateDateDisplay();
 
-        // 🔥 初始化已选中账户RecyclerView (瀑布流)
-        selectedAccountAdapter = new SelectedAccountAdapter(requireContext(),
-                (account, position) -> {
-                    // 删除账户
-                    selectedAccounts.remove(account);
-                    selectedAccountAdapter.removeAccount(account);
-                    updateAccountDisplay();
+        // Init Switches
+        binding.switchBudget.setChecked(filter.getIncludeBudget() != null && filter.getIncludeBudget());
+        binding.switchExclude.setChecked(filter.getIncludeIncomeExpense() != null && filter.getIncludeIncomeExpense());
 
-                    Log.d(TAG, "🗑️ 删除账户: " + account.getName());
-                    Toast.makeText(requireContext(),
-                            "已删除账户: " + account.getName(),
-                            Toast.LENGTH_SHORT).show();
-                });
+        // Init Labels
+        if (filter.getCategoryId() != null && filter.getCategoryName() != null) {
+            binding.tvSelectedCategory.setText(filter.getCategoryName() + " >"); 
+            binding.tvSelectedCategory.setTextColor(Color.parseColor("#3B82F6"));
+        } else {
+            binding.tvSelectedCategory.setText("请选择分类 (单选) >");
+            binding.tvSelectedCategory.setTextColor(Color.parseColor("#94A3B8"));
+        }
 
-        StaggeredGridLayoutManager selectedLayoutManager = new StaggeredGridLayoutManager(
-                3, StaggeredGridLayoutManager.HORIZONTAL);
-        selectedLayoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
-
-        binding.rvAccounts.setLayoutManager(selectedLayoutManager);
-        binding.rvAccounts.setAdapter(selectedAccountAdapter);
-        binding.rvAccounts.setNestedScrollingEnabled(false);
-
-        // 🔥 初始化时隐藏（因为没有选中的账户）
-        binding.rvAccounts.setVisibility(View.GONE);
-
-        Log.d(TAG, "✅ RecyclerView 初始化完成");
+        if (filter.getAccountIds() != null && !filter.getAccountIds().isEmpty()) {
+            String summary = filter.getAccountSummary() != null ? filter.getAccountSummary() : "已选择 >";
+            binding.tvSelectedAccount.setText(summary + " >");
+            binding.tvSelectedAccount.setTextColor(Color.parseColor("#3B82F6"));
+        } else {
+            binding.tvSelectedAccount.setText("请选择账户 >");
+            binding.tvSelectedAccount.setTextColor(Color.parseColor("#94A3B8"));
+        }
     }
 
-    /**
-     * 设置监听器
-     */
     private void setupListeners() {
-        // ==================== 日期选择 ====================
+        // Date Presets
+        binding.btnYear.setOnClickListener(v -> selectDatePreset(1));
+        binding.btnWeek.setOnClickListener(v -> selectDatePreset(2));
+        binding.btnMonth.setOnClickListener(v -> selectDatePreset(3));
 
-        // 开始日期点击 - 使用DateTimePickerFragment
-        binding.tvStartDate.setOnClickListener(v -> showDateTimePicker(true));
+        // Date Range
+        binding.tvStartDate.setOnClickListener(v -> showCustomDatePicker(true));
+        binding.tvEndDate.setOnClickListener(v -> showCustomDatePicker(false));
 
-        // 结束日期点击
-        binding.tvEndDate.setOnClickListener(v -> showDateTimePicker(false));
+        // Type Presets
+        binding.btnTypeAll.setOnClickListener(v -> { filter.setBillType(-1); updateTypeUI(-1); });
+        binding.btnTypeExpense.setOnClickListener(v -> { filter.setBillType(0); updateTypeUI(0); });
+        binding.btnTypeIncome.setOnClickListener(v -> { filter.setBillType(1); updateTypeUI(1); });
 
-        // 日历按钮点击
-        binding.btnCalendar.setOnClickListener(v -> showDateTimePicker(true));
+        // Selectors
+        binding.btnSelectBook.setOnClickListener(v -> { /* Select Book */ });
+        binding.btnSelectCategory.setOnClickListener(v -> showCategorySelector());
+        binding.btnSelectAccount.setOnClickListener(v -> showAccountSelector());
 
-        // 清除日期
-        binding.tvClearDate.setOnClickListener(v -> {
-            selectedStartDate = null;
-            selectedEndDate = null;
-            binding.tvStartDate.setText("");
-            binding.tvEndDate.setText("");
-            filter.setStartDate(null);
-            filter.setEndDate(null);
-            Toast.makeText(requireContext(), "已清除日期", Toast.LENGTH_SHORT).show();
+        binding.btnReset.setOnClickListener(v -> {
+            filter.clear();
+            initViews();
+            
+            // 修复重置 bug：手动恢复文字和颜色
+            binding.tvSelectedCategory.setText("请选择分类 (单选) >");
+            binding.tvSelectedCategory.setTextColor(Color.parseColor("#94A3B8"));
+            binding.tvSelectedAccount.setText("请选择账户 >");
+            binding.tvSelectedAccount.setTextColor(Color.parseColor("#94A3B8"));
+            
+            // 恢复日期预设 UI
+            updateDatePresetUI(0);
         });
 
-        // ==================== 账户选择 ====================
+        binding.btnConfirm.setOnClickListener(v -> {
+            // Type
+            if (binding.btnTypeExpense.getCurrentTextColor() == Color.parseColor("#3B82F6")) filter.setBillType(0);
+            else if (binding.btnTypeIncome.getCurrentTextColor() == Color.parseColor("#3B82F6")) filter.setBillType(1);
+            else filter.setBillType(-1);
 
-        // 🔥 添加账户按钮 - 显示账户选择弹窗（使用原有的单选模式）
-        binding.tvAddAccount.setOnClickListener(v -> showAccountSelectorDialog());
+            // Switches
+            filter.setIncludeBudget(binding.switchBudget.isChecked());
+            filter.setIncludeIncomeExpense(binding.switchExclude.isChecked());
 
-        // ==================== 底部按钮 ====================
-
-        // 重置按钮
-        binding.btnReset.setOnClickListener(v -> resetFilter());
-
-        // 确定按钮
-        binding.btnConfirm.setOnClickListener(v -> confirmFilter());
-    }
-
-    // ==================== 日期选择 ====================
-
-    /**
-     * 显示日期时间选择器
-     *
-     * @param isStartDate true=选择开始日期, false=选择结束日期
-     */
-    private void showDateTimePicker(boolean isStartDate) {
-        DateTimePickerFragment picker = new DateTimePickerFragment();
-
-        picker.setOnDateTimeSelectedListener((timestamp, formattedDateTime) -> {
-            Date selectedDate = new Date(timestamp);
-
-            if (isStartDate) {
-                selectedStartDate = selectedDate;
-                filter.setStartDate(selectedDate);
-            } else {
-                selectedEndDate = selectedDate;
-                filter.setEndDate(selectedDate);
-            }
-
-            updateDateDisplay();
-            Log.d(TAG, "📅 选择日期: " + formattedDateTime);
+            if (listener != null) listener.onFilterConfirm(filter);
+            dismiss();
         });
-
-        picker.show(getChildFragmentManager(), "date_time_picker");
     }
 
-    /**
-     * 更新日期显示
-     */
-    private void updateDateDisplay() {
-        if (selectedStartDate != null) {
-            binding.tvStartDate.setText(dateFormat.format(selectedStartDate));
-        } else {
-            binding.tvStartDate.setText("");
-            binding.tvStartDate.setHint("开始日期");
-        }
-
-        if (selectedEndDate != null) {
-            binding.tvEndDate.setText(dateFormat.format(selectedEndDate));
-        } else {
-            binding.tvEndDate.setText("");
-            binding.tvEndDate.setHint("结束日期");
-        }
+    private void showCategorySelector() {
+        CategorySelectorBottomSheet fragment = new CategorySelectorBottomSheet();
+        fragment.setOnCategorySelectedListener(item -> {
+            filter.setCategoryId(item.getId());
+            filter.setCategoryName(item.getName());
+            binding.tvSelectedCategory.setText(item.getName() + " >");
+            binding.tvSelectedCategory.setTextColor(Color.parseColor("#3B82F6"));
+        });
+        fragment.show(getChildFragmentManager(), "CategorySelector");
     }
 
-    // ==================== 账户选择 ====================
-
-    /**
-     * 🔥 显示账户选择弹窗（使用原有的单选BillChooseAccountFragment）
-     */
-    private void showAccountSelectorDialog() {
-        Log.d(TAG, "📱 打开账户选择器");
-
-        // 创建原有的单选账户选择器
-        BillChooseAccountFragment selectorSheet = new BillChooseAccountFragment();
-
-        // 设置单选回调
-        selectorSheet.setOnAccountChooseListener((account, iconUrl, accountName) -> {
-            Log.d(TAG, "🎯 账户选择回调触发: " + (account != null ? account.getName() : "null"));
-
-            // 每次选择一个账户
-            if (account != null) {
-                // 检查是否已经选择过该账户（避免重复）
-                if (!containsAccount(selectedAccounts, account.getObjectId())) {
-                    // 添加到列表
-                    selectedAccounts.add(account);
-
-                    // 🔥 关键：通知适配器添加账户
-                    selectedAccountAdapter.addAccount(account);
-
-                    // 更新显示
-                    updateAccountDisplay();
-
-                    Log.d(TAG, "✅ 成功添加账户: " + account.getName() + ", 当前数量: " + selectedAccounts.size());
-                    Toast.makeText(requireContext(),
-                            "已添加账户: " + account.getName(),
-                            Toast.LENGTH_SHORT).show();
+    private void showAccountSelector() {
+        MultiAccountSelectBottomSheet fragment = new MultiAccountSelectBottomSheet();
+        fragment.setInitialSelectedIds(filter.getAccountIds());
+        fragment.setOnAccountsSelectedListener(accounts -> {
+            if (accounts != null && !accounts.isEmpty()) {
+                java.util.ArrayList<String> ids = new java.util.ArrayList<>();
+                for (com.example.my_project1.data.model.account.Account a : accounts) {
+                    ids.add(a.getObjectId());
+                }
+                filter.setAccountIds(ids);
+                
+                String summary;
+                if (accounts.size() == 1) {
+                    summary = accounts.get(0).getName();
                 } else {
-                    Toast.makeText(requireContext(),
-                            "该账户已添加",
-                            Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "⚠️ 账户已存在: " + account.getName());
+                    summary = "已选" + accounts.size() + "个账户";
                 }
+                filter.setAccountSummary(summary);
+                binding.tvSelectedAccount.setText(summary + " >");
+                binding.tvSelectedAccount.setTextColor(Color.parseColor("#3B82F6"));
             } else {
-                Log.d(TAG, "⚠️ 账户为null");
+                filter.setAccountIds(new java.util.ArrayList<>());
+                filter.setAccountSummary(null);
+                binding.tvSelectedAccount.setText("请选择账户 >");
+                binding.tvSelectedAccount.setTextColor(Color.parseColor("#94A3B8"));
             }
         });
-
-        selectorSheet.show(getChildFragmentManager(), "account_selector");
+        fragment.show(getChildFragmentManager(), "AccountSelector");
     }
 
-    /**
-     * 检查账户是否已选择
-     */
-    private boolean containsAccount(List<Account> accounts, String accountId) {
-        for (Account account : accounts) {
-            if (account.getObjectId().equals(accountId)) {
-                return true;
-            }
+    private void selectDatePreset(int type) {
+        Calendar cal = Calendar.getInstance();
+        Date end = cal.getTime();
+        if (type == 1) { // Year
+            cal.add(Calendar.YEAR, -1);
+        } else if (type == 2) { // Week
+            cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
+        } else if (type == 3) { // Month
+            cal.set(Calendar.DAY_OF_MONTH, 1);
         }
-        return false;
-    }
-
-    /**
-     * 🔥 更新账户显示（修复版）
-     */
-    private void updateAccountDisplay() {
-        Log.d(TAG, "📊 更新账户显示: " + selectedAccounts.size() + " 个账户");
-
-        if (selectedAccounts.isEmpty()) {
-            binding.rvAccounts.setVisibility(View.GONE);
-            Log.d(TAG, "   → 隐藏 RecyclerView");
-        } else {
-            binding.rvAccounts.setVisibility(View.VISIBLE);
-            Log.d(TAG, "   → 显示 RecyclerView");
-
-            // 🔥 确保RecyclerView重新布局
-            binding.rvAccounts.post(() -> {
-                binding.rvAccounts.requestLayout();
-                Log.d(TAG, "   → RecyclerView 请求重新布局");
-            });
-        }
-    }
-
-    // ==================== 筛选操作 ====================
-
-    /**
-     * 重置筛选条件
-     */
-    private void resetFilter() {
-        // 清空金额
-        binding.etMinAmount.setText("");
-        binding.etMaxAmount.setText("");
-
-        // 清空备注
-        binding.etRemark.setText("");
-
-        // 重置日期为本月
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.DAY_OF_MONTH, 1);
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        selectedStartDate = calendar.getTime();
-
-        calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH));
-        calendar.set(Calendar.HOUR_OF_DAY, 23);
-        calendar.set(Calendar.MINUTE, 59);
-        calendar.set(Calendar.SECOND, 59);
-        selectedEndDate = calendar.getTime();
-
+        filter.setStartDate(cal.getTime());
+        filter.setEndDate(end);
+        
         updateDateDisplay();
-
-        // 🔥 清空账户
-        selectedAccounts.clear();
-        selectedAccountAdapter.clearAll();
-        updateAccountDisplay();
-
-        // 清空筛选对象
-        filter.clear();
-        filter.setStartDate(selectedStartDate);
-        filter.setEndDate(selectedEndDate);
-
-        Toast.makeText(requireContext(), "已重置筛选条件", Toast.LENGTH_SHORT).show();
-        Log.d(TAG, "🔄 重置筛选条件");
+        updateDatePresetUI(type);
     }
 
-    /**
-     * 确认筛选
-     */
-    private void confirmFilter() {
-        // ==================== 金额验证 ====================
-
-        String minAmountStr = binding.etMinAmount.getText().toString().trim();
-        String maxAmountStr = binding.etMaxAmount.getText().toString().trim();
-
-        if (!TextUtils.isEmpty(minAmountStr)) {
-            try {
-                filter.setMinAmount(Double.parseDouble(minAmountStr));
-            } catch (NumberFormatException e) {
-                Toast.makeText(requireContext(), "最低金额格式错误", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        } else {
-            filter.setMinAmount(null);
-        }
-
-        if (!TextUtils.isEmpty(maxAmountStr)) {
-            try {
-                filter.setMaxAmount(Double.parseDouble(maxAmountStr));
-            } catch (NumberFormatException e) {
-                Toast.makeText(requireContext(), "最高金额格式错误", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        } else {
-            filter.setMaxAmount(null);
-        }
-
-        // 验证金额范围
-        if (filter.getMinAmount() != null && filter.getMaxAmount() != null) {
-            if (filter.getMinAmount() > filter.getMaxAmount()) {
-                Toast.makeText(requireContext(), "最低金额不能大于最高金额", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
-
-        // ==================== 日期验证 ====================
-
-        if (selectedStartDate != null && selectedEndDate != null) {
-            if (selectedStartDate.after(selectedEndDate)) {
-                Toast.makeText(requireContext(), "开始日期不能晚于结束日期", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
-
-        // ==================== 备注 ====================
-
-        String remark = binding.etRemark.getText().toString().trim();
-        if (!TextUtils.isEmpty(remark)) {
-            filter.setRemarkKeyword(remark);
-        } else {
-            filter.setRemarkKeyword(null);
-        }
-
-        // 🔥 账户筛选 (支持多账户)
-        if (!selectedAccounts.isEmpty()) {
-            List<String> accountIds = new ArrayList<>();
-            for (Account account : selectedAccounts) {
-                accountIds.add(account.getObjectId());
-            }
-            filter.setAccountIds(accountIds);
-            Log.d(TAG, "✅ 设置筛选账户: " + accountIds.size() + " 个");
-        } else {
-            filter.setAccountIds(new ArrayList<>());
-        }
-
-        // 回调监听器
-        if (listener != null) {
-            listener.onFilterConfirm(filter);
-            Log.d(TAG, "✅ 确认筛选: " + filter.toString());
-        }
-
-        // 关闭底部弹窗
-        dismiss();
+    private void updateDatePresetUI(int selected) {
+        binding.btnYear.setBackgroundResource(selected == 1 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        binding.btnYear.setTextColor(selected == 1 ? Color.parseColor("#3B82F6") : Color.parseColor("#64748B"));
+        
+        binding.btnWeek.setBackgroundResource(selected == 2 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        binding.btnWeek.setTextColor(selected == 2 ? Color.parseColor("#3B82F6") : Color.parseColor("#64748B"));
+        
+        binding.btnMonth.setBackgroundResource(selected == 3 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        binding.btnMonth.setTextColor(selected == 3 ? Color.parseColor("#3B82F6") : Color.parseColor("#64748B"));
     }
 
-    // ==================== 公开方法 ====================
-
-    /**
-     * 设置监听器
-     */
-    public void setOnFilterConfirmListener(OnFilterConfirmListener listener) {
-        this.listener = listener;
+    private void updateTypeUI(int type) {
+        binding.btnTypeAll.setBackgroundResource(type == -1 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        binding.btnTypeAll.setTextColor(type == -1 ? Color.parseColor("#3B82F6") : Color.parseColor("#64748B"));
+        
+        binding.btnTypeExpense.setBackgroundResource(type == 0 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        binding.btnTypeExpense.setTextColor(type == 0 ? Color.parseColor("#3B82F6") : Color.parseColor("#64748B"));
+        
+        binding.btnTypeIncome.setBackgroundResource(type == 1 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        binding.btnTypeIncome.setTextColor(type == 1 ? Color.parseColor("#3B82F6") : Color.parseColor("#64748B"));
     }
 
-    /**
-     * 设置当前筛选条件
-     */
-    public void setCurrentFilter(SearchFilter currentFilter) {
-        if (currentFilter != null) {
-            this.filter = currentFilter;
+    private void showCustomDatePicker(boolean isStart) {
+        Calendar initial = Calendar.getInstance();
+        Date current = isStart ? filter.getStartDate() : filter.getEndDate();
+        if (current != null) initial.setTime(current);
 
-            // 更新UI显示
-            if (currentFilter.getStartDate() != null) {
-                selectedStartDate = currentFilter.getStartDate();
-            }
-            if (currentFilter.getEndDate() != null) {
-                selectedEndDate = currentFilter.getEndDate();
-            }
-
-            if (binding != null) {
-                updateDateDisplay();
-
-                if (currentFilter.getMinAmount() != null) {
-                    binding.etMinAmount.setText(String.valueOf(currentFilter.getMinAmount()));
-                }
-                if (currentFilter.getMaxAmount() != null) {
-                    binding.etMaxAmount.setText(String.valueOf(currentFilter.getMaxAmount()));
-                }
-                if (currentFilter.getRemarkKeyword() != null) {
-                    binding.etRemark.setText(currentFilter.getRemarkKeyword());
-                }
-            }
-        }
+        CustomDateTimePickerFragment.show(getChildFragmentManager(), initial, calendar -> {
+            if (isStart) filter.setStartDate(calendar.getTime());
+            else filter.setEndDate(calendar.getTime());
+            updateDateDisplay();
+            updateDatePresetUI(0); // Clear presets
+        });
     }
 
-    // ==================== Dialog配置 ====================
+    private void updateDateDisplay() {
+        binding.tvStartDate.setText(filter.getStartDate() != null ? dateFormat.format(filter.getStartDate()) : "开始时间");
+        binding.tvEndDate.setText(filter.getEndDate() != null ? dateFormat.format(filter.getEndDate()) : "结束时间");
+    }
 
+    @NonNull
     @Override
-    public Dialog onCreateDialog(Bundle savedInstanceState) {
+    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
-
         dialog.setOnShowListener(d -> {
-            FrameLayout bottomSheet = dialog.findViewById(
-                    com.google.android.material.R.id.design_bottom_sheet);
-
+            FrameLayout bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
-                bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.bg_bottom_sheet1));
+                BottomSheetBehavior behavior = BottomSheetBehavior.from(bottomSheet);
+                
+                // 固定高度为屏幕的 0.75
+                ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
+                layoutParams.height = (int) (getResources().getDisplayMetrics().heightPixels * 0.75);
+                bottomSheet.setLayoutParams(layoutParams);
 
-                ViewGroup.LayoutParams params = bottomSheet.getLayoutParams();
-                params.height = (int) (getScreenHeight() * 0.75);
-                bottomSheet.setLayoutParams(params);
-
-                BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
-                behavior.setSkipCollapsed(true);
                 behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                behavior.setSkipCollapsed(true);
+                bottomSheet.setBackgroundResource(android.R.color.transparent);
             }
         });
-
         return dialog;
     }
 
-    private int getScreenHeight() {
-        return requireContext().getResources().getDisplayMetrics().heightPixels;
+    public void setOnFilterConfirmListener(OnFilterConfirmListener listener) {
+        this.listener = listener;
     }
 }

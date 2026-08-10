@@ -3,23 +3,20 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:clipChildren="false"
-    android:clipToPadding="false"
     android:orientation="vertical"
     android:paddingBottom="8dp">
 
-    <!-- ══ 账单日卡片 ══ -->
+    <!-- ══ 搜索结果日卡片 (无阴影，扁平化) ══ -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardDayGroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginEnd="0dp"
+        android:layout_marginTop="12dp"
         app:cardBackgroundColor="#FFFFFF"
         app:cardCornerRadius="24dp"
-        app:cardElevation="6dp"
-        app:cardUseCompatPadding="false"
+        app:cardElevation="0dp"
         app:strokeWidth="0dp">
 
         <LinearLayout
@@ -27,7 +24,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Header: 日期 & 统计 -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -41,7 +37,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
-                    android:text="7月5日 (周日)"
                     android:textColor="#333333"
                     android:textSize="14sp"
                     android:fontFamily="@font/font3_regular"
@@ -52,13 +47,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
-                    android:text="支 20.00 | 收 0.00"
-                    android:textColor="#999999"
+                    android:textColor="#94A3B8"
                     android:fontFamily="@font/font3_regular"
                     android:textSize="12sp" />
             </RelativeLayout>
 
-            <!-- 账单列表容器 (改为 RecyclerView 提升性能) -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvBills"
                 android:layout_width="match_parent"

@@ -85,4 +85,6 @@ public interface CategoryDao {
 
     @Query("SELECT * FROM categories WHERE name = :name AND owner_id = :userId LIMIT 1")
     Category getCategoryByNameAndUser(String name, String userId);
+    @Query("SELECT * FROM categories WHERE owner_id = :userId AND name LIKE :keyword AND sync_state != 3 LIMIT 5")
+    List<Category> searchCategories(String userId, String keyword);
 }
