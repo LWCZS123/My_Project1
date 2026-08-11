@@ -211,13 +211,13 @@ public class CalendarFragment extends Fragment implements
 
     private void renderBillList(List<Bill> bills) {
         if (mCurrentSelectedDate == null || binding == null) return;
-        
+
         List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
         List<BillListAdapter.ListItem> items = new ArrayList<>();
         if (uiModels != null && !uiModels.isEmpty()) {
             items.add(new BillListAdapter.ListItem(uiModels));
         }
-        
+
         billAdapter.submitList(items);
         infoAdapter.updateDate(mCurrentSelectedDate);
     }

@@ -22,7 +22,6 @@ import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.BillRepository;
 import com.example.my_project1.data.repository.user.UserProfileRepository;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
-import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.work.BillSyncWorker;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -233,7 +232,7 @@ public class BillViewModel extends AndroidViewModel {
      */
     private void loadSnapshot() {
         android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
-        
+
         String headerJson = sp.getString(KEY_HEADER_SNAPSHOT, null);
         String billsJson = sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null);
         String calendarJson = sp.getString(KEY_CALENDAR_SNAPSHOT, null);
@@ -254,7 +253,7 @@ public class BillViewModel extends AndroidViewModel {
             Map<String, com.example.my_project1.data.model.calendar.DailyStat> stats = gson.fromJson(calendarJson, type);
             _dailyStatsMap.setValue(stats);
         }
-        
+
         isSnapshotLoaded = true;
         Log.d(TAG, "⚡ 快照加载完成");
     }
@@ -267,7 +266,7 @@ public class BillViewModel extends AndroidViewModel {
         bgExecutor.execute(() -> {
             if (isCleared) return;
             android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
-            
+
             // 限制首页快照大小：只存前 5 组数据
             List<BillAdapter.BillGroup> snapshotItems = billItems;
             if (billItems != null && billItems.size() > 5) {
@@ -294,7 +293,7 @@ public class BillViewModel extends AndroidViewModel {
 
         allBillsObserver = bills -> {
             if (bills == null || isCleared) return;
-            
+
             // 🚀 性能优化：日历数据指纹校验
             // 🔴 修复：同样改进日历指纹，确保所有账单的变化都能反映在日历统计中
             long billChecksum = 0;
@@ -304,7 +303,7 @@ public class BillViewModel extends AndroidViewModel {
                     billChecksum += b.getUpdatedAt().getTime();
                 }
             }
-            
+
             String fingerprint = bills.size() + "_" + billChecksum;
             if (fingerprint.equals(lastCalendarFingerprint)) {
                 return;
@@ -316,14 +315,14 @@ public class BillViewModel extends AndroidViewModel {
                 if (isCleared) return;
                 int count = computeBillCount(bills);
                 int days  = computeBillDays(bills);
-                
+
                 // 计算日历所需的映射
                 Map<String, com.example.my_project1.data.model.calendar.DailyStat> statsMap = new HashMap<>();
-                
+
                 for (Bill b : bills) {
                     if (b.getBillTime() == null) continue;
                     String key = DATE_KEY_FMT.format(b.getBillTime());
-                    
+
                     // 统计
                     com.example.my_project1.data.model.calendar.DailyStat stat = statsMap.get(key);
                     if (stat == null) {
@@ -429,7 +428,7 @@ public class BillViewModel extends AndroidViewModel {
             if (isCleared) return;
             List<Bill> bills = currentMonthBills.getValue();
             List<Account> accounts = allAccountsLive.getValue();
-            
+
             // 🚀 快速指纹比对：如果数据未变，直接返回
             if (isHomeDataUnchanged(bills, accounts)) {
                 Log.d(TAG, "⚡ 首页数据指纹未变，跳过映射");
@@ -458,7 +457,7 @@ public class BillViewModel extends AndroidViewModel {
                 mainHandler.postDelayed(() -> {
                     _billItems.setValue(uiItems);
                     _headerData.setValue(header);
-                    
+
                     // 保存新快照
                     saveSnapshot(header, uiItems);
                     isSnapshotLoaded = false; // 保护期过后的下一次更新不再延迟
@@ -549,7 +548,7 @@ public class BillViewModel extends AndroidViewModel {
                     .remarkText(bill.getRemark())
                     .imageUrls(bill.getImageUrls())
                     .build();
-            
+
             billUiCache.put(cacheKey, newModel);
             uiModels.add(newModel);
         }
@@ -590,7 +589,7 @@ public class BillViewModel extends AndroidViewModel {
             Bill   bill    = sortedBills.get(i);
             Date billTime = bill.getBillTime();
             if (billTime == null) continue;
-            
+
             String dateKey = DATE_KEY_FMT.format(billTime);
 
             if (prevDateKey != null && !dateKey.equals(prevDateKey)) {
@@ -603,7 +602,7 @@ public class BillViewModel extends AndroidViewModel {
                                 String.format(Locale.getDefault(), "收 %.2f", dayIncome));
                     headerCache.put(headerKey, header);
                 }
-                
+
                 if (header != null) {
                     groups.add(new BillAdapter.BillGroup(header, new ArrayList<>(currentDayBills)));
                 }
@@ -633,7 +632,7 @@ public class BillViewModel extends AndroidViewModel {
                 String prefix = "";
                 int amountColor;
                 String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
-                
+
                 if (billType == 0) {
                     prefix = "- ¥";
                     amountColor = getApplication().getColor(R.color.red);
@@ -642,11 +641,11 @@ public class BillViewModel extends AndroidViewModel {
                     amountColor = getApplication().getColor(R.color.green);
                 } else {
                     prefix = "¥";
-                    amountColor = getApplication().getColor(R.color.orange_500); 
+                    amountColor = getApplication().getColor(R.color.orange_500);
                     Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
                     categoryIcon = uri.toString();
                 }
-                
+
                 String amountText = prefix + AMT_FMT.format(bill.getAmount());
                 Account account = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
                 Account toAccount = (accountMap != null && (billType == 2 || billType == 3)) ? accountMap.get(bill.getToAccountId()) : null;
@@ -700,7 +699,7 @@ public class BillViewModel extends AndroidViewModel {
     private HeaderUiModel buildHeaderUiModel(List<Bill> monthBills, List<Account> accounts) {
         double monthlyExpense = 0, monthlyIncome = 0;
         double todayChange = 0;
-        
+
         SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String todayKey = fmt.format(new Date());
 
@@ -708,7 +707,7 @@ public class BillViewModel extends AndroidViewModel {
             for (Bill b : monthBills) {
                 if (b.getType() == 0) monthlyExpense += b.getAmount();
                 else if (b.getType() == 1) monthlyIncome += b.getAmount();
-                
+
                 // 计算今日变化
                 if (b.getBillTime() != null && todayKey.equals(fmt.format(b.getBillTime()))) {
                     if (b.getType() == 0) todayChange -= b.getAmount();
@@ -723,7 +722,7 @@ public class BillViewModel extends AndroidViewModel {
             for (Account acc : accounts) {
                 // 排除标记删除的账户
                 if (acc.getSyncState() == com.example.my_project1.data.model.SyncState.TO_DELETE) continue;
-                
+
                 if (acc.isCredit()) {
                     liabilities += acc.getBalance();
                 } else {
@@ -735,9 +734,9 @@ public class BillViewModel extends AndroidViewModel {
         // 计算总收入和总支出 (从所有账单获取) 以及周结余
         double totalExpense = 0, totalIncome = 0;
         double weeklyExpense = 0, weeklyIncome = 0;
-        
+
         Date[] weekRange = getCurrentWeekRange();
-        
+
         List<Bill> allBillsList = repository.getAllBillsByUserSync(currentUserId);
         if (allBillsList != null) {
             for (Bill b : allBillsList) {
@@ -758,7 +757,7 @@ public class BillViewModel extends AndroidViewModel {
 
         DecimalFormat df = new DecimalFormat("#,##0.00");
         String changePrefix = todayChange >= 0 ? "+ ¥" : "- ¥";
-        
+
         return new HeaderUiModel(
                 "¥" + df.format(assets - liabilities),
                 changePrefix + df.format(Math.abs(todayChange)),
@@ -779,7 +778,7 @@ public class BillViewModel extends AndroidViewModel {
         c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0);
         c.set(Calendar.SECOND, 0);      c.set(Calendar.MILLISECOND, 0);
         Date start = c.getTime();
-        
+
         c.add(Calendar.DAY_OF_WEEK, 6);
         c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59);
         c.set(Calendar.SECOND, 59);      c.set(Calendar.MILLISECOND, 999);
@@ -863,14 +862,14 @@ public class BillViewModel extends AndroidViewModel {
 
     public LiveData<List<Bill>> getBillsByAccount(String accountId, long localAccountId) {
         final String cacheKey = (accountId != null ? accountId : "") + "_" + localAccountId;
-        
+
         // 1. 如果已有活跃的 LiveData，直接返回 (避免重复创建 Room 查询)
         if (mActiveAccountLiveDatas.containsKey(cacheKey)) {
             return mActiveAccountLiveDatas.get(cacheKey);
         }
 
         MediatorLiveData<List<Bill>> result = new MediatorLiveData<>();
-        
+
         // 2. 尝试从内存缓存获取并立即返回 (瞬间展示)
         List<Bill> cached = mAccountBillsCache.get(cacheKey);
         if (cached != null) {
@@ -892,7 +891,7 @@ public class BillViewModel extends AndroidViewModel {
                 }
             });
         }
-        
+
         mActiveAccountLiveDatas.put(cacheKey, result);
         return result;
     }
@@ -1096,7 +1095,7 @@ public class BillViewModel extends AndroidViewModel {
             if (!success) {
                 Log.w(TAG, "⚠️ 账户同步失败: " + message);
             }
-            
+
             repository.syncFromCloud(currentUserId, r -> {
                 isSyncing = false;
                 if (r.isSuccess()) {
@@ -1118,12 +1117,12 @@ public class BillViewModel extends AndroidViewModel {
 
     public void silentSyncFromCloud() {
         if (isSyncing || currentUserId == null) return;
-        
+
         isSyncing = true;
         // 注意：静默同步不更新 _syncState 为 loading，也不显示 Toast
-        
+
         Log.d(TAG, "开始后台静默同步...");
-        
+
         accountRepository.syncFromAccountGroupCloud((success, message) -> {
             repository.syncFromCloud(currentUserId, r -> {
                 isSyncing = false;
@@ -1261,11 +1260,11 @@ public class BillViewModel extends AndroidViewModel {
     @Override
     protected void onCleared() {
         isCleared = true;
-        
+
         // 1. 立即移除所有 Handler 任务，防止销毁后继续回调
         mainHandler.removeCallbacksAndMessages(null);
         statsDebounceHandler.removeCallbacksAndMessages(null);
-        
+
         // 2. 移除所有观察者
         if (billCountObserver  != null) billCount.removeObserver(billCountObserver);
         if (billDaysObserver   != null) billDays .removeObserver(billDaysObserver);
@@ -1275,7 +1274,7 @@ public class BillViewModel extends AndroidViewModel {
             currentMonthBills.removeObserver(monthBillsObserver);
         if (accountsObserver != null && allAccountsLive != null)
             allAccountsLive.removeObserver(accountsObserver);
-        
+
         // 3. 安全且快速地关闭线程池
         try {
             bgExecutor.shutdownNow();

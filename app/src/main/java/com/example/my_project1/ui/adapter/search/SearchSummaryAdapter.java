@@ -4,6 +4,8 @@ import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.data.model.bill.SearchSummary;
@@ -12,24 +14,39 @@ import com.example.my_project1.databinding.ItemSearchSummaryCardBinding;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
- * SearchSummaryAdapter - 搜索汇总卡片适配器
+ * SearchSummaryAdapter - 搜索汇总卡片适配器 (优化版：ListAdapter + DiffUtil)
  */
-public class SearchSummaryAdapter extends RecyclerView.Adapter<SearchSummaryAdapter.ViewHolder> {
+public class SearchSummaryAdapter extends ListAdapter<SearchSummaryAdapter.SummaryItem, SearchSummaryAdapter.ViewHolder> {
 
-    private final List<SummaryItem> items = new ArrayList<>();
+    public SearchSummaryAdapter() {
+        super(new DiffUtil.ItemCallback<SummaryItem>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull SummaryItem oldItem, @NonNull SummaryItem newItem) {
+                return oldItem.label.equals(newItem.label);
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull SummaryItem oldItem, @NonNull SummaryItem newItem) {
+                return oldItem.equals(newItem);
+            }
+        });
+    }
 
     public void setSummary(SearchSummary summary) {
-        items.clear();
+        List<SummaryItem> items = new ArrayList<>();
         if (summary != null) {
+            // 计算结余 (Room 返回的结果可能没计算 netAmount)
+            double net = summary.getIncomeTotal() - summary.getExpenseTotal();
             items.add(new SummaryItem("支出", String.format(Locale.getDefault(), "¥ %.2f", summary.getExpenseTotal())));
             items.add(new SummaryItem("收入", String.format(Locale.getDefault(), "¥ %.2f", summary.getIncomeTotal())));
-            items.add(new SummaryItem("结余", String.format(Locale.getDefault(), "¥ %.2f", summary.getNetAmount())));
+            items.add(new SummaryItem("结余", String.format(Locale.getDefault(), "¥ %.2f", net)));
             items.add(new SummaryItem("账单数", String.valueOf(summary.getBillCount())));
             items.add(new SummaryItem("涉及天数", String.valueOf(summary.getBillDays())));
         }
-        notifyDataSetChanged();
+        submitList(items);
     }
 
     @NonNull
@@ -40,11 +57,8 @@ public class SearchSummaryAdapter extends RecyclerView.Adapter<SearchSummaryAdap
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.bind(items.get(position));
+        holder.bind(getItem(position));
     }
-
-    @Override
-    public int getItemCount() { return items.size(); }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         private final ItemSearchSummaryCardBinding binding;
@@ -55,9 +69,29 @@ public class SearchSummaryAdapter extends RecyclerView.Adapter<SearchSummaryAdap
         }
     }
 
-    static class SummaryItem {
-        String label;
-        String value;
-        SummaryItem(String label, String value) { this.label = label; this.value = value; }
+    /**
+     * 不可变汇总项模型
+     */
+    public static class SummaryItem {
+        public final String label;
+        public final String value;
+
+        public SummaryItem(String label, String value) {
+            this.label = label;
+            this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SummaryItem that = (SummaryItem) o;
+            return Objects.equals(label, that.label) && Objects.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(label, value);
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.example.my_project1.data.model.bill;
 
+import androidx.room.Ignore;
+
 import java.io.Serializable;
 
 /**
@@ -8,12 +10,14 @@ import java.io.Serializable;
 public class SearchSummary implements Serializable {
     private double incomeTotal;
     private double expenseTotal;
+    @Ignore
     private double netAmount;
     private int billCount;
     private int billDays;
 
     public SearchSummary() {}
 
+    @Ignore
     public SearchSummary(double incomeTotal, double expenseTotal, double netAmount, int billCount, int billDays) {
         this.incomeTotal = incomeTotal;
         this.expenseTotal = expenseTotal;

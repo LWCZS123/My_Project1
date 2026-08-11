@@ -183,17 +183,31 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void selectDatePreset(int type) {
-        Calendar cal = Calendar.getInstance();
-        Date end = cal.getTime();
-        if (type == 1) { // Year
-            cal.add(Calendar.YEAR, -1);
-        } else if (type == 2) { // Week
-            cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
-        } else if (type == 3) { // Month
-            cal.set(Calendar.DAY_OF_MONTH, 1);
+        Calendar startCal = Calendar.getInstance();
+        Calendar endCal = Calendar.getInstance();
+        
+        // 结束时间统一设置为今天 23:59:59.999
+        endCal.set(Calendar.HOUR_OF_DAY, 23);
+        endCal.set(Calendar.MINUTE, 59);
+        endCal.set(Calendar.SECOND, 59);
+        endCal.set(Calendar.MILLISECOND, 999);
+
+        if (type == 1) { // 近一年 (从一年前的今天到今天)
+            startCal.add(Calendar.YEAR, -1);
+        } else if (type == 2) { // 本周
+            startCal.set(Calendar.DAY_OF_WEEK, startCal.getFirstDayOfWeek());
+        } else if (type == 3) { // 本月
+            startCal.set(Calendar.DAY_OF_MONTH, 1);
         }
-        filter.setStartDate(cal.getTime());
-        filter.setEndDate(end);
+        
+        // 开始时间统一设置为当天 00:00:00.000
+        startCal.set(Calendar.HOUR_OF_DAY, 0);
+        startCal.set(Calendar.MINUTE, 0);
+        startCal.set(Calendar.SECOND, 0);
+        startCal.set(Calendar.MILLISECOND, 0);
+
+        filter.setStartDate(startCal.getTime());
+        filter.setEndDate(endCal.getTime());
         
         updateDateDisplay();
         updateDatePresetUI(type);
@@ -227,8 +241,19 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         if (current != null) initial.setTime(current);
 
         CustomDateTimePickerFragment.show(getChildFragmentManager(), initial, calendar -> {
-            if (isStart) filter.setStartDate(calendar.getTime());
-            else filter.setEndDate(calendar.getTime());
+            if (isStart) {
+                calendar.set(Calendar.HOUR_OF_DAY, 0);
+                calendar.set(Calendar.MINUTE, 0);
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                filter.setStartDate(calendar.getTime());
+            } else {
+                calendar.set(Calendar.HOUR_OF_DAY, 23);
+                calendar.set(Calendar.MINUTE, 59);
+                calendar.set(Calendar.SECOND, 59);
+                calendar.set(Calendar.MILLISECOND, 999);
+                filter.setEndDate(calendar.getTime());
+            }
             updateDateDisplay();
             updateDatePresetUI(0); // Clear presets
         });

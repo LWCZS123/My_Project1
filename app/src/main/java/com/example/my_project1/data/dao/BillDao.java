@@ -10,6 +10,7 @@ import androidx.room.Update;
 
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.bill.SearchSummary;
 
 import java.util.Date;
 import java.util.List;
@@ -130,6 +131,51 @@ public interface BillDao {
     List<Bill> searchBillsAdvanced(String userId, String keyword, int billType, String categoryId,
                                    List<String> accountIds, int accountIdsCount,
                                    Date startTime, Date endTime, Double minAmount, Double maxAmount);
+
+    /**
+     * 🔥 高级搜索：支持分页
+     */
+    @Query("SELECT * FROM bills WHERE user_id = :userId " +
+            "AND sync_state != 'TO_DELETE' " +
+            "AND (:keyword IS NULL OR category_name LIKE :keyword OR remark LIKE :keyword OR location LIKE :keyword) " +
+            "AND (:billType = -1 OR type = :billType) " +
+            "AND (:categoryId IS NULL OR category_id = :categoryId) " +
+            "AND (:accountIdsCount = 0 OR account_id IN (:accountIds)) " +
+            "AND (:startTime IS NULL OR billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR billTime <= :endTime) " +
+            "AND (:minAmount IS NULL OR amount >= :minAmount) " +
+            "AND (:maxAmount IS NULL OR amount <= :maxAmount) " +
+            "AND (:includeBudget IS NULL OR excludeBudget != :includeBudget) " +
+            "ORDER BY billTime DESC LIMIT :limit OFFSET :offset")
+    List<Bill> searchBillsAdvancedPaged(String userId, String keyword, int billType, String categoryId,
+                                        List<String> accountIds, int accountIdsCount,
+                                        Date startTime, Date endTime, Double minAmount, Double maxAmount,
+                                        Boolean includeBudget,
+                                        int limit, int offset);
+
+    /**
+     * 📊 高级搜索汇总：直接在数据库层面计算聚合结果
+     */
+    @Query("SELECT " +
+            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal, " +
+            "COUNT(*) as billCount, " +
+            "COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
+            "FROM bills WHERE user_id = :userId " +
+            "AND sync_state != 'TO_DELETE' " +
+            "AND (:keyword IS NULL OR category_name LIKE :keyword OR remark LIKE :keyword OR location LIKE :keyword) " +
+            "AND (:billType = -1 OR type = :billType) " +
+            "AND (:categoryId IS NULL OR category_id = :categoryId) " +
+            "AND (:accountIdsCount = 0 OR account_id IN (:accountIds)) " +
+            "AND (:startTime IS NULL OR billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR billTime <= :endTime) " +
+            "AND (:minAmount IS NULL OR amount >= :minAmount) " +
+            "AND (:maxAmount IS NULL OR amount <= :maxAmount) " +
+            "AND (:includeBudget IS NULL OR excludeBudget != :includeBudget)")
+    SearchSummary searchBillsSummaryAdvanced(String userId, String keyword, int billType, String categoryId,
+                                           List<String> accountIds, int accountIdsCount,
+                                           Date startTime, Date endTime, Double minAmount, Double maxAmount,
+                                           Boolean includeBudget);
 
     /**
      * 获取搜索建议：备注

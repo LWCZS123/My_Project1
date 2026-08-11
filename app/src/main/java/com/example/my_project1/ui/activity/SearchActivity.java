@@ -8,6 +8,7 @@ import android.text.TextWatcher;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -15,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.bill.SearchHistory;
@@ -29,7 +31,11 @@ import com.google.android.material.chip.Chip;
 import java.util.List;
 
 /**
- * SearchActivity - 搜索模块主页面 (直接在 Activity 中实现所有逻辑)
+ * SearchActivity - 搜索模块主页面 (优化版)
+ * -------------------------------------------------------
+ * ✅ 对接分页加载，支持大数据量搜索
+ * ✅ 优化 Loading 状态切换，确保 Lottie 动画流畅
+ * ✅ 使用 ListAdapter 高效更新汇总卡片
  */
 public class SearchActivity extends AppCompatActivity {
 
@@ -44,7 +50,6 @@ public class SearchActivity extends AppCompatActivity {
         binding = ActivitySearchBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // 状态栏美化
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
@@ -76,6 +81,23 @@ public class SearchActivity extends AppCompatActivity {
         binding.rvBills.setLayoutManager(new LinearLayoutManager(this));
         binding.rvBills.setAdapter(billAdapter);
 
+        // 分页加载监听
+        binding.rvBills.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                if (dy <= 0) return;
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager != null && !viewModel.isLoading() && !viewModel.isLastPage()) {
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5) {
+                        viewModel.loadNextPage();
+                    }
+                }
+            }
+        });
+
         summaryAdapter = new SearchSummaryAdapter();
         binding.rvSummary.setAdapter(summaryAdapter);
         binding.rvSummary.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
@@ -93,6 +115,7 @@ public class SearchActivity extends AppCompatActivity {
                     binding.layoutResults.setVisibility(View.GONE);
                     binding.layoutPreSearch.setVisibility(View.VISIBLE);
                     binding.layoutEmpty.setVisibility(View.GONE);
+                    binding.layoutLoading.setVisibility(View.GONE);
                 }
             }
             @Override
@@ -117,19 +140,15 @@ public class SearchActivity extends AppCompatActivity {
         viewModel.searchHistory.observe(this, this::updateHistoryChips);
         viewModel.suggestions.observe(this, this::updateSuggestionChips);
         
-        viewModel.searchResults.observe(this, bills -> {
-            if (bills != null && !bills.isEmpty()) {
-                billAdapter.submitList(viewModel.mapBillsToUiGroups(bills));
+        // 观察 UI 分组后的列表
+        viewModel.uiGroups.observe(this, groups -> {
+            billAdapter.submitList(groups); // 始终提交，允许清空
+            
+            if (groups != null && !groups.isEmpty()) {
                 binding.layoutResults.setVisibility(View.VISIBLE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
                 binding.layoutEmpty.setVisibility(View.GONE);
                 binding.layoutLoading.setVisibility(View.GONE);
-            } else if (bills != null) {
-                 binding.layoutResults.setVisibility(View.GONE);
-                 binding.layoutPreSearch.setVisibility(View.GONE);
-                 binding.layoutEmpty.setVisibility(View.VISIBLE);
-                 binding.layoutLoading.setVisibility(View.GONE);
-                 binding.lottieEmpty.playAnimation();
             }
         });
 
@@ -142,6 +161,7 @@ public class SearchActivity extends AppCompatActivity {
 
         viewModel.searchState.observe(this, state -> {
             if (state.isLoading()) {
+                // 立即切换到加载布局，隐藏其他布局，确保 Lottie 能够第一时间显示
                 binding.layoutResults.setVisibility(View.GONE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
                 binding.layoutEmpty.setVisibility(View.GONE);
@@ -153,9 +173,12 @@ public class SearchActivity extends AppCompatActivity {
                 binding.layoutEmpty.setVisibility(View.VISIBLE);
                 binding.layoutLoading.setVisibility(View.GONE);
                 binding.lottieEmpty.playAnimation();
-            } else if (state.isSuccess() || state.isError()) {
+            } else if (state.isError()) {
                 binding.layoutLoading.setVisibility(View.GONE);
             }
+            // 重要：isSuccess 状态不在这里隐藏 Loading！
+            // 搜索大量数据时，isSuccess 表示数据加载回来了，但 UI 转换（mapBillsToUiGroups）可能还在后台进行。
+            // 我们在 uiGroups 观察者中，等数据真正渲染到列表后再隐藏 Loading。
         });
     }
 

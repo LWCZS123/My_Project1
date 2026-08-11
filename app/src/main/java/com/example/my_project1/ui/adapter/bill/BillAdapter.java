@@ -100,7 +100,7 @@ public class BillAdapter extends ListAdapter<BillAdapter.BillGroup, BillAdapter.
                 b.rvBills.setLayoutManager(new LinearLayoutManager(context));
                 b.rvBills.setAdapter(new BillRowAdapter(context, listener, sharedPhotoPool));
             }
-            
+
             BillRowAdapter rowAdapter = (BillRowAdapter) b.rvBills.getAdapter();
             if (rowAdapter != null) {
                 rowAdapter.submitList(group.bills);
