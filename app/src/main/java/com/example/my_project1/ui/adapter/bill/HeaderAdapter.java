@@ -180,7 +180,8 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
             b.tvMonthlyIncome.setText("月收入: " + model.monthlyIncome);
             b.tvMonthlyExpense.setText("月支出: " + model.monthlyExpense);
             
-            // 💡 优化：避免重复触发 Lottie 动画重置
+            // 💡 优化：只有在 Lottie 不在播放且是在冷启动或者发生重大数值变化时才考虑播放
+            // 这里简单处理为只在初始化时自动播放，之后由 Lottie 自己的 loop 决定，不再由 updateData 强行 reset
             if (!b.lottieAnimation.isAnimating()) {
                 b.lottieAnimation.playAnimation();
             }

@@ -11,16 +11,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#FFFFFF"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp">
 
+        <!-- 分类图标 (优化尺寸与缩放，防止切割) -->
         <ImageView
             android:id="@+id/ivCategoryIcon"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="7dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:padding="10dp"
+            android:scaleType="centerInside"
             android:background="@drawable/bg_circle_grey"
             app:shapeAppearanceOverlay="@style/CircleAppearance"
             app:layout_constraintStart_toStartOf="parent"
@@ -31,10 +32,10 @@
             android:id="@+id/tvCategory"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="14dp"
             android:text="餐饮"
             android:textColor="#2D3436"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:fontFamily="@font/font3_regular"
             app:layout_constraintStart_toEndOf="@id/ivCategoryIcon"
@@ -45,9 +46,10 @@
             android:id="@+id/tvSubInfo"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
             android:text="18:08"
             android:textColor="#636E72"
-            android:textSize="10sp"
+            android:textSize="12sp"
             android:maxLines="1"
             android:ellipsize="end"
             android:fontFamily="@font/font3_regular"
@@ -62,7 +64,7 @@
             android:layout_marginTop="1dp"
             android:text="微信支付"
             android:textColor="#A0A0A0"
-            android:textSize="9sp"
+            android:textSize="10sp"
             android:fontFamily="@font/font3_regular"
             app:layout_constraintStart_toStartOf="@id/tvCategory"
             app:layout_constraintTop_toBottomOf="@id/tvSubInfo" />
@@ -86,64 +88,100 @@
             android:layout_marginStart="4dp"
             android:text="招商银行"
             android:textColor="#A0A0A0"
-            android:textSize="9sp"
+            android:textSize="10sp"
             android:fontFamily="@font/font3_regular"
             android:visibility="gone"
             app:layout_constraintStart_toEndOf="@id/ivTransferArrow"
             app:layout_constraintTop_toTopOf="@id/tvAccount" />
 
+        <!-- 金额：位置微调，与文字区域中心对齐 -->
         <TextView
             android:id="@+id/tvAmount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="-¥55.00"
             android:textColor="#E74C3C"
-            android:textSize="16sp"
+            android:textSize="17sp"
             android:textStyle="bold"
             android:fontFamily="@font/font3_regular"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:layout_constraintTop_toTopOf="@id/ivCategoryIcon"
+            app:layout_constraintBottom_toBottomOf="@id/tvAccount" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/ivBillImage"
+        <!-- 图片列表 -->
+        <LinearLayout
+            android:id="@+id/llBillImages"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
             android:visibility="gone"
             app:layout_constraintStart_toStartOf="@id/tvCategory"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvAccount" />
+            app:layout_constraintTop_toBottomOf="@id/tvAccount">
 
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/ivBillImage1"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:scaleType="centerCrop"
+                android:background="#EEEEEE"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.App.Corner.Rounded" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/ivBillImage2"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:scaleType="centerCrop"
+                android:background="#EEEEEE"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.App.Corner.Rounded" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/ivBillImage3"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:scaleType="centerCrop"
+                android:background="#EEEEEE"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.App.Corner.Rounded" />
+        </LinearLayout>
+
+        <!-- 分隔线：始终在最下面，且作为底边锚点 -->
         <View
             android:id="@+id/billDivider"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="0.5dp"
-            android:background="#F0F0F0"
-            android:layout_marginTop="10dp"
-            app:layout_constraintTop_toBottomOf="@id/ivBillImage" />
+            android:background="#EEEEEE"
+            android:layout_marginTop="12dp"
+            android:layout_marginStart="60dp"
+            app:layout_constraintTop_toBottomOf="@id/llBillImages"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 2. 侧滑菜单 (退款、编辑、删除) -->
+    <!-- 2. 侧滑菜单 (优化：背景色设为 F2F4F8) -->
     <LinearLayout
         android:id="@+id/menuView"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:background="#F2F4F8">
 
-        <!-- 退款 (蓝色) -->
+        <!-- 退款 -->
         <LinearLayout
             android:id="@+id/btnRefund"
-            android:layout_width="60dp"
+            android:layout_width="72dp"
             android:layout_height="match_parent"
-            android:background="#F8F9FA"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical">
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:padding="7dp"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
                 android:background="@drawable/bg_circle_blue"
                 android:src="@drawable/ic_convert"
                 app:tint="#FFFFFF" />
@@ -152,23 +190,23 @@
                 android:layout_height="wrap_content"
                 android:text="退款"
                 android:textColor="#666666"
-                android:textSize="9sp"
-                android:layout_marginTop="2dp"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp"
                 android:fontFamily="@font/font3_regular" />
         </LinearLayout>
 
-        <!-- 编辑 (黑色/深灰) -->
+        <!-- 编辑 -->
         <LinearLayout
             android:id="@+id/btnEdit"
-            android:layout_width="60dp"
+            android:layout_width="72dp"
             android:layout_height="match_parent"
-            android:background="#F8F9FA"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical">
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:padding="7dp"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
                 android:background="@drawable/bg_circle_gray"
                 android:src="@drawable/ic_edit"
                 app:tint="#FFFFFF" />
@@ -177,23 +215,23 @@
                 android:layout_height="wrap_content"
                 android:text="编辑"
                 android:textColor="#666666"
-                android:textSize="9sp"
-                android:layout_marginTop="2dp"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp"
                 android:fontFamily="@font/font3_regular" />
         </LinearLayout>
 
-        <!-- 删除 (红色) -->
+        <!-- 删除 -->
         <LinearLayout
             android:id="@+id/btnDelete"
-            android:layout_width="60dp"
+            android:layout_width="72dp"
             android:layout_height="match_parent"
-            android:background="#F8F9FA"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical">
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:padding="7dp"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
                 android:background="@drawable/bg_circle_red"
                 android:src="@drawable/ic_trash"
                 app:tint="#FFFFFF" />
@@ -202,8 +240,8 @@
                 android:layout_height="wrap_content"
                 android:text="删除"
                 android:textColor="#666666"
-                android:textSize="9sp"
-                android:layout_marginTop="2dp"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp"
                 android:fontFamily="@font/font3_regular" />
         </LinearLayout>
 

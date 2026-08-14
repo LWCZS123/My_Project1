@@ -14,7 +14,6 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ConcatAdapter;
-import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -29,13 +28,13 @@ import com.example.my_project1.ui.activity.SearchActivity;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
 import com.example.my_project1.ui.adapter.bill.FooterAdapter;
 import com.example.my_project1.ui.adapter.bill.HeaderAdapter;
+import com.example.my_project1.ui.adapter.bill.HomeBillAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.PagingState;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
-import com.example.my_project1.utils.SwipeToDeleteCallback;
 import com.google.android.material.snackbar.Snackbar;
 
 import cn.bmob.v3.BmobUser;
@@ -64,9 +63,9 @@ public class HomeFragment extends Fragment {
     private UserProfileViewModel userViewModel;
 
     // ── Adapter 三件套 ────────────────────────────────
-    private HeaderAdapter headerAdapter;
-    private BillAdapter   billAdapter;
-    private FooterAdapter footerAdapter;
+    private HeaderAdapter     headerAdapter;
+    private HomeBillAdapter   billAdapter;
+    private FooterAdapter     footerAdapter;
 
     // ── 用户 ─────────────────────────────────────────
     private String  currentUserId;
@@ -161,7 +160,7 @@ public class HomeFragment extends Fragment {
             billViewModel.forceSyncFromCloud();
         });
 
-        billAdapter = new BillAdapter(requireContext(), new BillAdapter.OnBillClickListener() {
+        billAdapter = new HomeBillAdapter(requireContext(), new BillAdapter.OnBillClickListener() {
             @Override
             public void onBillClick(long localId, String objectId, View itemView) {
                 openBillDetail(localId, objectId);
@@ -176,6 +175,7 @@ public class HomeFragment extends Fragment {
             }
             @Override
             public void onBillEdit(BillUiModel bill) {
+                if (bill == null) return;
                 Intent intent = new Intent(getActivity(), com.example.my_project1.ui.activity.AddBillActivity.class);
                 intent.putExtra("editBillLocalId", bill.localId);
                 startActivity(intent);
@@ -264,7 +264,9 @@ public class HomeFragment extends Fragment {
     private void observeData() {
         // ── 1. 账单列表（已预处理为 UiModel 混合列表）──
         billViewModel.billItems.observe(getViewLifecycleOwner(), items -> {
-            billAdapter.submitList(items);        // AsyncListDiffer 后台计算 diff，丝滑刷新
+            if (items != null) {
+                billAdapter.submitList(items);        // AsyncListDiffer 后台计算 diff，丝滑刷新
+            }
             binding.swipeRefreshLayout.setRefreshing(false);
         });
 
@@ -277,11 +279,17 @@ public class HomeFragment extends Fragment {
         // ── 3. 分页 Footer 状态 ────────────────────────
         billViewModel.pagingState.observe(getViewLifecycleOwner(), state -> {
             if (state == null) return;
-            footerAdapter.setState(state);
-            // 加载完成时停止下拉刷新动画（双重保障）
-            if (state != PagingState.LOADING) {
-                binding.swipeRefreshLayout.setRefreshing(false);
-            }
+            
+            // 🚀 修复：避免在滚动回调中直接修改 Adapter（防止 IllegalStateException）
+            binding.rvBills.post(() -> {
+                if (footerAdapter != null) {
+                    footerAdapter.setState(state);
+                }
+                // 加载完成时停止下拉刷新动画
+                if (state != PagingState.LOADING) {
+                    binding.swipeRefreshLayout.setRefreshing(false);
+                }
+            });
         });
 
         // ── 4. 同步状态 ────────────────────────────────

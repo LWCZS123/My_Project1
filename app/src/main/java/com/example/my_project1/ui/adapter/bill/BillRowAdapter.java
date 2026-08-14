@@ -8,17 +8,13 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.recyclerview.widget.DiffUtil;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.databinding.ItemBillBinding;
-import com.example.my_project1.ui.adapter.photo.PhotoAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
-
-import java.util.ArrayList;
 
 import io.reactivex.annotations.NonNull;
 
@@ -26,7 +22,6 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
 
     private final Context context;
     private final BillAdapter.OnBillClickListener listener;
-    private final RecyclerView.RecycledViewPool photoPool;
 
     public BillRowAdapter(Context context, BillAdapter.OnBillClickListener listener, RecyclerView.RecycledViewPool photoPool) {
         super(new DiffUtil.ItemCallback<BillUiModel>() {
@@ -43,7 +38,6 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
         });
         this.context = context;
         this.listener = listener;
-        this.photoPool = photoPool;
     }
 
     @NonNull
@@ -104,27 +98,41 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
                 b.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
             }
 
+            // 🚀 优化图片展示：使用 LinearLayout + 3 ImageViews 替代嵌套 RecyclerView
             if (bill.imageUrls != null && !bill.imageUrls.isEmpty()) {
-                b.ivBillImage.setVisibility(View.VISIBLE);
-                if (b.ivBillImage.getLayoutManager() == null) {
-                    b.ivBillImage.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
+                b.llBillImages.setVisibility(View.VISIBLE);
+                int size = bill.imageUrls.size();
+
+                // 图片 1
+                b.ivBillImage1.setVisibility(View.VISIBLE);
+                ImageLoaderUtils.loadThumbnail(context, bill.imageUrls.get(0), b.ivBillImage1);
+                b.ivBillImage1.setOnClickListener(v -> {
+                    if (listener != null) listener.onPhotoClick(bill.imageUrls.get(0), 0);
+                });
+
+                // 图片 2
+                if (size >= 2) {
+                    b.ivBillImage2.setVisibility(View.VISIBLE);
+                    ImageLoaderUtils.loadThumbnail(context, bill.imageUrls.get(1), b.ivBillImage2);
+                    b.ivBillImage2.setOnClickListener(v -> {
+                        if (listener != null) listener.onPhotoClick(bill.imageUrls.get(1), 1);
+                    });
+                } else {
+                    b.ivBillImage2.setVisibility(View.GONE);
                 }
-                if (photoPool != null) b.ivBillImage.setRecycledViewPool(photoPool);
-                
-                PhotoAdapter photoAdapter = (PhotoAdapter) b.ivBillImage.getAdapter();
-                if (photoAdapter == null) {
-                    photoAdapter = new PhotoAdapter(context, new ArrayList<>(), false,
-                            new PhotoAdapter.OnPhotoClickListener() {
-                                @Override public void onPhotoClick(String url, int pos) {
-                                    if (listener != null) listener.onPhotoClick(url, pos);
-                                }
-                                @Override public void onDeleteClick(int pos) { }
-                            });
-                    b.ivBillImage.setAdapter(photoAdapter);
+
+                // 图片 3
+                if (size >= 3) {
+                    b.ivBillImage3.setVisibility(View.VISIBLE);
+                    ImageLoaderUtils.loadThumbnail(context, bill.imageUrls.get(2), b.ivBillImage3);
+                    b.ivBillImage3.setOnClickListener(v -> {
+                        if (listener != null) listener.onPhotoClick(bill.imageUrls.get(2), 2);
+                    });
+                } else {
+                    b.ivBillImage3.setVisibility(View.GONE);
                 }
-                photoAdapter.setPhotos(bill.imageUrls);
             } else {
-                b.ivBillImage.setVisibility(View.GONE);
+                b.llBillImages.setVisibility(View.GONE);
             }
 
             b.billDivider.setVisibility(isLast ? View.GONE : View.VISIBLE);
@@ -148,4 +156,3 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
         }
     }
 }
-
