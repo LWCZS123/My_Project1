@@ -18,11 +18,11 @@ public class SnackbarUtils {
     }
 
     public static void show(View view, String message) {
-        show(view, message, Type.INFO, Snackbar.LENGTH_SHORT);
+        show(view, message, Type.INFO, 500);
     }
 
     public static void show(View view, String message, Type type) {
-        show(view, message, type, Snackbar.LENGTH_SHORT);
+        show(view, message, type, 500);
     }
 
     public static void show(View view, String message, Type type, int duration) {
@@ -67,16 +67,31 @@ public class SnackbarUtils {
         bg.setColor(color);
 
         layout.setBackground(null);
-        layout.setPadding(0, 0, 0, 0);
         layout.setClipChildren(false);
         layout.setClipToPadding(false);
+
+        // 🔑 使用 padding 代替 margin 来向下偏移，因为 Snackbar 内部逻辑经常会重置 margin
+        int topOffset = DisplayUtils.dp2px(view.getContext(), 40);
+        layout.setPadding(0, topOffset, 0, 0);
+
+        // 🔑 将 Snackbar 整体移动到顶部
+        android.view.ViewGroup.LayoutParams lp = layout.getLayoutParams();
+        if (lp instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) lp;
+            flp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        } else if (lp != null && lp.getClass().getName().contains("CoordinatorLayout$LayoutParams")) {
+            try {
+                java.lang.reflect.Field gravityField = lp.getClass().getField("gravity");
+                gravityField.set(lp, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            } catch (Exception ignored) {}
+        }
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
         );
-        params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        params.setMargins(0, 0, 0, 48);
+        params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        params.setMargins(0, 0, 0, 0);
 
         layout.addView(binding.getRoot(), 0, params);
 

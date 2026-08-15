@@ -30,6 +30,7 @@ import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Objects;
 
 /**
@@ -170,6 +171,14 @@ public class AccountBillAdapter extends ListAdapter<AccountDetailUiModel, Recycl
                 binding.tvAvailableLimit.setText(String.format("可用额度 ¥%s", df.format(acc.getCreditLimit() + acc.getBalance())));
                 binding.tvBillingStatus.setText(String.format("出账日 %s", acc.getBillingDay() > 0 ? acc.getBillingDay() + "日" : "--"));
                 binding.tvRepaymentStatus.setText(String.format("还款日 %s", acc.getRepaymentDay() > 0 ? acc.getRepaymentDay() + "日" : "--"));
+
+                // 更新本期还款卡片信息
+                Calendar cal = Calendar.getInstance();
+                int year = cal.get(Calendar.YEAR);
+                int month = cal.get(Calendar.MONTH) + 1;
+                binding.tvBillMonthLabel.setText(String.format(java.util.Locale.getDefault(), "%d年%d月账单（剩余应还）", year, month));
+                // 信用账户余额通常为负值表示欠款，这里取绝对值展示
+                binding.tvBillAmount.setText(String.format(java.util.Locale.getDefault(), "¥%s", df.format(Math.abs(acc.getBalance()))));
             } else {
                 binding.layoutCreditInfo.setVisibility(View.GONE);
                 binding.cardCreditBill.setVisibility(View.GONE);

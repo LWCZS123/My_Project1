@@ -171,12 +171,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
-
-            int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-
-            v.setPadding(0, top, 0, 0);
-
-            return insets;
+            androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(0, systemBars.top, 0, systemBars.bottom);
+            return WindowInsetsCompat.CONSUMED;
         });
 
         // 设置状态栏图标为深色（因为背景是浅色 #F0F4FF）
