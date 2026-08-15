@@ -12,6 +12,7 @@ import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.Transformations;
+import androidx.paging.PagingData;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.dao.AccountDao;
@@ -22,6 +23,7 @@ import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.repository.bill.BillRepository;
 import com.example.my_project1.data.repository.user.UserProfileRepository;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
+import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.work.BillSyncWorker;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -62,7 +64,6 @@ public class BillViewModel extends AndroidViewModel {
 
     // ── 分页常量 ──────────────────────────────────────
     private static final int PAGE_SIZE        = 20;  // 每页条数
-    private static final int PREFETCH_OFFSET  = 5;   // 距底部 5 条时触发预加载
     private static final long SNAPSHOT_PROTECT_MS = 500L; // 快照保护期
 
     // ── 后台计算线程 ───────────────────────────────────
@@ -84,6 +85,7 @@ public class BillViewModel extends AndroidViewModel {
     private static final String[] WEEK_DAYS = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 
     private volatile boolean isCleared = false;
+    private boolean hasRoomBillsPublished = false;
 
     // ── 标志位 ────────────────────────────────────────
     private long viewModelStartTime;
@@ -96,11 +98,6 @@ public class BillViewModel extends AndroidViewModel {
     // ── 用户 ─────────────────────────────────────────
     private String currentUserId;
     private String lastUserId;
-
-    // ── 分页状态（内部维护）────────────────────────────
-    private int     currentPage = 1;
-    private boolean isLoading   = false;
-    private boolean isLastPage  = false;
 
     // ──────────────── LiveData ────────────────────────
 
@@ -116,9 +113,10 @@ public class BillViewModel extends AndroidViewModel {
     /** 所有账单（用于统计 billCount / billDays） */
     private LiveData<List<Bill>> allBills;
 
-    /** ✅ 新增：供 HomeFragment 的 BillAdapter 使用，按日分组的账单数据 */
-    private final MutableLiveData<List<HomeBillUiModel>> _billItems = new MutableLiveData<>(new ArrayList<>());
-    public  final LiveData<List<HomeBillUiModel>>         billItems  = _billItems;
+    private final MediatorLiveData<PagingData<HomeBillUiModel>> _homeBillPagingData = new MediatorLiveData<>();
+    public final LiveData<PagingData<HomeBillUiModel>> homeBillPagingData = _homeBillPagingData;
+    private LiveData<PagingData<HomeBillUiModel>> pagerLiveData;
+    private volatile HomeBillsPagingSource homeBillsPagingSource;
 
     /** ✅ 新增：供 HeaderAdapter 使用的统计概览数据 */
     private final MutableLiveData<HeaderUiModel> _headerData =
@@ -132,10 +130,6 @@ public class BillViewModel extends AndroidViewModel {
 
 
 
-
-    /** ✅ 新增：分页加载状态 */
-    private final MutableLiveData<PagingState> _pagingState = new MutableLiveData<>(PagingState.IDLE);
-    public  final LiveData<PagingState>         pagingState  = _pagingState;
 
     /** 账单总数 */
     private final MutableLiveData<Integer> _billCount = new MutableLiveData<>(0);
@@ -222,6 +216,7 @@ public class BillViewModel extends AndroidViewModel {
         });
 
         initializeLiveData();
+        rebuildHomeBillsPager();
         observeAllBillsForStats();
         observeStatsForSync();
         observeMonthBillsForUiMapping();
@@ -233,19 +228,17 @@ public class BillViewModel extends AndroidViewModel {
     private void loadSnapshot() {
         android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
 
-        String headerJson = sp.getString(KEY_HEADER_SNAPSHOT, null);
-        String billsJson = sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null);
-        String calendarJson = sp.getString(KEY_CALENDAR_SNAPSHOT, null);
+        String headerJson = sp.getString(snapshotKey(KEY_HEADER_SNAPSHOT),
+                sp.getString(KEY_HEADER_SNAPSHOT, null));
+        String calendarJson = sp.getString(snapshotKey(KEY_CALENDAR_SNAPSHOT),
+                sp.getString(KEY_CALENDAR_SNAPSHOT, null));
+        String billItemsJson = sp.getString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT),
+                sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null));
+        boolean billSnapshotRestored = false;
 
         if (headerJson != null) {
             HeaderUiModel header = gson.fromJson(headerJson, HeaderUiModel.class);
             _headerData.setValue(header);
-        }
-
-        if (billsJson != null) {
-            Type type = new TypeToken<List<HomeBillUiModel>>(){}.getType();
-            List<HomeBillUiModel> groups = gson.fromJson(billsJson, type);
-            _billItems.setValue(groups);
         }
 
         if (calendarJson != null) {
@@ -254,36 +247,50 @@ public class BillViewModel extends AndroidViewModel {
             _dailyStatsMap.setValue(stats);
         }
 
-        isSnapshotLoaded = true;
+        if (billItemsJson != null) {
+            Type type = new TypeToken<List<HomeBillUiModel>>(){}.getType();
+            List<HomeBillUiModel> billItems = gson.fromJson(billItemsJson, type);
+            if (billItems != null) {
+                ImageLoaderUtils.preloadHomeBillCategoryIcons(getApplication(), collectCategoryIconUrls(billItems));
+                _homeBillPagingData.setValue(PagingData.from(billItems));
+                billSnapshotRestored = true;
+            }
+        }
+
+        isSnapshotLoaded = billSnapshotRestored;
         Log.d(TAG, "⚡ 快照加载完成");
     }
 
     /**
-     * ✅ 保存快照：包含统计数据、首页账单和日历统计
+     * ✅ 保存快照：包含统计数据和日历统计
      */
-    private void saveSnapshot(HeaderUiModel header, List<HomeBillUiModel> billItems, Map<String, com.example.my_project1.data.model.calendar.DailyStat> calendarStats) {
+    private String snapshotKey(String baseKey) {
+        return snapshotKey(baseKey, currentUserId);
+    }
+
+    private String snapshotKey(String baseKey, String userId) {
+        return userId == null ? baseKey : baseKey + "_" + userId;
+    }
+
+    private void saveSnapshot(HeaderUiModel header, Map<String, com.example.my_project1.data.model.calendar.DailyStat> calendarStats,
+                              List<HomeBillUiModel> billItems) {
         if (isCleared || bgExecutor.isShutdown()) return;
+        String snapshotUserId = currentUserId;
         bgExecutor.execute(() -> {
             if (isCleared) return;
             android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
 
-            // 限制首页快照大小
-            List<HomeBillUiModel> snapshotItems = billItems;
-            if (billItems != null && billItems.size() > 30) {
-                snapshotItems = new ArrayList<>(billItems.subList(0, 30));
-            }
-
             sp.edit()
-                .putString(KEY_HEADER_SNAPSHOT, gson.toJson(header))
-                .putString(KEY_BILL_ITEMS_SNAPSHOT, gson.toJson(snapshotItems))
-                .putString(KEY_CALENDAR_SNAPSHOT, gson.toJson(calendarStats))
+                .putString(snapshotKey(KEY_HEADER_SNAPSHOT, snapshotUserId), gson.toJson(header))
+                .putString(snapshotKey(KEY_CALENDAR_SNAPSHOT, snapshotUserId), gson.toJson(calendarStats))
+                .putString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, snapshotUserId), gson.toJson(billItems))
                 .apply();
             Log.d(TAG, "💾 快照已持久化");
         });
     }
 
     private void saveSnapshot(HeaderUiModel header, List<HomeBillUiModel> billItems) {
-        saveSnapshot(header, billItems, _dailyStatsMap.getValue());
+        saveSnapshot(header, _dailyStatsMap.getValue(), billItems);
     }
 
     private void observeAllBillsForStats() {
@@ -372,6 +379,24 @@ public class BillViewModel extends AndroidViewModel {
         }
     }
 
+    private void rebuildHomeBillsPager() {
+        if (pagerLiveData != null) {
+            _homeBillPagingData.removeSource(pagerLiveData);
+            pagerLiveData = null;
+        }
+        homeBillsPagingSource = null;
+        if (currentUserId == null) {
+            _homeBillPagingData.setValue(PagingData.from(new ArrayList<>()));
+        }
+    }
+
+    private void invalidateHomeBillsPaging() {
+        HomeBillsPagingSource source = homeBillsPagingSource;
+        if (source != null) {
+            source.invalidate();
+        }
+    }
+
     /**
      * 快速判断首页数据指纹是否变化
      * -------------------------------------------------------
@@ -398,8 +423,8 @@ public class BillViewModel extends AndroidViewModel {
         if (accounts != null) {
             sb.append(accounts.size()).append("_");
             for (Account acc : accounts) {
-                // 余额是关键，但也包含同步状态以捕捉标记删除等变化
-                sb.append(acc.getBalance()).append(acc.getSyncState()).append(",");
+                sb.append(acc.getObjectId()).append(acc.getName()).append(acc.getIconUrl())
+                        .append(acc.getBalance()).append(acc.getSyncState()).append(",");
             }
         }
 
@@ -429,6 +454,9 @@ public class BillViewModel extends AndroidViewModel {
             List<Bill> bills = currentMonthBills.getValue();
             List<Account> accounts = allAccountsLive.getValue();
 
+            // null 表示 Room 查询尚未返回，不等同于“没有账单”。此时保留快照内容。
+            if (bills == null) return;
+
             // 🚀 快速指纹比对：如果数据未变，直接返回
             if (isHomeDataUnchanged(bills, accounts)) {
                 Log.d(TAG, "⚡ 首页数据指纹未变，跳过映射");
@@ -439,36 +467,31 @@ public class BillViewModel extends AndroidViewModel {
             if (bgExecutor.isShutdown()) return;
             bgExecutor.execute(() -> {
                 if (isCleared) return;
+                HeaderUiModel header = buildHeaderUiModel(bills, accounts);
                 Map<String, Account> accountMap = new HashMap<>();
                 if (accounts != null) {
-                    for (Account acc : accounts) {
-                        accountMap.put(acc.getObjectId(), acc);
+                    for (Account account : accounts) {
+                        if (account.getObjectId() != null) {
+                            accountMap.put(account.getObjectId(), account);
+                        }
                     }
                 }
-
-                // 2. 映射 UI 模型 (扁平化版)
-                List<HomeBillUiModel> uiItems = mapBillsToFlatList(bills, accountMap);
-                HeaderUiModel header = buildHeaderUiModel(bills, accounts);
+                List<HomeBillUiModel> homeItems = mapBillsToFlatList(bills, accountMap);
 
                 // ✅ 3. 计算保护期剩余时间
                 long elapsed = System.currentTimeMillis() - viewModelStartTime;
                 long delay = isSnapshotLoaded ? Math.max(0, SNAPSHOT_PROTECT_MS - elapsed) : 0;
 
                 mainHandler.postDelayed(() -> {
-                    _billItems.setValue(uiItems);
                     _headerData.setValue(header);
+                    hasRoomBillsPublished = true;
+                    ImageLoaderUtils.preloadHomeBillCategoryIcons(getApplication(), collectCategoryIconUrls(homeItems));
+                    _homeBillPagingData.setValue(PagingData.from(homeItems));
 
                     // 保存新快照
-                    saveSnapshot(header, uiItems);
+                    saveSnapshot(header, homeItems);
                     isSnapshotLoaded = false; // 保护期过后的下一次更新不再延迟
 
-                    // 分页状态：首页加载完成
-                    if (currentPage == 1) {
-                        boolean empty   = bills == null || bills.isEmpty();
-                        boolean hasMore = !empty && bills.size() >= PAGE_SIZE * currentPage;
-                        _pagingState.setValue(empty || !hasMore
-                                ? PagingState.NO_MORE : PagingState.IDLE);
-                    }
                 }, delay);
             });
         };
@@ -625,7 +648,9 @@ public class BillViewModel extends AndroidViewModel {
                 billUiCache.put(billCacheKey, billUi);
             }
             
-            boolean isLastInDay = (i + 1 == sortedBills.size() || !DATE_KEY_FMT.format(sortedBills.get(i + 1).getBillTime()).equals(dateKey));
+            Bill nextBill = i + 1 < sortedBills.size() ? sortedBills.get(i + 1) : null;
+            boolean isLastInDay = nextBill == null || nextBill.getBillTime() == null
+                    || !DATE_KEY_FMT.format(nextBill.getBillTime()).equals(dateKey);
             flatItems.add(HomeBillUiModel.item(billUi, isLastInDay));
         }
 
@@ -776,57 +801,29 @@ public class BillViewModel extends AndroidViewModel {
         return new Date[]{start, c.getTime()};
     }
 
-    // ════════════════════════════════════════════════════
-    //  ✅ 分页控制
-    // ════════════════════════════════════════════════════
-
     /**
-     * 上拉加载更多
-     * HomeFragment 滚动监听：距底部 PREFETCH_OFFSET 条时调用
-     */
-    public void loadMore() {
-        if (isLoading || isLastPage) return;
-        isLoading = true;
-        currentPage++;
-        _pagingState.setValue(PagingState.LOADING);
-
-        // TODO: 如果后端支持分页接口，在此处请求 currentPage；
-        // 当前项目直接从 Room 拿全量数据，此处模拟演示分页完成逻辑
-        mainHandler.postDelayed(() -> {
-            isLoading = false;
-            // 若后端返回数量 < PAGE_SIZE，说明已到最后一页
-            // isLastPage = (newItems.size() < PAGE_SIZE);
-            // 此处暂以 NO_MORE 为示意，实际项目替换为真实分页判断
-            _pagingState.setValue(PagingState.NO_MORE);
-            isLastPage = true;
-        }, 500);
-    }
-
-    /**
-     * 下拉刷新：重置分页状态并重新拉取数据
+     * 下拉刷新只检查云端增量，不能清空或重建当前已展示的本地账单。
      */
     public void refresh() {
         Log.d(TAG, "开始下拉刷新...");
 
-        // 1. 重置分页状态
-        currentPage = 1;
-        isLastPage  = false;
-        isLoading   = false;
-        _pagingState.setValue(PagingState.IDLE);
-
         if (currentUserId != null) {
             forceSyncFromCloud();
         } else {
-            // 如果没登录，只刷新本地触发器
-            _refreshTrigger.setValue(System.currentTimeMillis());
+            refreshData();
         }
     }
 
-    /** 加载失败后点击重试 */
-    public void retryLoad() {
-        if (_pagingState.getValue() != PagingState.ERROR) return;
-        currentPage = Math.max(1, currentPage - 1);
-        loadMore();
+    private List<String> collectCategoryIconUrls(List<HomeBillUiModel> items) {
+        Set<String> urls = new java.util.LinkedHashSet<>();
+        if (items == null) return new ArrayList<>();
+        for (HomeBillUiModel item : items) {
+            if (item != null && item.billItem != null && item.billItem.categoryIconUrl != null) {
+                urls.add(item.billItem.categoryIconUrl);
+                if (urls.size() == 12) break;
+            }
+        }
+        return new ArrayList<>(urls);
     }
 
     // ════════════════════════════════════════════════════
@@ -894,6 +891,10 @@ public class BillViewModel extends AndroidViewModel {
 
     public void refreshData() {
         _refreshTrigger.setValue(System.currentTimeMillis());
+
+        // HomeBillsPagingSource performs synchronous Room queries, so it is not
+        // invalidated by Room automatically. Refresh it whenever bill data changes.
+        invalidateHomeBillsPaging();
     }
 
     public Bill saveBill(String objectId) {
@@ -1139,6 +1140,7 @@ public class BillViewModel extends AndroidViewModel {
             isFirstInit   = true;
             isSyncing     = false;
             lastSyncTime  = 0;
+            hasRoomBillsPublished = false;
             reinitializeLiveData();
             if (currentUserId != null) Log.d(TAG, "✅ 新用户登录，将自动加载数据");
         }
@@ -1164,6 +1166,8 @@ public class BillViewModel extends AndroidViewModel {
         if (billDaysObserver  != null) billDays .removeObserver(billDaysObserver);
 
         initializeLiveData();
+        loadSnapshot();
+        rebuildHomeBillsPager();
         observeAllBillsForStats();
         observeStatsForSync();
         observeMonthBillsForUiMapping();

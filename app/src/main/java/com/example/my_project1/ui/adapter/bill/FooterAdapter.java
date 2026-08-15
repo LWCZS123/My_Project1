@@ -7,25 +7,24 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.paging.LoadState;
+import androidx.paging.LoadStateAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
-import com.example.my_project1.ui.viewmodel.billvm.PagingState;
-
-import io.reactivex.annotations.NonNull;
 
 /**
  * FooterAdapter - 分页加载状态 Footer
  * -------------------------------------------------------
- * 根据 PagingState 展示三种状态：
+ * Renders Paging 3 append state:
  *   LOADING  → ProgressBar 旋转动画
  *   NO_MORE  → "— 没有更多了 —" 文字
  *   ERROR    → "加载失败，点击重试" 按钮
  *   IDLE     → 隐藏（itemCount=0）
  */
-public class FooterAdapter extends RecyclerView.Adapter<FooterAdapter.FooterVH> {
+public class FooterAdapter extends LoadStateAdapter<FooterAdapter.FooterVH> {
 
-    private PagingState state = PagingState.IDLE;
     private OnRetryClickListener retryListener;
 
     public interface OnRetryClickListener {
@@ -36,41 +35,25 @@ public class FooterAdapter extends RecyclerView.Adapter<FooterAdapter.FooterVH> 
         this.retryListener = l;
     }
 
-    /** 更新分页状态，触发 Footer 刷新 */
-    public void setState(PagingState newState) {
-        PagingState old = this.state;
-        this.state = newState;
-
-        boolean wasVisible = old != PagingState.IDLE;
-        boolean nowVisible = newState != PagingState.IDLE;
-
-        if (!wasVisible && nowVisible) {
-            notifyItemInserted(0);
-        } else if (wasVisible && !nowVisible) {
-            notifyItemRemoved(0);
-        } else if (wasVisible) {
-            notifyItemChanged(0);
-        }
-    }
-
-    public PagingState getState() { return state; }
-
     @Override
-    public int getItemCount() {
-        return state == PagingState.IDLE ? 0 : 1;
-    }
-
-    @NonNull
-    @Override
-    public FooterVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public FooterVH onCreateViewHolder(@NonNull ViewGroup parent, @NonNull LoadState loadState) {
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_bill_footer, parent, false);
         return new FooterVH(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull FooterVH holder, int position) {
-        holder.bind(state);
+    public void onBindViewHolder(@NonNull FooterVH holder, @NonNull LoadState loadState) {
+        holder.bind(loadState);
+    }
+
+    @Override
+    public boolean displayLoadStateAsItem(@NonNull LoadState loadState) {
+        if (loadState instanceof LoadState.Loading || loadState instanceof LoadState.Error) {
+            return true;
+        }
+        return loadState instanceof LoadState.NotLoading
+                && ((LoadState.NotLoading) loadState).getEndOfPaginationReached();
     }
 
     class FooterVH extends RecyclerView.ViewHolder {
@@ -89,12 +72,17 @@ public class FooterAdapter extends RecyclerView.Adapter<FooterAdapter.FooterVH> 
             });
         }
 
-        void bind(PagingState s) {
-            progressBar.setVisibility(s == PagingState.LOADING ? View.VISIBLE : View.GONE);
-            tvMessage.setVisibility(s == PagingState.NO_MORE  ? View.VISIBLE : View.GONE);
-            btnRetry.setVisibility(s == PagingState.ERROR     ? View.VISIBLE : View.GONE);
+        void bind(LoadState state) {
+            boolean isLoading = state instanceof LoadState.Loading;
+            boolean isError = state instanceof LoadState.Error;
+            boolean isComplete = state instanceof LoadState.NotLoading
+                    && ((LoadState.NotLoading) state).getEndOfPaginationReached();
 
-            if (s == PagingState.NO_MORE) {
+            progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            tvMessage.setVisibility(isComplete ? View.VISIBLE : View.GONE);
+            btnRetry.setVisibility(isError ? View.VISIBLE : View.GONE);
+
+            if (isComplete) {
                 tvMessage.setText("— 没有更多了 —");
             }
         }

@@ -322,7 +322,7 @@ public class BmobApiImpl {
             query.addWhereEqualTo("parentCloudId", parentCloudId); // ✅ 使用字符串字段
             query.include("parentCategory"); // 可选:展开父分类信息
             query.order("order");
-            query.setLimit(500);
+            query.setLimit(100);
 
             List<CloudSubCategory> subList = query.findObjectsSync(CloudSubCategory.class);
 

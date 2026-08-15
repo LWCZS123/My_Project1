@@ -131,8 +131,19 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
                 } else {
                     b.ivBillImage3.setVisibility(View.GONE);
                 }
+
+                if (size > 3) {
+                    b.tvBillImageMore.setVisibility(View.VISIBLE);
+                    b.tvBillImageMore.setText("+" + (size - 3));
+                    b.tvBillImageMore.setOnClickListener(v -> {
+                        if (listener != null) listener.onBillClick(bill.localId, bill.objectId, b.getRoot());
+                    });
+                } else {
+                    b.tvBillImageMore.setVisibility(View.GONE);
+                }
             } else {
                 b.llBillImages.setVisibility(View.GONE);
+                b.tvBillImageMore.setVisibility(View.GONE);
             }
 
             b.billDivider.setVisibility(isLast ? View.GONE : View.VISIBLE);

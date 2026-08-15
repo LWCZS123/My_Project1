@@ -1,6 +1,7 @@
 package com.example.my_project1.utils;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.util.Log;
 import android.widget.ImageView;
@@ -9,6 +10,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.RequestOptions;
+import com.bumptech.glide.request.FutureTarget;
 import com.example.my_project1.R;
 
 /**
@@ -79,6 +81,109 @@ public class ImageLoaderUtils {
                 .load(url)
                 .apply(options)
                 .into(imageView);
+    }
+
+    /**
+     * 首页账单分类图标。
+     *
+     * 列表重绑时，Glide 的 placeholder 会立即覆盖磁盘缓存中的真实图标，造成
+     * "占位图 -> 真实图标" 的可见闪烁。首次绑定保留布局现有 drawable，复用到
+     * 另一条账单时才切换为默认分类图标，避免短暂显示上一条账单的图标。
+     */
+    public static void loadHomeBillCategoryIcon(Context context, String url, ImageView imageView) {
+        if (context == null || imageView == null) return;
+
+        String normalizedUrl = url == null ? "" : url;
+        Object previousUrl = imageView.getTag(R.id.home_bill_category_icon_url);
+        if (normalizedUrl.equals(previousUrl)) return;
+
+        imageView.setTag(R.id.home_bill_category_icon_url, normalizedUrl);
+        if (previousUrl != null) {
+            imageView.setImageResource(R.drawable.ic_default_category);
+        }
+
+        if (normalizedUrl.isEmpty()) {
+            imageView.setImageResource(R.drawable.ic_default_category);
+            return;
+        }
+
+        int iconSize = dpToPx(context, 44);
+        RequestOptions options = new RequestOptions()
+                .error(R.drawable.ic_default_category)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .skipMemoryCache(false)
+                .priority(Priority.IMMEDIATE)
+                .dontAnimate()
+                .centerInside()
+                .override(iconSize, iconSize);
+
+        Glide.with(imageView)
+                .load(getGlideSource(context, normalizedUrl))
+                .apply(options)
+                .into(imageView);
+    }
+
+    /** 异步预加载首页首屏图标，参数与 ImageView 请求完全一致。 */
+    public static void preloadHomeBillCategoryIcons(Context context, java.util.Collection<String> urls) {
+        if (context == null || urls == null || urls.isEmpty()) return;
+        int iconSize = dpToPx(context, 44);
+        for (String url : firstUniqueUrls(urls, 12)) {
+            Glide.with(context.getApplicationContext())
+                    .load(getGlideSource(context, url))
+                    .apply(new RequestOptions()
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .skipMemoryCache(false)
+                            .priority(Priority.IMMEDIATE)
+                            .dontAnimate()
+                            .centerInside()
+                            .override(iconSize, iconSize))
+                    .preload(iconSize, iconSize);
+        }
+    }
+
+    /**
+     * 启动页后台线程专用：从 Glide 磁盘缓存解码首屏图标到内存缓存。
+     * onlyRetrieveFromCache 保证不会等待网络。
+     */
+    public static void warmHomeBillCategoryIconsFromDisk(Context context,
+                                                          java.util.Collection<String> urls) {
+        if (context == null || urls == null || urls.isEmpty()) return;
+        int iconSize = dpToPx(context, 44);
+        for (String url : firstUniqueUrls(urls, 12)) {
+            FutureTarget<Drawable> target = Glide.with(context.getApplicationContext())
+                    .asDrawable()
+                    .load(getGlideSource(context, url))
+                    .apply(new RequestOptions()
+                            .onlyRetrieveFromCache(true)
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .skipMemoryCache(false)
+                            .priority(Priority.IMMEDIATE)
+                            .dontAnimate()
+                            .centerInside()
+                            .override(iconSize, iconSize))
+                    .submit(iconSize, iconSize);
+            try {
+                target.get();
+            } catch (Exception ignored) {
+                // 未缓存的图标由首页正常的异步请求处理。
+            } finally {
+                Glide.with(context.getApplicationContext()).clear(target);
+            }
+        }
+    }
+
+    private static java.util.Set<String> firstUniqueUrls(java.util.Collection<String> urls, int limit) {
+        java.util.Set<String> result = new java.util.LinkedHashSet<>();
+        for (String url : urls) {
+            if (url == null || url.isEmpty()) continue;
+            result.add(url);
+            if (result.size() == limit) break;
+        }
+        return result;
+    }
+
+    private static int dpToPx(Context context, int dp) {
+        return Math.round(dp * context.getResources().getDisplayMetrics().density);
     }
 
     /**
@@ -284,18 +389,44 @@ public class ImageLoaderUtils {
 
         if (context == null || imageView == null) return;
 
+        int avatarSize = dpToPx(context, 32);
         RequestOptions options = new RequestOptions()
                 .placeholder(R.drawable.ic_default_avatar)
                 .error(R.drawable.ic_default_avatar)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .skipMemoryCache(false)
                 .priority(Priority.HIGH)   // 👈 头像优先级高
-                .centerCrop();
+                .centerCrop()
+                .override(avatarSize, avatarSize);
 
         Glide.with(context.getApplicationContext())
                 .load(url)
                 .apply(options)
                 .into(imageView);
+    }
+
+    /** 启动页后台线程专用：把已缓存头像按首页尺寸恢复到内存缓存。 */
+    public static void warmAvatarFromDisk(Context context, String url) {
+        if (context == null || url == null || url.isEmpty()) return;
+        int avatarSize = dpToPx(context, 32);
+        FutureTarget<Drawable> target = Glide.with(context.getApplicationContext())
+                .asDrawable()
+                .load(url)
+                .apply(new RequestOptions()
+                        .onlyRetrieveFromCache(true)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .skipMemoryCache(false)
+                        .priority(Priority.IMMEDIATE)
+                        .centerCrop()
+                        .override(avatarSize, avatarSize))
+                .submit(avatarSize, avatarSize);
+        try {
+            target.get();
+        } catch (Exception ignored) {
+            // 未缓存头像继续由页面正常加载。
+        } finally {
+            Glide.with(context.getApplicationContext()).clear(target);
+        }
     }
 
 

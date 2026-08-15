@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
@@ -61,11 +62,15 @@ public class SearchViewModel extends AndroidViewModel {
     private boolean isLastPage = false;
     private boolean isLoading = false;
     private final List<Bill> allLoadedBills = new ArrayList<>();
+    private final AtomicInteger searchGeneration = new AtomicInteger(0);
 
     // ==================== LiveData ====================
 
     private final MutableLiveData<List<BillAdapter.BillGroup>> _uiGroups = new MutableLiveData<>();
     public final LiveData<List<BillAdapter.BillGroup>> uiGroups = _uiGroups;
+
+    private final MutableLiveData<List<HomeBillUiModel>> _uiItems = new MutableLiveData<>();
+    public final LiveData<List<HomeBillUiModel>> uiItems = _uiItems;
 
     private final MutableLiveData<SearchSummary> _searchSummary = new MutableLiveData<>();
     public final LiveData<SearchSummary> searchSummary = _searchSummary;
@@ -122,6 +127,7 @@ public class SearchViewModel extends AndroidViewModel {
      */
     public void performSearch() {
         if (currentUserId == null) return;
+        int generation = searchGeneration.incrementAndGet();
 
         String keyword = currentFilter.getKeyword();
         if (keyword != null && !keyword.trim().isEmpty()) {
@@ -131,8 +137,10 @@ public class SearchViewModel extends AndroidViewModel {
         // 1. 重置分页状态
         currentPage = 0;
         isLastPage = false;
+        isLoading = false;
         allLoadedBills.clear();
         _uiGroups.setValue(new ArrayList<>());
+        _uiItems.setValue(new ArrayList<>());
 
         // 2. 先设置 Loading 状态。由于 setValue 在主线程，UI 会立即收到通知。
         _searchState.setValue(ApiResponse.loading());
@@ -148,18 +156,19 @@ public class SearchViewModel extends AndroidViewModel {
             });
 
             // 加载第一页数据
-            loadNextPageInternal();
+            loadNextPageInternal(generation);
         });
     }
 
     public void loadNextPage() {
         if (isLoading || isLastPage || currentUserId == null) return;
-        loadNextPageInternal();
+        loadNextPageInternal(searchGeneration.get());
     }
 
-    private void loadNextPageInternal() {
+    private void loadNextPageInternal(int generation) {
         isLoading = true;
         repository.searchBillsPaged(currentUserId, currentFilter, PAGE_SIZE, currentPage * PAGE_SIZE, response -> {
+            if (generation != searchGeneration.get()) return;
             isLoading = false;
             if (response.isSuccess()) {
                 List<Bill> newBills = response.data;
@@ -174,7 +183,7 @@ public class SearchViewModel extends AndroidViewModel {
                     if (newBills.size() < PAGE_SIZE) isLastPage = true;
 
                     // 后台线程进行 UI Model 映射，不阻塞主线程
-                    processBillsToUiGroups(new ArrayList<>(allLoadedBills));
+                    processBillsToUiItems(new ArrayList<>(allLoadedBills), generation);
                     // 标记为 Success，但 Activity 此时不隐藏 Loading，直到 uiGroups 渲染
                     _searchState.setValue(ApiResponse.success("已加载"));
                 }
@@ -184,10 +193,21 @@ public class SearchViewModel extends AndroidViewModel {
         });
     }
 
-    private void processBillsToUiGroups(List<Bill> bills) {
+    private void processBillsToUiItems(List<Bill> bills, int generation) {
         AppExecutors.get().computation().execute(() -> {
             List<BillAdapter.BillGroup> groups = mapBillsToUiGroups(bills);
-            _uiGroups.postValue(groups);
+            List<HomeBillUiModel> items = new ArrayList<>(bills.size() + groups.size());
+            for (BillAdapter.BillGroup group : groups) {
+                items.add(HomeBillUiModel.header(group.header));
+                for (int i = 0; i < group.bills.size(); i++) {
+                    items.add(HomeBillUiModel.item(group.bills.get(i), i == group.bills.size() - 1));
+                }
+            }
+            handler.post(() -> {
+                if (generation == searchGeneration.get()) {
+                    _uiItems.setValue(items);
+                }
+            });
         });
     }
 

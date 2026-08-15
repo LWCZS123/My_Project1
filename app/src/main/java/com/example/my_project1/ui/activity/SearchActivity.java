@@ -15,6 +15,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.paging.PagingData;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -22,6 +23,7 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.bill.SearchHistory;
 import com.example.my_project1.databinding.ActivitySearchBinding;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
+import com.example.my_project1.ui.adapter.bill.HomeBillAdapter;
 import com.example.my_project1.ui.adapter.search.SearchSummaryAdapter;
 import com.example.my_project1.ui.fragment.SearchFilterBottomSheet;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
@@ -41,7 +43,7 @@ public class SearchActivity extends AppCompatActivity {
 
     private ActivitySearchBinding binding;
     private SearchViewModel viewModel;
-    private BillAdapter billAdapter;
+    private HomeBillAdapter billAdapter;
     private SearchSummaryAdapter summaryAdapter;
 
     @Override
@@ -68,7 +70,7 @@ public class SearchActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        billAdapter = new BillAdapter(this, new BillAdapter.OnBillClickListener() {
+        billAdapter = new HomeBillAdapter(this, new BillAdapter.OnBillClickListener() {
             @Override
             public void onBillClick(long localId, String objectId, View itemView) {
                 openBillDetail(localId, objectId);
@@ -78,8 +80,13 @@ public class SearchActivity extends AppCompatActivity {
             @Override public void onBillEdit(BillUiModel bill) {}
             @Override public void onBillRefund(BillUiModel bill) {}
         }, true);
-        binding.rvBills.setLayoutManager(new LinearLayoutManager(this));
+        LinearLayoutManager billLayoutManager = new LinearLayoutManager(this);
+        billLayoutManager.setInitialPrefetchItemCount(8);
+        binding.rvBills.setLayoutManager(billLayoutManager);
         binding.rvBills.setAdapter(billAdapter);
+        binding.rvBills.setHasFixedSize(true);
+        binding.rvBills.setItemViewCacheSize(16);
+        binding.rvBills.setItemAnimator(null);
 
         // 分页加载监听
         binding.rvBills.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -141,10 +148,11 @@ public class SearchActivity extends AppCompatActivity {
         viewModel.suggestions.observe(this, this::updateSuggestionChips);
         
         // 观察 UI 分组后的列表
-        viewModel.uiGroups.observe(this, groups -> {
-            billAdapter.submitList(groups); // 始终提交，允许清空
+        viewModel.uiItems.observe(this, items -> {
+            billAdapter.submitData(getLifecycle(), PagingData.from(
+                    items != null ? items : java.util.Collections.emptyList()));
             
-            if (groups != null && !groups.isEmpty()) {
+            if (items != null && !items.isEmpty()) {
                 binding.layoutResults.setVisibility(View.VISIBLE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
                 binding.layoutEmpty.setVisibility(View.GONE);
@@ -177,8 +185,7 @@ public class SearchActivity extends AppCompatActivity {
                 binding.layoutLoading.setVisibility(View.GONE);
             }
             // 重要：isSuccess 状态不在这里隐藏 Loading！
-            // 搜索大量数据时，isSuccess 表示数据加载回来了，但 UI 转换（mapBillsToUiGroups）可能还在后台进行。
-            // 我们在 uiGroups 观察者中，等数据真正渲染到列表后再隐藏 Loading。
+            // 搜索大量数据时，等待扁平化 UI 列表真正提交后再隐藏 Loading。
         });
     }
 

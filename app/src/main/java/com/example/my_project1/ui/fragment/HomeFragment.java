@@ -31,7 +31,6 @@ import com.example.my_project1.ui.adapter.bill.HeaderAdapter;
 import com.example.my_project1.ui.adapter.bill.HomeBillAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
-import com.example.my_project1.ui.viewmodel.billvm.PagingState;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
@@ -46,15 +45,13 @@ import io.reactivex.annotations.Nullable;
  * -------------------------------------------------------
  * ✅ 布局改为 SwipeRefreshLayout + RecyclerView，彻底去除 NestedScrollView
  * ✅ ConcatAdapter 组合三段 Adapter：Header / Bill / Footer
- * ✅ 上拉预加载：距底部 5 条时提前触发 loadMore()
+ * ✅ Paging 3 自动按需加载账单页
  * ✅ 下拉刷新：重置页码并重新拉取
  * ✅ onBindViewHolder 只做 setText，计算全在 ViewModel 后台线程完成
  */
 public class HomeFragment extends Fragment {
 
     private static final String TAG            = "HomeFragment";
-    private static final int    PREFETCH_OFFSET = 5; // 距底部 N 条时预加载
-
     // ── 视图绑定 ─────────────────────────────────────
     private FragmentHomeBinding binding;
 
@@ -108,10 +105,9 @@ public class HomeFragment extends Fragment {
         setupClickListeners();
         loadUserAvatar();
 
-        if (!isDataObserved) {
-            observeData();
-            isDataObserved = true;
-        }
+        // 每个新 ViewLifecycleOwner 都需要重新订阅；旧观察者会随旧 View 自动移除。
+        observeData();
+        isDataObserved = true;
 
         billViewModel.checkAndAutoSync();
     }
@@ -146,6 +142,7 @@ public class HomeFragment extends Fragment {
         // 避免 RecyclerView 滚动监听在 View 销毁后回调
         if (binding != null) binding.rvBills.clearOnScrollListeners();
         binding = null;
+        isDataObserved = false;
     }
 
     // ════════════════════════════════════════════════════
@@ -187,14 +184,14 @@ public class HomeFragment extends Fragment {
         });
 
         footerAdapter = new FooterAdapter();
-        footerAdapter.setRetryClickListener(() -> billViewModel.retryLoad());
+        footerAdapter.setRetryClickListener(() -> billAdapter.retry());
 
         // ── ConcatAdapter 组合 ────────────────────────
         ConcatAdapter.Config config = new ConcatAdapter.Config.Builder()
                 .setIsolateViewTypes(true)   // 允许三个子 Adapter 共用 ViewHolder 类型，提升复用率
                 .build();
         ConcatAdapter concatAdapter = new ConcatAdapter(config,
-                headerAdapter, billAdapter, footerAdapter);
+                headerAdapter, billAdapter.withLoadStateFooter(footerAdapter));
 
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext());
@@ -205,22 +202,6 @@ public class HomeFragment extends Fragment {
         binding.rvBills.setHasFixedSize(false); // Header 高度固定，但Footer变化，设为 false
         binding.rvBills.setItemViewCacheSize(30);
 
-        // ── 上拉预加载监听 ────────────────────────────
-        binding.rvBills.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-                if (dy <= 0) return; // 只在向下滑动时检测
-
-                int totalItemCount  = layoutManager.getItemCount();
-                int lastVisibleItem = layoutManager.findLastVisibleItemPosition();
-
-                // 距底部还剩 PREFETCH_OFFSET 条时预加载
-                if (totalItemCount > 0
-                        && lastVisibleItem >= totalItemCount - PREFETCH_OFFSET - 1) {
-                    billViewModel.loadMore();
-                }
-            }
-        });
     }
 
     // ════════════════════════════════════════════════════
@@ -262,10 +243,10 @@ public class HomeFragment extends Fragment {
     // ════════════════════════════════════════════════════
 
     private void observeData() {
-        // ── 1. 账单列表（已预处理为 UiModel 混合列表）──
-        billViewModel.billItems.observe(getViewLifecycleOwner(), items -> {
-            if (items != null) {
-                billAdapter.submitList(items);        // AsyncListDiffer 后台计算 diff，丝滑刷新
+        // ── 1. 首页账单（Paging 3 根据滚动位置自动追加）──
+        billViewModel.homeBillPagingData.observe(getViewLifecycleOwner(), pagingData -> {
+            if (pagingData != null) {
+                billAdapter.submitData(getViewLifecycleOwner().getLifecycle(), pagingData);
             }
             binding.swipeRefreshLayout.setRefreshing(false);
         });
@@ -276,35 +257,21 @@ public class HomeFragment extends Fragment {
             headerAdapter.setHeader(header);
         });
 
-        // ── 3. 分页 Footer 状态 ────────────────────────
-        billViewModel.pagingState.observe(getViewLifecycleOwner(), state -> {
-            if (state == null) return;
-            
-            // 🚀 修复：避免在滚动回调中直接修改 Adapter（防止 IllegalStateException）
-            binding.rvBills.post(() -> {
-                if (footerAdapter != null) {
-                    footerAdapter.setState(state);
-                }
-                // 加载完成时停止下拉刷新动画
-                if (state != PagingState.LOADING) {
-                    binding.swipeRefreshLayout.setRefreshing(false);
-                }
-            });
-        });
-
-        // ── 4. 同步状态 ────────────────────────────────
+        // ── 3. 同步状态 ────────────────────────────────
         billViewModel.syncState.observe(getViewLifecycleOwner(), state -> {
             if (state == null) return;
             if (state.isSuccess() && state.data != null) {
+                binding.swipeRefreshLayout.setRefreshing(false);
                 String msg = String.format("同步完成: 新增%d, 更新%d, 删除%d",
                         state.data.newCount, state.data.updateCount, state.data.deleteCount);
                 showSnackbar(msg);
             } else if (state.isError()) {
+                binding.swipeRefreshLayout.setRefreshing(false);
                 showSnackbar("同步失败: " + state.message);
             }
         });
 
-        // ── 5. Toast 消息 ──────────────────────────────
+        // ── 4. Toast 消息 ──────────────────────────────
 
     }
 

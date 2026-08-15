@@ -223,7 +223,7 @@ public class BmobBudgetApiImpl {
 
         BmobQuery<CloudBudget> query = new BmobQuery<>();
         query.addWhereEqualTo("ownerId", user);
-        query.setLimit(500);
+        query.setLimit(100);
         query.findObjects(listener);
     }
 
@@ -239,7 +239,7 @@ public class BmobBudgetApiImpl {
 
         BmobQuery<CloudBudget> query = new BmobQuery<>();
         query.addWhereEqualTo("ownerId", user);
-        query.setLimit(500);
+        query.setLimit(100);
         return query.findObjectsSync(CloudBudget.class);
     }
 

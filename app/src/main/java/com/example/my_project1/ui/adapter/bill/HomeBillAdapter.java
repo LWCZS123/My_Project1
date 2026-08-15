@@ -8,8 +8,8 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.paging.PagingDataAdapter;
 import androidx.recyclerview.widget.DiffUtil;
-import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -25,12 +25,17 @@ import java.util.Objects;
  * HomeBillAdapter - 首页扁平化账单适配器
  * 🚀 彻底消除嵌套 RecyclerView，实现高性能滚动
  */
-public class HomeBillAdapter extends ListAdapter<HomeBillUiModel, RecyclerView.ViewHolder> {
+public class HomeBillAdapter extends PagingDataAdapter<HomeBillUiModel, RecyclerView.ViewHolder> {
 
     private final Context context;
     private final BillAdapter.OnBillClickListener listener;
+    private final boolean isSearchMode;
 
     public HomeBillAdapter(Context context, BillAdapter.OnBillClickListener listener) {
+        this(context, listener, false);
+    }
+
+    public HomeBillAdapter(Context context, BillAdapter.OnBillClickListener listener, boolean isSearchMode) {
         super(new DiffUtil.ItemCallback<HomeBillUiModel>() {
             @Override
             public boolean areItemsTheSame(@NonNull HomeBillUiModel oldItem, @NonNull HomeBillUiModel newItem) {
@@ -49,11 +54,13 @@ public class HomeBillAdapter extends ListAdapter<HomeBillUiModel, RecyclerView.V
         });
         this.context = context;
         this.listener = listener;
+        this.isSearchMode = isSearchMode;
     }
 
     @Override
     public int getItemViewType(int position) {
-        return getItem(position).type;
+        HomeBillUiModel item = getItem(position);
+        return item != null ? item.type : HomeBillUiModel.TYPE_BILL_ITEM;
     }
 
     @NonNull
@@ -76,6 +83,9 @@ public class HomeBillAdapter extends ListAdapter<HomeBillUiModel, RecyclerView.V
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         HomeBillUiModel item = getItem(position);
+        if (item == null) {
+            return;
+        }
         if (holder instanceof HeaderVH) {
             ((HeaderVH) holder).bind(item);
         } else if (holder instanceof BillVH) {
@@ -170,7 +180,7 @@ public class HomeBillAdapter extends ListAdapter<HomeBillUiModel, RecyclerView.V
                 b.tvToAccount.setVisibility(View.GONE);
             }
 
-            ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, b.ivCategoryIcon);
+            ImageLoaderUtils.loadHomeBillCategoryIcon(context, bill.categoryIconUrl, b.ivCategoryIcon);
 
             // 背景色
             if (bill.categoryIconBackgroundColor != null && !bill.categoryIconBackgroundColor.isEmpty()) {
@@ -206,8 +216,19 @@ public class HomeBillAdapter extends ListAdapter<HomeBillUiModel, RecyclerView.V
                     ImageLoaderUtils.loadThumbnail(context, bill.imageUrls.get(2), b.ivBillImage3);
                     b.ivBillImage3.setOnClickListener(v -> { if (listener != null) listener.onPhotoClick(bill.imageUrls.get(2), 2); });
                 } else b.ivBillImage3.setVisibility(View.GONE);
+
+                if (size > 3) {
+                    b.tvBillImageMore.setVisibility(View.VISIBLE);
+                    b.tvBillImageMore.setText("+" + (size - 3));
+                    b.tvBillImageMore.setOnClickListener(v -> {
+                        if (listener != null) listener.onBillClick(bill.localId, bill.objectId, b.getRoot());
+                    });
+                } else {
+                    b.tvBillImageMore.setVisibility(View.GONE);
+                }
             } else {
                 b.llBillImages.setVisibility(View.GONE);
+                b.tvBillImageMore.setVisibility(View.GONE);
             }
 
             b.contentView.setOnClickListener(v -> {

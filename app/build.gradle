@@ -102,8 +102,11 @@ dependencies {
 
 
 
-    //implementation "androidx.lifecycle:lifecycle-viewmodel:2.6.1"
-    //implementation "androidx.lifecycle:lifecycle-livedata:2.6.1"
+    // Keep Lifecycle artifacts on one release line. Older transitive KTX versions
+    // contain classes that were moved into lifecycle-viewmodel in newer releases.
+    implementation "androidx.lifecycle:lifecycle-viewmodel:2.5.1"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1"
+    implementation "androidx.lifecycle:lifecycle-livedata:2.5.1"
     //room数据库
     implementation 'androidx.room:room-runtime:2.2.5'
     annotationProcessor 'androidx.room:room-compiler:2.2.5'
@@ -112,6 +115,7 @@ dependencies {
     annotationProcessor "com.github.bumptech.glide:compiler:4.15.1"
     // AndroidX WorkManager
     implementation "androidx.work:work-runtime:2.7.1"
+    implementation "androidx.paging:paging-runtime:3.1.1"
 
     //进度条
     implementation 'com.github.lzyzsd:circleprogress:1.2.4'

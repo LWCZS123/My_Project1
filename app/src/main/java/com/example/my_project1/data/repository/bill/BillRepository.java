@@ -792,6 +792,15 @@ public class BillRepository {
         return billDao.getBillsInTimeRange(userId, start, end);
     }
 
+    /** Synchronous page query for PagingSource.load, which is never run on the UI thread. */
+    public List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset) {
+        return billDao.getBillsInTimeRangePaged(userId, start, end, limit, offset);
+    }
+
+    public List<Bill> getBillsInTimeRangeSync(String userId, Date start, Date end) {
+        return billDao.getBillsInTimeRangeSync(userId, start, end);
+    }
+
     /**
      * 按账本查询账单
      */
@@ -834,83 +843,78 @@ public class BillRepository {
      */
     public void syncFromCloud(String userId, ApiResponse.Callback<SyncResult> callback) {
         Log.d(TAG, "========== 强制云端同步开始 ==========");
+        executors.networkIO().execute(() -> fetchCloudBillPage(userId, 0, new ArrayList<>(), callback));
+    }
 
-        executors.networkIO().execute(() -> {
-            // 1. 获取云端最新数据（关键：NETWORK_ONLY 绕过 Bmob 本地磁盘缓存）
-            cn.bmob.v3.BmobQuery<CloudBill> query = new cn.bmob.v3.BmobQuery<>();
-            // 匹配当前用户
-            query.addWhereEqualTo("user", cn.bmob.v3.BmobUser.getCurrentUser());
-            query.setCachePolicy(cn.bmob.v3.BmobQuery.CachePolicy.NETWORK_ONLY);
-            query.setLimit(500); // 确保拉取量足够
+    private void fetchCloudBillPage(String userId, int skip, List<CloudBill> allBills,
+                                    ApiResponse.Callback<SyncResult> callback) {
+        cn.bmob.v3.BmobQuery<CloudBill> query = new cn.bmob.v3.BmobQuery<>();
+        query.addWhereEqualTo("user", cn.bmob.v3.BmobUser.getCurrentUser());
+        query.setCachePolicy(cn.bmob.v3.BmobQuery.CachePolicy.NETWORK_ONLY);
+        query.order("createdAt");
+        query.setLimit(100);
+        query.setSkip(skip);
 
-            query.findObjects(new cn.bmob.v3.listener.FindListener<CloudBill>() {
-                @Override
-                public void done(List<CloudBill> cloudBills, cn.bmob.v3.exception.BmobException e) {
-                    if (e != null) {
-                        Log.e(TAG, "❌ 拉取云端失败: " + e.getMessage());
-                        executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e.getMessage())));
-                        return;
+        query.findObjects(new cn.bmob.v3.listener.FindListener<CloudBill>() {
+            @Override
+            public void done(List<CloudBill> page, cn.bmob.v3.exception.BmobException e) {
+                if (e != null) {
+                    Log.e(TAG, "❌ 拉取云端失败: " + e.getMessage());
+                    executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e.getMessage())));
+                    return;
+                }
+
+                if (page != null) allBills.addAll(page);
+                if (page != null && page.size() == 100) {
+                    fetchCloudBillPage(userId, skip + page.size(), allBills, callback);
+                    return;
+                }
+                applyCloudBills(userId, allBills, callback);
+            }
+        });
+    }
+
+    private void applyCloudBills(String userId, List<CloudBill> cloudBills,
+                                 ApiResponse.Callback<SyncResult> callback) {
+        executors.diskIO().execute(() -> {
+            try {
+                List<Bill> localBills = billDao.getAllBillsByUserSync(userId);
+                Map<String, Bill> localMap = new HashMap<>();
+                for (Bill bill : localBills) {
+                    if (bill.getObjectId() != null) localMap.put(bill.getObjectId(), bill);
+                }
+
+                int newCount = 0;
+                int updateCount = 0;
+                List<Bill> toUpsert = new ArrayList<>();
+                for (CloudBill cloud : cloudBills) {
+                    Bill cloudEntity = cloud.toLocalEntity();
+                    Bill local = localMap.get(cloud.getObjectId());
+                    if (local == null) {
+                        cloudEntity.setSyncState(SyncState.SYNCED);
+                        toUpsert.add(cloudEntity);
+                        newCount++;
+                        continue;
                     }
 
-                    executors.diskIO().execute(() -> {
-                        try {
-                            // 2. 获取本地数据库中所有该用户的账单
-                            List<Bill> localBills = billDao.getAllBillsByUserSync(userId);
-                            Map<String, Bill> localMap = new HashMap<>();
-                            for (Bill b : localBills) {
-                                if (b.getObjectId() != null) localMap.put(b.getObjectId(), b);
-                            }
-
-                            int newCount = 0;
-                            int updateCount = 0;
-                            List<Bill> toUpsert = new ArrayList<>();
-
-                            // 3. 遍历云端数据，利用你提供的 CloudBill.toLocalEntity() 转换
-                            for (CloudBill cloud : cloudBills) {
-                                Bill cloudEntity = cloud.toLocalEntity(); // 🔴 使用你的转换逻辑
-                                Bill local = localMap.get(cloud.getObjectId());
-
-                                if (local == null) {
-                                    // 本地完全没有 -> 插入
-                                    cloudEntity.setSyncState(SyncState.SYNCED);
-                                    toUpsert.add(cloudEntity);
-                                    newCount++;
-                                } else {
-                                    // 本地有 -> 对比 updatedAt 判断是否需要更新
-                                    // 注意：BmobObject 的 getUpdatedAt() 返回字符串，需转为 Date 对比
-                                    Date cloudTime = DateConvertUtil.safeConvertToDate(cloud.getUpdatedAt());
-                                    Date localTime = local.getUpdatedAt();
-
-                                    if (localTime == null || (cloudTime != null && cloudTime.after(localTime))) {
-                                        // 云端比本地新 -> 覆盖更新本地
-                                        cloudEntity.setId(local.getId()); // 保持本地自增ID一致
-                                        cloudEntity.setSyncState(SyncState.SYNCED);
-                                        toUpsert.add(cloudEntity);
-                                        updateCount++;
-                                    }
-                                }
-                            }
-
-                            // 4. 执行本地数据库写入
-                            if (!toUpsert.isEmpty()) {
-                                // 使用 REPLACE 策略的 insert 或 update
-                                billDao.insertBills(toUpsert);
-                            }
-
-                            Log.i(TAG, "✅ 同步结果: 新增 " + newCount + ", 更新 " + updateCount);
-
-                            SyncResult result = new SyncResult(newCount, updateCount, 0);
-                            executors.mainThread().execute(() -> {
-                                callback.onComplete(ApiResponse.success(result, "同步成功"));
-                            });
-
-                        } catch (Exception ex) {
-                            Log.e(TAG, "❌ 同步处理异常", ex);
-                            executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(ex)));
-                        }
-                    });
+                    Date cloudTime = DateConvertUtil.safeConvertToDate(cloud.getUpdatedAt());
+                    Date localTime = local.getUpdatedAt();
+                    if (localTime == null || (cloudTime != null && cloudTime.after(localTime))) {
+                        cloudEntity.setId(local.getId());
+                        cloudEntity.setSyncState(SyncState.SYNCED);
+                        toUpsert.add(cloudEntity);
+                        updateCount++;
+                    }
                 }
-            });
+
+                if (!toUpsert.isEmpty()) billDao.insertBills(toUpsert);
+                Log.i(TAG, "✅ 同步结果: 新增 " + newCount + ", 更新 " + updateCount);
+                SyncResult result = new SyncResult(newCount, updateCount, 0);
+                executors.mainThread().execute(() -> callback.onComplete(ApiResponse.success(result, "同步成功")));
+            } catch (Exception ex) {
+                Log.e(TAG, "❌ 同步处理异常", ex);
+                executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(ex)));
+            }
         });
     }
 

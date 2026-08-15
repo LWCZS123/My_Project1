@@ -68,6 +68,13 @@ public interface BillDao {
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsInTimeRange(String userId, Date start, Date end);
 
+    /** Homepage paging query with a stable tie-breaker for equal timestamps. */
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC LIMIT :limit OFFSET :offset")
+    List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset);
+
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
+    List<Bill> getBillsInTimeRangeSync(String userId, Date start, Date end);
+
     /** 🔥 按账本和用户查询账单 - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND book_id = :bookId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsByBook(String userId, String bookId);
