@@ -14,11 +14,14 @@ import java.util.Locale;
 
 public class CustomMonthView extends MonthView {
 
+    private static final String[] DAY_TEXT = createDayText();
+
     private final Paint mIncomePaint = new Paint();
     private final Paint mExpensePaint = new Paint();
     private final Paint mHeatMapPaint = new Paint();
     private final Paint mHolidayPaint = new Paint();
     private final Paint mTagPaint = new Paint();
+    private final RectF mDrawRect = new RectF();
     
     // 缓存尺寸，避免 onDraw 中重复计算
     private final int mPadding;
@@ -74,8 +77,8 @@ public class CustomMonthView extends MonthView {
     @Override
     protected boolean onDrawSelected(Canvas canvas, Calendar calendar, int x, int y, boolean hasScheme) {
         mSelectedPaint.setStyle(Paint.Style.FILL);
-        RectF rectF = new RectF(x + mPadding, y + mPadding, x + mItemWidth - mPadding, y + mItemHeight - mPadding);
-        canvas.drawRoundRect(rectF, mRoundRadius, mRoundRadius, mSelectedPaint);
+        mDrawRect.set(x + mPadding, y + mPadding, x + mItemWidth - mPadding, y + mItemHeight - mPadding);
+        canvas.drawRoundRect(mDrawRect, mRoundRadius, mRoundRadius, mSelectedPaint);
         return true;
     }
 
@@ -87,11 +90,11 @@ public class CustomMonthView extends MonthView {
         DailyStat stat = getDailyStat(calendar);
         if (stat == null) return;
 
-        RectF rectF = new RectF(x + mPadding, y + mPadding, x + mItemWidth - mPadding, y + mItemHeight - mPadding);
+        mDrawRect.set(x + mPadding, y + mPadding, x + mItemWidth - mPadding, y + mItemHeight - mPadding);
 
         // 1. 节假日背景
         if (stat.isHoliday) {
-            canvas.drawRoundRect(rectF, mRoundRadius, mRoundRadius, mHolidayPaint);
+            canvas.drawRoundRect(mDrawRect, mRoundRadius, mRoundRadius, mHolidayPaint);
         }
 
         // 2. 热力图背景 (仅在有金额或账单时绘制)
@@ -106,7 +109,7 @@ public class CustomMonthView extends MonthView {
                 int alpha = (int) Math.min(60 + (stat.expense / 500.0) * 120, 200);
                 mHeatMapPaint.setAlpha(alpha);
             }
-            canvas.drawRoundRect(rectF, mRoundRadius, mRoundRadius, mHeatMapPaint);
+            canvas.drawRoundRect(mDrawRect, mRoundRadius, mRoundRadius, mHeatMapPaint);
         }
 
         // 3. 绘制 "休" 或 "班" 标签
@@ -120,17 +123,17 @@ public class CustomMonthView extends MonthView {
         float baseLine = y + mItemHeight - mCapsuleOffset2;
 
         if (stat.income > 0 && stat.expense > 0) {
-            canvas.drawText(formatAmt(stat.income), cx, baseLine - mCapsuleOffset1, mIncomePaint);
-            canvas.drawText(formatAmt(stat.expense), cx, baseLine, mExpensePaint);
+            canvas.drawText(amountText(stat.incomeText, stat.income), cx, baseLine - mCapsuleOffset1, mIncomePaint);
+            canvas.drawText(amountText(stat.expenseText, stat.expense), cx, baseLine, mExpensePaint);
         } else if (stat.income > 0) {
-            canvas.drawText(formatAmt(stat.income), cx, baseLine, mIncomePaint);
+            canvas.drawText(amountText(stat.incomeText, stat.income), cx, baseLine, mIncomePaint);
         } else if (stat.expense > 0) {
-            canvas.drawText(formatAmt(stat.expense), cx, baseLine, mExpensePaint);
+            canvas.drawText(amountText(stat.expenseText, stat.expense), cx, baseLine, mExpensePaint);
         }
     }
 
-    // 优化：使用简单的逻辑代替复杂的 String.format
-    private String formatAmt(double amt) {
+    private String amountText(String cached, double amt) {
+        if (cached != null) return cached;
         if (amt >= 10000) return (int)(amt / 1000) + "k";
         return String.valueOf((int)amt);
     }
@@ -144,12 +147,12 @@ public class CustomMonthView extends MonthView {
         boolean hasBills = stat != null && (stat.income > 0 || stat.expense > 0 || stat.count > 0);
 
         if (isSelected) {
-            canvas.drawText(String.valueOf(calendar.getDay()), cx, mTextBaseLine + top, mSelectTextPaint);
+            canvas.drawText(DAY_TEXT[calendar.getDay()], cx, mTextBaseLine + top, mSelectTextPaint);
             if (!hasBills) {
                 canvas.drawText(calendar.getLunar(), cx, mTextBaseLine + y + mItemHeight / 10f, mSelectedLunarTextPaint);
             }
         } else {
-            canvas.drawText(String.valueOf(calendar.getDay()), cx, mTextBaseLine + top,
+            canvas.drawText(DAY_TEXT[calendar.getDay()], cx, mTextBaseLine + top,
                     calendar.isCurrentMonth() ? mCurMonthTextPaint : mOtherMonthTextPaint);
             if (!hasBills) {
                 canvas.drawText(calendar.getLunar(), cx, mTextBaseLine + y + mItemHeight / 10f,
@@ -168,5 +171,11 @@ public class CustomMonthView extends MonthView {
     private static int dipToPx(Context context, float dpValue) {
         final float scale = context.getResources().getDisplayMetrics().density;
         return (int) (dpValue * scale + 0.5f);
+    }
+
+    private static String[] createDayText() {
+        String[] result = new String[32];
+        for (int day = 1; day < result.length; day++) result[day] = String.valueOf(day);
+        return result;
     }
 }

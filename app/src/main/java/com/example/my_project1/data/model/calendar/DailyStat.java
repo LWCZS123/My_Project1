@@ -10,6 +10,10 @@ public class DailyStat implements Serializable {
     public int count;
     public boolean isHoliday;
     public String dayTag; // "休" or "班"
+    public transient String incomeText;
+    public transient String expenseText;
+    public transient String signedIncomeText;
+    public transient String signedExpenseText;
 
     public DailyStat(double income, double expense, int count) {
         this.income = income;

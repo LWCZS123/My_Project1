@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ConcurrentHashMap;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
@@ -72,7 +73,7 @@ public class BillViewModel extends AndroidViewModel {
     private final Gson gson = new Gson();
 
     // 🔴 性能优化相关
-    private final Map<String, BillUiModel> billUiCache = new HashMap<>();
+    private final Map<String, BillUiModel> billUiCache = new ConcurrentHashMap<>();
     private final Map<String, BillAdapter.DateHeader> headerCache = new HashMap<>();
     private String lastHomeFingerprint = "";
     private String lastCalendarFingerprint = "";
@@ -158,7 +159,7 @@ public class BillViewModel extends AndroidViewModel {
     public final LiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> dailyStatsMap = _dailyStatsMap;
 
     /** ✅ 新增：选中日期的账单列表（取代全量分组映射） */
-    private final MutableLiveData<Date> _selectedDate = new MutableLiveData<>();
+    private final MutableLiveData<Date> _selectedDate = new MutableLiveData<>(new Date());
     public LiveData<List<Bill>> selectedDateBills;
 
     // ── 同步节流 ──────────────────────────────────────
@@ -355,6 +356,16 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     public void setSelectedDate(int year, int month, int day) {
+        Date current = _selectedDate.getValue();
+        if (current != null) {
+            Calendar selected = Calendar.getInstance();
+            selected.setTime(current);
+            if (selected.get(Calendar.YEAR) == year
+                    && selected.get(Calendar.MONTH) == month - 1
+                    && selected.get(Calendar.DAY_OF_MONTH) == day) {
+                return;
+            }
+        }
         Calendar cal = Calendar.getInstance();
         cal.set(year, month - 1, day);
         _selectedDate.setValue(cal.getTime());
@@ -513,6 +524,9 @@ public class BillViewModel extends AndroidViewModel {
     public List<BillUiModel> mapBillsToUiModels(List<Bill> bills) {
         if (bills == null || bills.isEmpty()) return new ArrayList<>();
 
+        DecimalFormat amountFormatter = new DecimalFormat("#,##0.00");
+        SimpleDateFormat timeFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
+
         List<Account> accounts = allAccountsLive.getValue();
         Map<String, Account> accountMap = new HashMap<>();
         if (accounts != null) {
@@ -550,7 +564,7 @@ public class BillViewModel extends AndroidViewModel {
                 categoryIcon = uri.toString();
             }
 
-            String amountText = prefix + AMT_FMT.format(bill.getAmount());
+            String amountText = prefix + amountFormatter.format(bill.getAmount());
 
             Account account = accountMap.get(bill.getAccountId());
             Account toAccount = (billType == 2 || billType == 3) ? accountMap.get(bill.getToAccountId()) : null;
@@ -558,7 +572,7 @@ public class BillViewModel extends AndroidViewModel {
             BillUiModel newModel = BillUiModel.builder()
                     .localId(bill.getId())
                     .objectId(bill.getObjectId())
-                    .timeText(TIME_FMT.format(bill.getBillTime()))
+                    .timeText(timeFormatter.format(bill.getBillTime()))
                     .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
                     .categoryIconUrl(categoryIcon)
                     .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())

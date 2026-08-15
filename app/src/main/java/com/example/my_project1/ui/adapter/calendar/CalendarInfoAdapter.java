@@ -22,8 +22,13 @@ public class CalendarInfoAdapter extends RecyclerView.Adapter<CalendarInfoAdapte
     private Calendar mCalendar;
 
     public void updateDate(Calendar calendar) {
+        boolean hadItem = mCalendar != null;
         this.mCalendar = calendar;
-        notifyDataSetChanged();
+        if (hadItem) {
+            notifyItemChanged(0);
+        } else if (calendar != null) {
+            notifyItemInserted(0);
+        }
     }
 
     @NonNull

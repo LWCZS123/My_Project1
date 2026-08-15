@@ -10,16 +10,23 @@ import com.haibin.calendarview.Calendar;
 import com.haibin.calendarview.WeekView;
 
 import java.util.List;
-import java.util.Locale;
 
 public class CustomWeekView extends WeekView {
+
+    private static final String[] DAY_TEXT = createDayText();
 
     private final Paint mIncomePaint = new Paint();
     private final Paint mExpensePaint = new Paint();
     private final Paint mHeatMapPaint = new Paint();
     private final Paint mHolidayPaint = new Paint();
     private final Paint mTagPaint = new Paint();
+    private final RectF mDrawRect = new RectF();
     private final int mPadding;
+    private final float mRoundRadius;
+    private final float mTagMarginRight;
+    private final float mTagMarginTop;
+    private final float mAmountBaselineOffset;
+    private final float mDualAmountOffset;
 
     public CustomWeekView(Context context) {
         super(context);
@@ -45,6 +52,14 @@ public class CustomWeekView extends WeekView {
         mTagPaint.setFakeBoldText(true);
 
         mPadding = dipToPx(getContext(), 3);
+        mRoundRadius = dipToPx(getContext(), 8);
+        mTagMarginRight = dipToPx(getContext(), 10);
+        mTagMarginTop = dipToPx(getContext(), 11);
+        mAmountBaselineOffset = dipToPx(getContext(), 6);
+        mDualAmountOffset = dipToPx(getContext(), 11);
+        float amountTextSize = dipToPx(getContext(), 9);
+        mIncomePaint.setTextSize(amountTextSize);
+        mExpensePaint.setTextSize(amountTextSize);
 
         // 加深农历字体
         mCurMonthLunarTextPaint.setColor(0xFF666666);
@@ -55,8 +70,8 @@ public class CustomWeekView extends WeekView {
     @Override
     protected boolean onDrawSelected(Canvas canvas, Calendar calendar, int x, boolean hasScheme) {
         mSelectedPaint.setStyle(Paint.Style.FILL);
-        RectF rectF = new RectF(x + mPadding, mPadding, x + mItemWidth - mPadding, mItemHeight - mPadding);
-        canvas.drawRoundRect(rectF, dipToPx(getContext(), 8), dipToPx(getContext(), 8), mSelectedPaint);
+        mDrawRect.set(x + mPadding, mPadding, x + mItemWidth - mPadding, mItemHeight - mPadding);
+        canvas.drawRoundRect(mDrawRect, mRoundRadius, mRoundRadius, mSelectedPaint);
         return true;
     }
 
@@ -65,10 +80,10 @@ public class CustomWeekView extends WeekView {
         DailyStat stat = getDailyStat(calendar);
         if (stat == null) return;
 
-        RectF rectF = new RectF(x + mPadding, mPadding, x + mItemWidth - mPadding, mItemHeight - mPadding);
+        mDrawRect.set(x + mPadding, mPadding, x + mItemWidth - mPadding, mItemHeight - mPadding);
 
         if (stat.isHoliday) {
-            canvas.drawRoundRect(rectF, dipToPx(getContext(), 8), dipToPx(getContext(), 8), mHolidayPaint);
+            canvas.drawRoundRect(mDrawRect, mRoundRadius, mRoundRadius, mHolidayPaint);
         }
 
         double net = stat.income - stat.expense;
@@ -82,7 +97,7 @@ public class CustomWeekView extends WeekView {
                 int alpha = (int) Math.min(60 + (stat.expense / 500.0) * 120, 200);
                 mHeatMapPaint.setAlpha(alpha);
             }
-            canvas.drawRoundRect(rectF, dipToPx(getContext(), 8), dipToPx(getContext(), 8), mHeatMapPaint);
+            canvas.drawRoundRect(mDrawRect, mRoundRadius, mRoundRadius, mHeatMapPaint);
         }
 
         if (stat.dayTag != null) {
@@ -91,28 +106,26 @@ public class CustomWeekView extends WeekView {
             } else {
                 mTagPaint.setColor(0xFFFF5252);
             }
-            canvas.drawText(stat.dayTag, x + mItemWidth - dipToPx(getContext(), 10), dipToPx(getContext(), 11), mTagPaint);
+            canvas.drawText(stat.dayTag, x + mItemWidth - mTagMarginRight, mTagMarginTop, mTagPaint);
         }
 
         float cx = x + mItemWidth / 2f;
-        float baseLine = mItemHeight - dipToPx(getContext(), 6);
-
-        mIncomePaint.setTextSize(dipToPx(getContext(), 9));
-        mExpensePaint.setTextSize(dipToPx(getContext(), 9));
+        float baseLine = mItemHeight - mAmountBaselineOffset;
 
         if (stat.income > 0 && stat.expense > 0) {
-            canvas.drawText("+" + formatAmt(stat.income), cx, baseLine - dipToPx(getContext(), 11), mIncomePaint);
-            canvas.drawText("-" + formatAmt(stat.expense), cx, baseLine, mExpensePaint);
+            canvas.drawText(amountText(stat.signedIncomeText, "+", stat.income), cx, baseLine - mDualAmountOffset, mIncomePaint);
+            canvas.drawText(amountText(stat.signedExpenseText, "-", stat.expense), cx, baseLine, mExpensePaint);
         } else if (stat.income > 0) {
-            canvas.drawText("+" + formatAmt(stat.income), cx, baseLine, mIncomePaint);
+            canvas.drawText(amountText(stat.signedIncomeText, "+", stat.income), cx, baseLine, mIncomePaint);
         } else if (stat.expense > 0) {
-            canvas.drawText("-" + formatAmt(stat.expense), cx, baseLine, mExpensePaint);
+            canvas.drawText(amountText(stat.signedExpenseText, "-", stat.expense), cx, baseLine, mExpensePaint);
         }
     }
 
-    private String formatAmt(double amt) {
-        if (amt >= 10000) return String.format(Locale.getDefault(), "%.1fk", amt / 1000.0);
-        return String.format(Locale.getDefault(), "%.0f", amt);
+    private String amountText(String cached, String prefix, double amt) {
+        if (cached != null) return cached;
+        if (amt >= 10000) return prefix + (int) (amt / 1000) + "k";
+        return prefix + (int) amt;
     }
 
     @Override
@@ -124,12 +137,12 @@ public class CustomWeekView extends WeekView {
         boolean reallyHasBills = stat != null && (stat.income > 0 || stat.expense > 0 || stat.count > 0);
 
         if (isSelected) {
-            canvas.drawText(String.valueOf(calendar.getDay()), cx, mTextBaseLine + top, mSelectTextPaint);
+            canvas.drawText(DAY_TEXT[calendar.getDay()], cx, mTextBaseLine + top, mSelectTextPaint);
             if (!reallyHasBills) {
                 canvas.drawText(calendar.getLunar(), cx, mTextBaseLine + mItemHeight / 10f, mSelectedLunarTextPaint);
             }
         } else {
-            canvas.drawText(String.valueOf(calendar.getDay()), cx, mTextBaseLine + top,
+            canvas.drawText(DAY_TEXT[calendar.getDay()], cx, mTextBaseLine + top,
                     calendar.isCurrentMonth() ? mCurMonthTextPaint : mOtherMonthTextPaint);
             if (!reallyHasBills) {
                 canvas.drawText(calendar.getLunar(), cx, mTextBaseLine + mItemHeight / 10f,
@@ -150,5 +163,11 @@ public class CustomWeekView extends WeekView {
     private static int dipToPx(Context context, float dpValue) {
         final float scale = context.getResources().getDisplayMetrics().density;
         return (int) (dpValue * scale + 0.5f);
+    }
+
+    private static String[] createDayText() {
+        String[] result = new String[32];
+        for (int day = 1; day < result.length; day++) result[day] = String.valueOf(day);
+        return result;
     }
 }

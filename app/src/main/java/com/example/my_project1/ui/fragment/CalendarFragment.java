@@ -31,9 +31,11 @@ import com.haibin.calendarview.CalendarView;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class CalendarFragment extends Fragment implements
         CalendarView.OnCalendarSelectListener,
@@ -46,9 +48,17 @@ public class CalendarFragment extends Fragment implements
     private Calendar mCurrentSelectedDate;
     private int mVisibleYear, mVisibleMonth;
 
-    // 缓存已生成的日历 Scheme Map，避免重复生成
-    private Map<String, Calendar> mFullSchemeMap = new HashMap<>();
-    private String mLastStatsFingerprint = ""; // 🚀 渲染拦截指纹
+    private Map<String, DailyStat> mLatestStatsMap = new HashMap<>();
+    private final Map<String, Map<String, Calendar>> mMonthSchemeCache =
+            new LinkedHashMap<String, Map<String, Calendar>>(24, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Map<String, Calendar>> eldest) {
+                    return size() > 24;
+                }
+            };
+    private final AtomicInteger mSchemeGeneration = new AtomicInteger();
+    private final AtomicInteger mBillRenderGeneration = new AtomicInteger();
+    private int mStatsVersion = 0;
 
     @Nullable
     @Override
@@ -76,6 +86,7 @@ public class CalendarFragment extends Fragment implements
         setupRecyclerView();
         setupListeners();
         observeData();
+        selectToday(false);
     }
 
     private void setupCalendar() {
@@ -103,6 +114,9 @@ public class CalendarFragment extends Fragment implements
 
         binding.rvBills.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvBills.setAdapter(concatAdapter);
+        binding.rvBills.setHasFixedSize(true);
+        binding.rvBills.setItemViewCacheSize(12);
+        binding.rvBills.setItemAnimator(null);
     }
 
     private void setupListeners() {
@@ -116,134 +130,138 @@ public class CalendarFragment extends Fragment implements
     private void observeData() {
         // 核心优化：观察 ViewModel 预计算好的统计 Map
         billViewModel.dailyStatsMap.observe(getViewLifecycleOwner(), statsMap -> {
-            updateCalendarSchemes(statsMap);
+            mLatestStatsMap = statsMap == null ? new HashMap<>() : statsMap;
+            mStatsVersion++;
+            synchronized (mMonthSchemeCache) {
+                mMonthSchemeCache.clear();
+            }
+            updateCalendarSchemes();
         });
 
         // 🚀 核心优化：按需加载选中日期的账单
         billViewModel.selectedDateBills.observe(getViewLifecycleOwner(), this::renderBillList);
     }
 
-    private void updateCalendarSchemes(Map<String, DailyStat> statsMap) {
-        // 🚀 性能拦截：计算指纹，防止重复渲染
-        int statsSize = statsMap == null ? 0 : statsMap.size();
-        int statsHash = statsMap == null ? 0 : statsMap.hashCode();
-        String fingerprint = statsSize + "_" + statsHash + "_" + mVisibleYear + "_" + mVisibleMonth;
-        
-        if (java.util.Objects.equals(fingerprint, mLastStatsFingerprint)) {
-            return;
-        }
-        mLastStatsFingerprint = fingerprint;
-
+    private void updateCalendarSchemes() {
         final int year = mVisibleYear;
         final int month = mVisibleMonth;
+        final int generation = mSchemeGeneration.incrementAndGet();
+        final int statsVersion = mStatsVersion;
+        final Map<String, DailyStat> statsSnapshot = mLatestStatsMap;
 
         AppExecutors.get().computation().execute(() -> {
             Map<String, Calendar> schemeMap = new HashMap<>();
-            
-            // 1. 将账单统计转换为日历 Scheme
-            if (statsMap != null) {
-                for (Map.Entry<String, DailyStat> entry : statsMap.entrySet()) {
-                    String dateKey = entry.getKey(); // yyyy-MM-dd
-                    DailyStat stat = entry.getValue();
-                    
-                    Calendar calendar = parseDateKey(dateKey);
-                    if (calendar == null) continue;
-
-                    // 获取并缓存节假日信息
-                    stat.dayTag = HolidayUtil.getDayTag(calendar.getYear(), calendar.getMonth(), calendar.getDay());
-                    stat.isHoliday = "休".equals(stat.dayTag);
-
-                    Calendar.Scheme scheme = new Calendar.Scheme();
-                    scheme.setObj(stat);
-                    scheme.setScheme("s");
-                    calendar.addScheme(scheme);
-                    schemeMap.put(calendar.toString(), calendar);
-                }
+            java.util.Calendar cursor = java.util.Calendar.getInstance();
+            cursor.set(year, month - 1, 1);
+            cursor.add(java.util.Calendar.MONTH, -1);
+            for (int i = 0; i < 3; i++) {
+                int windowYear = cursor.get(java.util.Calendar.YEAR);
+                int windowMonth = cursor.get(java.util.Calendar.MONTH) + 1;
+                schemeMap.putAll(getOrBuildMonthSchemes(
+                        statsSnapshot, statsVersion, windowYear, windowMonth));
+                cursor.add(java.util.Calendar.MONTH, 1);
             }
 
-            // 2. 补全可见范围内的节假日（即使没账单也要显示“休/班”）
-            addVisibleHolidays(schemeMap, year, month);
-
             AppExecutors.get().mainThread().execute(() -> {
-                if (binding == null) return;
-                mFullSchemeMap = schemeMap;
+                if (binding == null || generation != mSchemeGeneration.get()
+                        || year != mVisibleYear || month != mVisibleMonth) return;
                 binding.calendarView.setSchemeDate(schemeMap);
             });
         });
     }
 
-    private void addVisibleHolidays(Map<String, Calendar> schemeMap, int year, int month) {
-        // 为了极致性能，我们仅补全当前选中月份中没有账单但有节假日的日期
+    private Map<String, Calendar> getOrBuildMonthSchemes(Map<String, DailyStat> statsMap,
+                                                         int statsVersion, int year, int month) {
+        String displayMonthKey = year + "-" + twoDigits(month);
+        String cacheKey = statsVersion + "_" + displayMonthKey;
+        synchronized (mMonthSchemeCache) {
+            Map<String, Calendar> cached = mMonthSchemeCache.get(cacheKey);
+            if (cached != null) return cached;
+        }
+
+        Map<String, Calendar> result = new HashMap<>();
         java.util.Calendar c = java.util.Calendar.getInstance();
         c.set(year, month - 1, 1);
         int maxDays = c.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
-        
+
         for (int d = 1; d <= maxDays; d++) {
+            String dateKey = displayMonthKey + "-" + twoDigits(d);
+            DailyStat source = statsMap.get(dateKey);
             String tag = HolidayUtil.getDayTag(year, month, d);
-            if (tag != null) {
-                Calendar calObj = new Calendar();
-                calObj.setYear(year); calObj.setMonth(month); calObj.setDay(d);
-                String libKey = calObj.toString();
-                if (!schemeMap.containsKey(libKey)) {
-                    DailyStat stat = new DailyStat(0, 0, 0);
-                    stat.dayTag = tag;
-                    stat.isHoliday = "休".equals(tag);
-                    Calendar.Scheme s = new Calendar.Scheme();
-                    s.setObj(stat);
-                    s.setScheme("s");
-                    calObj.addScheme(s);
-                    schemeMap.put(libKey, calObj);
-                }
-            }
+            if (source == null && tag == null) continue;
+
+            DailyStat stat = source == null
+                    ? new DailyStat(0, 0, 0)
+                    : new DailyStat(source.income, source.expense, source.count);
+            stat.dayTag = tag;
+            stat.isHoliday = "休".equals(tag);
+            stat.incomeText = formatCalendarAmount(stat.income);
+            stat.expenseText = formatCalendarAmount(stat.expense);
+            stat.signedIncomeText = "+" + stat.incomeText;
+            stat.signedExpenseText = "-" + stat.expenseText;
+
+            Calendar calendar = new Calendar();
+            calendar.setYear(year);
+            calendar.setMonth(month);
+            calendar.setDay(d);
+            Calendar.Scheme scheme = new Calendar.Scheme();
+            scheme.setObj(stat);
+            scheme.setScheme("s");
+            calendar.addScheme(scheme);
+            result.put(calendar.toString(), calendar);
         }
+
+        synchronized (mMonthSchemeCache) {
+            mMonthSchemeCache.put(cacheKey, result);
+        }
+        return result;
     }
 
-    private Calendar parseDateKey(String key) {
-        try {
-            String[] parts = key.split("-");
-            Calendar c = new Calendar();
-            c.setYear(Integer.parseInt(parts[0]));
-            c.setMonth(Integer.parseInt(parts[1]));
-            c.setDay(Integer.parseInt(parts[2]));
-            return c;
-        } catch (Exception e) { return null; }
+    private static String formatCalendarAmount(double amount) {
+        if (amount >= 10000) return (int) (amount / 1000) + "k";
+        return String.valueOf((int) amount);
+    }
+
+    private static String twoDigits(int value) {
+        return value < 10 ? "0" + value : String.valueOf(value);
     }
 
     private void renderBillList(List<Bill> bills) {
         if (mCurrentSelectedDate == null || binding == null) return;
-
-        List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
-        List<BillListAdapter.ListItem> items = new ArrayList<>();
-        if (uiModels != null && !uiModels.isEmpty()) {
-            items.add(new BillListAdapter.ListItem(uiModels));
-        }
-
-        billAdapter.submitList(items);
-        infoAdapter.updateDate(mCurrentSelectedDate);
+        final int generation = mBillRenderGeneration.incrementAndGet();
+        final List<Bill> snapshot = bills == null ? new ArrayList<>() : new ArrayList<>(bills);
+        AppExecutors.get().computation().execute(() -> {
+            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(snapshot);
+            List<BillListAdapter.ListItem> items = new ArrayList<>();
+            if (uiModels != null) {
+                for (BillUiModel model : uiModels) {
+                    items.add(new BillListAdapter.ListItem(model));
+                }
+            }
+            AppExecutors.get().mainThread().execute(() -> {
+                if (binding == null || generation != mBillRenderGeneration.get()) return;
+                billAdapter.submitList(items);
+            });
+        });
     }
 
     private void updateDateTitle(Calendar calendar) {
         if (calendar == null || binding == null) return;
         binding.tvYearMonth.setText(String.format(Locale.getDefault(), "%d / %d", calendar.getYear(), calendar.getMonth()));
-        
-        // 计算相对时间（今天/x天前）
-        AppExecutors.get().computation().execute(() -> {
-            java.util.Calendar today = java.util.Calendar.getInstance();
-            today.set(java.util.Calendar.HOUR_OF_DAY, 0); today.set(java.util.Calendar.MINUTE, 0);
-            today.set(java.util.Calendar.SECOND, 0); today.set(java.util.Calendar.MILLISECOND, 0);
 
-            java.util.Calendar target = java.util.Calendar.getInstance();
-            target.set(calendar.getYear(), calendar.getMonth() - 1, calendar.getDay());
-            target.set(java.util.Calendar.HOUR_OF_DAY, 0); target.set(java.util.Calendar.MINUTE, 0);
-            target.set(java.util.Calendar.SECOND, 0); target.set(java.util.Calendar.MILLISECOND, 0);
+        java.util.Calendar today = java.util.Calendar.getInstance();
+        today.set(java.util.Calendar.HOUR_OF_DAY, 12);
+        today.set(java.util.Calendar.MINUTE, 0);
+        today.set(java.util.Calendar.SECOND, 0);
+        today.set(java.util.Calendar.MILLISECOND, 0);
 
-            long diff = (target.getTimeInMillis() - today.getTimeInMillis()) / (1000 * 60 * 60 * 24);
-            String text = diff == 0 ? "今天" : (diff > 0 ? diff + "天后" : Math.abs(diff) + "天前");
-            
-            AppExecutors.get().mainThread().execute(() -> {
-                if (binding != null) binding.tvRelativeTime.setText(text);
-            });
-        });
+        java.util.Calendar target = java.util.Calendar.getInstance();
+        target.set(calendar.getYear(), calendar.getMonth() - 1, calendar.getDay(), 12, 0, 0);
+        target.set(java.util.Calendar.MILLISECOND, 0);
+
+        long diff = (target.getTimeInMillis() - today.getTimeInMillis()) / (24L * 60 * 60 * 1000);
+        binding.tvRelativeTime.setText(
+                diff == 0 ? "今天" : (diff > 0 ? diff + "天后" : Math.abs(diff) + "天前"));
     }
 
     /**
@@ -285,6 +303,7 @@ public class CalendarFragment extends Fragment implements
         if (calendar == null) return;
         
         mCurrentSelectedDate = calendar;
+        infoAdapter.updateDate(calendar);
         updateDateTitle(calendar);
         updateTodayButtonVisibility(calendar);
         
@@ -297,8 +316,30 @@ public class CalendarFragment extends Fragment implements
         mVisibleYear = year;
         mVisibleMonth = month;
         binding.tvYearMonth.setText(String.format(Locale.getDefault(), "%d / %d", year, month));
-        // 月份改变时，补全该月的节假日信息
-        updateCalendarSchemes(billViewModel.dailyStatsMap.getValue());
+        updateCalendarSchemes();
+    }
+
+    private void selectToday(boolean scrollCalendar) {
+        if (binding == null || billViewModel == null) return;
+        if (scrollCalendar) binding.calendarView.scrollToCurrent(false);
+        java.util.Calendar today = java.util.Calendar.getInstance();
+        Calendar selected = new Calendar();
+        selected.setYear(today.get(java.util.Calendar.YEAR));
+        selected.setMonth(today.get(java.util.Calendar.MONTH) + 1);
+        selected.setDay(today.get(java.util.Calendar.DAY_OF_MONTH));
+        mCurrentSelectedDate = selected;
+        infoAdapter.updateDate(selected);
+        mVisibleYear = selected.getYear();
+        mVisibleMonth = selected.getMonth();
+        updateDateTitle(selected);
+        updateTodayButtonVisibility(selected);
+        billViewModel.setSelectedDate(selected.getYear(), selected.getMonth(), selected.getDay());
+    }
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (!hidden) selectToday(true);
     }
 
     @Override
@@ -307,6 +348,8 @@ public class CalendarFragment extends Fragment implements
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        mSchemeGeneration.incrementAndGet();
+        mBillRenderGeneration.incrementAndGet();
         binding = null;
     }
 }

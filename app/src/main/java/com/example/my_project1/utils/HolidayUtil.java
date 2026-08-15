@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 节假日工具类 - Assets 优化版
@@ -25,6 +26,9 @@ public class HolidayUtil {
 
     private static final String TAG = "HolidayUtil";
     private static final Map<String, String> HOLIDAY_DATA = new HashMap<>();
+    private static final List<HolidayInfo> SORTED_OFF_DAYS = new ArrayList<>();
+    private static final Map<String, String> DAY_TAG_CACHE = new ConcurrentHashMap<>();
+    private static final String NO_TAG = "";
     private static boolean isInitialized = false;
 
     /**
@@ -51,6 +55,7 @@ public class HolidayUtil {
                     Log.e(TAG, "Failed to load " + fileName, e);
                 }
             }
+            Collections.sort(SORTED_OFF_DAYS, (o1, o2) -> o1.dateKey.compareTo(o2.dateKey));
             isInitialized = true;
         } catch (Exception e) {
             Log.e(TAG, "HolidayUtil initialization failed", e);
@@ -59,27 +64,45 @@ public class HolidayUtil {
 
     private static void add(String date, String name, boolean isOff) {
         HOLIDAY_DATA.put(date, name + "|" + (isOff ? "休" : "班"));
+        if (isOff) SORTED_OFF_DAYS.add(new HolidayInfo(date, name));
     }
 
     /**
      * 获取日期的标签：休、班 或 null
      */
     public static String getDayTag(int year, int month, int day) {
-        String key = String.format(Locale.getDefault(), "%04d-%02d-%02d", year, month, day);
+        String key = dateKey(year, month, day);
+        String cached = DAY_TAG_CACHE.get(key);
+        if (cached != null) return cached.isEmpty() ? null : cached;
+
         String data = HOLIDAY_DATA.get(key);
         if (data != null) {
-            return data.split("\\|")[1];
+            int separator = data.lastIndexOf('|');
+            String tag = separator >= 0 ? data.substring(separator + 1) : null;
+            DAY_TAG_CACHE.put(key, tag == null ? NO_TAG : tag);
+            return tag;
         }
         
         // 兜底使用库数据
         try {
             com.nlf.calendar.Holiday h = com.nlf.calendar.util.HolidayUtil.getHoliday(year, month, day);
             if (h != null) {
-                return h.isWork() ? "班" : "休";
+                String tag = h.isWork() ? "班" : "休";
+                DAY_TAG_CACHE.put(key, tag);
+                return tag;
             }
         } catch (Exception ignored) {}
-        
+
+        DAY_TAG_CACHE.put(key, NO_TAG);
         return null;
+    }
+
+    private static String dateKey(int year, int month, int day) {
+        StringBuilder key = new StringBuilder(10).append(year).append('-');
+        if (month < 10) key.append('0');
+        key.append(month).append('-');
+        if (day < 10) key.append('0');
+        return key.append(day).toString();
     }
 
     public static boolean isHoliday(int year, int month, int day) {
@@ -88,23 +111,16 @@ public class HolidayUtil {
 
     public static String[] getNextHoliday(int year, int month, int day) {
         String currentKey = String.format(Locale.getDefault(), "%04d-%02d-%02d", year, month, day);
-        List<HolidayInfo> list = new ArrayList<>();
-        
-        for (Map.Entry<String, String> entry : HOLIDAY_DATA.entrySet()) {
-            String[] parts = entry.getValue().split("\\|");
-            if ("休".equals(parts[1])) {
-                list.add(new HolidayInfo(entry.getKey(), parts[0]));
-            }
-        }
+        List<HolidayInfo> list = SORTED_OFF_DAYS;
 
         if (year >= 2027) {
+            list = new ArrayList<>(SORTED_OFF_DAYS);
             addMajorFestivals(list, year);
             addMajorFestivals(list, year + 1);
+            Collections.sort(list, (o1, o2) -> o1.dateKey.compareTo(o2.dateKey));
         }
 
         if (list.isEmpty()) return null;
-
-        Collections.sort(list, (o1, o2) -> o1.dateKey.compareTo(o2.dateKey));
 
         for (HolidayInfo h : list) {
             if (h.dateKey.compareTo(currentKey) >= 0) {
