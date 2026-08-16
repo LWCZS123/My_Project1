@@ -136,6 +136,7 @@ public class CalendarFragment extends Fragment implements
                 mMonthSchemeCache.clear();
             }
             updateCalendarSchemes();
+            // 在日历数据加载并更新 Scheme 后初次隐藏 Loading（或者等待下方账单列表渲染）
         });
 
         // 🚀 核心优化：按需加载选中日期的账单
@@ -240,7 +241,7 @@ public class CalendarFragment extends Fragment implements
             }
             AppExecutors.get().mainThread().execute(() -> {
                 if (binding == null || generation != mBillRenderGeneration.get()) return;
-                billAdapter.submitList(items);
+                billAdapter.submitList(items, this::hideLoading);
             });
         });
     }
@@ -344,6 +345,20 @@ public class CalendarFragment extends Fragment implements
 
     @Override
     public void onCalendarOutOfRange(Calendar calendar) {}
+
+    private void hideLoading() {
+        if (binding == null || binding.loadingLayout.getVisibility() == View.GONE) return;
+
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.loadingLayout.setVisibility(View.GONE);
+                    }
+                })
+                .start();
+    }
 
     @Override
     public void onDestroyView() {

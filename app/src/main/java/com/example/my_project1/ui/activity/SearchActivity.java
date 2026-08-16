@@ -15,6 +15,8 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.paging.CombinedLoadStates;
+import androidx.paging.LoadState;
 import androidx.paging.PagingData;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -45,6 +47,7 @@ public class SearchActivity extends AppCompatActivity {
     private SearchViewModel viewModel;
     private HomeBillAdapter billAdapter;
     private SearchSummaryAdapter summaryAdapter;
+    private boolean isFirstSearch = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,6 +90,16 @@ public class SearchActivity extends AppCompatActivity {
         binding.rvBills.setHasFixedSize(true);
         binding.rvBills.setItemViewCacheSize(16);
         binding.rvBills.setItemAnimator(null);
+
+        // 🚀 使用 Paging 加载状态监听来隐藏 Loading，防止闪烁
+        billAdapter.addLoadStateListener(loadStates -> {
+            if (loadStates.getRefresh() instanceof androidx.paging.LoadState.NotLoading) {
+                if (!isFirstSearch && binding.layoutLoading.getVisibility() == View.VISIBLE) {
+                    hideLoading();
+                }
+            }
+            return null;
+        });
 
         // 分页加载监听
         binding.rvBills.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -156,7 +169,7 @@ public class SearchActivity extends AppCompatActivity {
                 binding.layoutResults.setVisibility(View.VISIBLE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
                 binding.layoutEmpty.setVisibility(View.GONE);
-                binding.layoutLoading.setVisibility(View.GONE);
+                // hideLoading will be called by loadStateListener
             }
         });
 
@@ -169,11 +182,13 @@ public class SearchActivity extends AppCompatActivity {
 
         viewModel.searchState.observe(this, state -> {
             if (state.isLoading()) {
+                isFirstSearch = false;
                 // 立即切换到加载布局，隐藏其他布局，确保 Lottie 能够第一时间显示
                 binding.layoutResults.setVisibility(View.GONE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
                 binding.layoutEmpty.setVisibility(View.GONE);
                 binding.layoutLoading.setVisibility(View.VISIBLE);
+                binding.layoutLoading.setAlpha(1f);
                 binding.lottieLoading.playAnimation();
             } else if (state.isEmpty()) {
                 binding.layoutResults.setVisibility(View.GONE);
@@ -254,6 +269,21 @@ public class SearchActivity extends AppCompatActivity {
             intent.putExtra(BillDetailActivity.EXTRA_BILL_LOCAL_ID, localId);
         }
         startActivity(intent);
+    }
+
+    private void hideLoading() {
+        if (binding == null || binding.layoutLoading.getVisibility() == View.GONE) return;
+
+        binding.layoutLoading.animate()
+                .alpha(0f)
+                .setDuration(300)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.layoutLoading.setVisibility(View.GONE);
+                        binding.layoutLoading.setAlpha(1f);
+                    }
+                })
+                .start();
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.example.my_project1.ui.activity;
 
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -322,7 +323,7 @@ public class BudgetActivity extends AppCompatActivity {
 
         vm.getCategoryBudgets().observe(this, budgets -> {
             if (budgets != null) buildAndSubmitItems(budgets);
-            else adapter.submitList(new ArrayList<>());
+            else adapter.submitList(new ArrayList<>(), this::hideLoading);
         });
 
         // Stats callback is the unique data source for tvBudgetAmount
@@ -629,7 +630,7 @@ public class BudgetActivity extends AppCompatActivity {
             final double finalAllocated = totalAllocated;
             runOnUiThread(() -> {
                 if (!isFinishing()) {
-                    adapter.submitList(items);
+                    adapter.submitList(items, this::hideLoading);
                     animateTextUpdate(binding.tvClassifiedBudget, String.format(Locale.getDefault(), "已分类预算 ¥%.2f", finalAllocated));
                 }
             });
@@ -641,6 +642,20 @@ public class BudgetActivity extends AppCompatActivity {
         if (now - lastSyncTimeMs < SYNC_DEBOUNCE_MS) return;
         lastSyncTimeMs = now;
         vm.syncFromCloud(success -> vm.loadStats());
+    }
+
+    private void hideLoading() {
+        if (binding == null || binding.loadingLayout.getVisibility() == View.GONE) return;
+
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.loadingLayout.setVisibility(View.GONE);
+                    }
+                })
+                .start();
     }
 
     @Override

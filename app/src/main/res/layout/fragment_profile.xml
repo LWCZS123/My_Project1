@@ -230,8 +230,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#2196F3"
+                            android:padding="6dp"
                             android:src="@drawable/ic_create_book" />
                         <TextView
                             android:layout_width="0dp"
@@ -260,8 +263,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#009688"
+                            android:padding="6dp"
                             android:src="@drawable/ic_category1" />
                         <TextView
                             android:layout_width="0dp"
@@ -290,8 +296,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#3F51B5"
+                            android:padding="6dp"
                             android:src="@drawable/ic_data_chart" />
                         <TextView
                             android:layout_width="0dp"
@@ -320,8 +329,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#FF9800"
+                            android:padding="6dp"
                             android:src="@drawable/ic_budget1" />
                         <TextView
                             android:layout_width="0dp"
@@ -374,8 +386,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#E91E63"
+                            android:padding="6dp"
                             android:src="@drawable/ic_desire" />
                         <TextView
                             android:layout_width="0dp"
@@ -404,8 +419,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#00BCD4"
+                            android:padding="6dp"
                             android:src="@drawable/ic_cloud" />
                         <TextView
                             android:layout_width="0dp"
@@ -434,8 +452,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#795548"
+                            android:padding="6dp"
                             android:src="@drawable/ic_package" />
                         <TextView
                             android:layout_width="0dp"
@@ -464,8 +485,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#FFC107"
+                            android:padding="6dp"
                             android:src="@drawable/ic_newsletter" />
                         <TextView
                             android:layout_width="0dp"
@@ -494,8 +518,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#4CAF50"
+                            android:padding="6dp"
                             android:src="@drawable/ic_nutrition" />
                         <TextView
                             android:layout_width="0dp"
@@ -524,8 +551,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#F44336"
+                            android:padding="6dp"
                             android:src="@drawable/ic_bill12" />
                         <TextView
                             android:layout_width="0dp"
@@ -554,8 +584,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#03A9F4"
+                            android:padding="6dp"
                             android:src="@drawable/ic_clock" />
                         <TextView
                             android:layout_width="0dp"
@@ -584,8 +617,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#9C27B0"
+                            android:padding="6dp"
                             android:src="@drawable/ic_financial" />
                         <TextView
                             android:layout_width="0dp"
@@ -614,8 +650,11 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp">
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_rounded_20"
+                            android:backgroundTint="#9E9E9E"
+                            android:padding="6dp"
                             android:src="@drawable/ic_settings_main" />
                         <TextView
                             android:layout_width="0dp"

@@ -130,7 +130,7 @@ public class CategoryBillsActivity extends AppCompatActivity {
             boolean empty = listItems.isEmpty();
             binding.rvBills.setVisibility(empty ? View.GONE : View.VISIBLE);
             binding.layoutEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-            adapter.setData(listItems);
+            adapter.submitList(listItems, this::hideLoading);
         });
     }
 
@@ -200,9 +200,23 @@ public class CategoryBillsActivity extends AppCompatActivity {
                 boolean empty = listItems.isEmpty();
                 binding.rvBills.setVisibility(empty ? View.GONE  : View.VISIBLE);
                 binding.layoutEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-                adapter.setData(listItems);
+                adapter.submitList(listItems, this::hideLoading);
             });
         });
+    }
+
+    private void hideLoading() {
+        if (binding == null || binding.loadingLayout.getVisibility() == View.GONE) return;
+
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.loadingLayout.setVisibility(View.GONE);
+                    }
+                })
+                .start();
     }
 
     // ================================================================

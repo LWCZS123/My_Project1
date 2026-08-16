@@ -13,6 +13,8 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.paging.CombinedLoadStates;
+import androidx.paging.LoadState;
 import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -67,6 +69,7 @@ public class HomeFragment extends Fragment {
     // ── 用户 ─────────────────────────────────────────
     private String  currentUserId;
     private boolean isDataObserved = false;
+    private boolean isFirstLoad = true;
 
     // ════════════════════════════════════════════════════
     //  生命周期
@@ -181,6 +184,17 @@ public class HomeFragment extends Fragment {
             public void onBillRefund(BillUiModel bill) {
                 showSnackbar("已触发退款申请");
             }
+        });
+
+        // 🚀 使用 Paging 的加载状态监听来控制 Loading 动画，防止数据未渲染时的闪烁
+        billAdapter.addLoadStateListener(loadStates -> {
+            if (loadStates.getRefresh() instanceof LoadState.NotLoading) {
+                if (isFirstLoad) {
+                    hideLoading();
+                    isFirstLoad = false;
+                }
+            }
+            return null;
         });
 
         footerAdapter = new FooterAdapter();
@@ -390,6 +404,20 @@ public class HomeFragment extends Fragment {
             
             snackbar.show();
         }
+    }
+
+    private void hideLoading() {
+        if (binding == null || binding.loadingLayout.getVisibility() == View.GONE) return;
+
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(500)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.loadingLayout.setVisibility(View.GONE);
+                    }
+                })
+                .start();
     }
 
     public static HomeFragment newInstance() { return new HomeFragment(); }

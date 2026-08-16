@@ -355,8 +355,24 @@ public class BillStatisticsActivity extends AppCompatActivity {
         });
 
         viewModel.categoryItems.observe(this, items -> {
-            if (items != null) categoryAdapter.submitList(items);
+            if (items != null) {
+                categoryAdapter.submitList(items, this::hideLoading);
+            }
         });
+    }
+
+    private void hideLoading() {
+        if (binding == null || binding.loadingLayout.getVisibility() == View.GONE) return;
+
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.loadingLayout.setVisibility(View.GONE);
+                    }
+                })
+                .start();
     }
 
 }

@@ -352,7 +352,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
             // Bills are queried by ViewModel according to effectiveStartTime/endTime
             binding.tvBillCount.setText(String.format(Locale.getDefault(), "共 %d 笔消费", bills != null ? bills.size() : 0));
             List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
-            billAdapter.submitList(uiModels);
+            billAdapter.submitList(uiModels, this::hideLoading);
             binding.tvEmptyBills.setVisibility(
                     (bills == null || bills.isEmpty()) ? View.VISIBLE : View.GONE);
         });
@@ -442,6 +442,20 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
     public void finish() {
         super.finish();
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+    }
+
+    private void hideLoading() {
+        if (binding == null || binding.loadingLayout.getVisibility() == View.GONE) return;
+
+        binding.loadingLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .withEndAction(() -> {
+                    if (binding != null) {
+                        binding.loadingLayout.setVisibility(View.GONE);
+                    }
+                })
+                .start();
     }
 
     /**
