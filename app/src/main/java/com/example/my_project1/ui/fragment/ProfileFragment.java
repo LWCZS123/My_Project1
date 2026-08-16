@@ -147,25 +147,39 @@ public class ProfileFragment extends Fragment {
     }
 
     private void initViews() {
-        // 头像点击
-        binding.ivAvatar.setOnClickListener(v -> openImagePicker(pickAvatarLauncher));
-
-        // 背景图点击
-        binding.ivTheme.setOnClickListener(v -> openImagePicker(pickBackgroundLauncher));
-
-        // 设置按钮
+        // 设置按钮 (原 ivBack 移除，改为 header 内的 ivSettings)
         binding.ivSettings.setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), EditProfileActivity.class);
-            startActivity(intent);
+            editProfileLauncher.launch(intent);
             if (getActivity() != null) {
                 getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
             }
         });
+
+        // 头像点击 - 选择头像
+        binding.ivAvatar.setOnClickListener(v -> openImagePicker(pickAvatarLauncher));
+
+        // 头像右下角图标 - 修改背景 (或者也可以改为修改资料)
+        binding.ivTheme.setOnClickListener(v -> openImagePicker(pickBackgroundLauncher));
+
+        // 点击用户名区域 - 编辑资料
+        View.OnClickListener editProfileListener = v -> {
+            Intent intent = new Intent(getActivity(), EditProfileActivity.class);
+            editProfileLauncher.launch(intent);
+            if (getActivity() != null) {
+                getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+            }
+        };
+        binding.tvUsername.setOnClickListener(editProfileListener);
+
+        // 列表项点击
         binding.llAppSettings.setOnClickListener(v -> changePasswordActivity());
         binding.llBudget.setOnClickListener(v -> budgetActivity());
         binding.llCategoryManage.setOnClickListener(v -> iconMarketActivity());
         binding.llMyWish.setOnClickListener(v -> savingsOverviewActivity());
         binding.llFinancialTips.setOnClickListener(v-> iconCheckAcitvity());
+        
+        // 定时记账
         binding.llScheduledRecord.setOnClickListener(v -> {
             CustomDateTimePickerFragment.show(
                     getChildFragmentManager(),
@@ -178,6 +192,9 @@ public class ProfileFragment extends Fragment {
             );
         });
 
+        // 其他点击项 (根据需要添加)
+        binding.llCloudBackup.setOnClickListener(v -> Toast.makeText(getContext(), "云端备份功能即将上线", Toast.LENGTH_SHORT).show());
+        binding.llDailyReceipt.setOnClickListener(v -> Toast.makeText(getContext(), "每日小票功能即将上线", Toast.LENGTH_SHORT).show());
     }
 
     private void iconCheckAcitvity() {
