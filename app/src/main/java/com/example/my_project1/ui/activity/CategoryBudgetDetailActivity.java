@@ -107,12 +107,9 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
-        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
-
+        ViewCompat.setOnApplyWindowInsetsListener(binding.topBar, (v, insets) -> {
             int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-
-            v.setPadding(0, top, 0, 0);
-
+            v.setPadding(v.getPaddingLeft(), top, v.getPaddingRight(), v.getPaddingBottom());
             return insets;
         });
 
@@ -120,6 +117,14 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
+
+        // 设置底部导航栏为白色
+        getWindow().setNavigationBarColor(android.graphics.Color.WHITE);
+        insetsController.setAppearanceLightNavigationBars(true);
+
+        // 设置导航栏为页面顶部背景色以保持一致
+        getWindow().setNavigationBarColor(android.graphics.Color.WHITE);
+        insetsController.setAppearanceLightNavigationBars(true);
 
 
         vm = new ViewModelProvider(this).get(CategoryBudgetDetailViewModel.class);

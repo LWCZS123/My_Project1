@@ -53,7 +53,7 @@
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
         <item name="android:textSize">14sp</item>
-        <item name="android:textColor">#999999</item>
+        <item name="android:textColor">@color/budget_text_aux</item>
     </style>
 
     <style name="NumberPickerStyle">
@@ -226,7 +226,7 @@
         <item name="android:layout_weight">1</item>
         <item name="android:background">@drawable/bg_quick_amount</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#666666</item>
+        <item name="android:textColor">@color/budget_text_secondary</item>
         <item name="android:textSize">13sp</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>

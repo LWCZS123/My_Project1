@@ -222,7 +222,7 @@ public class CategoryBudgetAdapter
             h.b.tvSpent.setTextColor(0xFFEB5757);
         } else {
             h.b.pbBgProgress.setProgressDrawable(ctx.getDrawable(R.drawable.bg_progress_fill_blue_light));
-            h.b.tvSpent.setTextColor(0xFF333333);
+            h.b.tvSpent.setTextColor(0xFF222222);
         }
 
         // ── 点击事件 ─────────────────────────────────────────

@@ -59,7 +59,7 @@ public class BudgetActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.clTopBar, (v, insets) -> {
             int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
             v.setPadding(0, top, 0, 0);
             return insets;
@@ -68,6 +68,10 @@ public class BudgetActivity extends AppCompatActivity {
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
+
+        // 设置底部导航栏为白色以匹配顶部栏风格
+        getWindow().setNavigationBarColor(android.graphics.Color.WHITE);
+        insetsController.setAppearanceLightNavigationBars(true);
 
         vm = new ViewModelProvider(this).get(BudgetViewModel.class);
         categoryVm = new ViewModelProvider(this).get(CategoryViewModel.class);
@@ -329,6 +333,7 @@ public class BudgetActivity extends AppCompatActivity {
             }
         });
 
+        // 年度统计始终观察并更新概览卡片，不论当前处于什么周期
         vm.getYearlyStats().observe(this, stats -> {
             updateYearlyOverview(stats);
             if (Budget.TYPE_YEAR.equals(vm.getBudgetType())) {
@@ -483,7 +488,7 @@ public class BudgetActivity extends AppCompatActivity {
     private void applyTopTab(android.widget.TextView tab, boolean selected) {
         if (selected) {
             tab.setBackgroundResource(R.drawable.bg_tab_selected_white);
-            tab.setTextColor(0xFF333333);
+            tab.setTextColor(0xFF222222);
         } else {
             tab.setBackground(null);
             tab.setTextColor(0xFF999999);
@@ -493,12 +498,12 @@ public class BudgetActivity extends AppCompatActivity {
     private void refreshBottomTabStyle(boolean isExpense) {
         if (isExpense) {
             binding.tabStatsBottom.setBackgroundResource(R.drawable.bg_tab_selected_white);
-            binding.tabStatsBottom.setTextColor(0xFF333333);
+            binding.tabStatsBottom.setTextColor(0xFF222222);
             binding.tabCompositionBottom.setBackground(null);
             binding.tabCompositionBottom.setTextColor(0xFF999999);
         } else {
             binding.tabCompositionBottom.setBackgroundResource(R.drawable.bg_tab_selected_white);
-            binding.tabCompositionBottom.setTextColor(0xFF333333);
+            binding.tabCompositionBottom.setTextColor(0xFF222222);
             binding.tabStatsBottom.setBackground(null);
             binding.tabStatsBottom.setTextColor(0xFF999999);
         }

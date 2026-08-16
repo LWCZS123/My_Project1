@@ -127,4 +127,14 @@
     <color name="blue_500">#3B82F6</color>
     <color name="blue_600">#2563EB</color>
     <color name="blue_700">#1D4ED8</color>
+
+    <!-- New Budget Theme Colors -->
+    <color name="budget_primary">#304FFE</color>
+    <color name="budget_text_main">#222222</color>
+    <color name="budget_text_secondary">#777777</color>
+    <color name="budget_text_aux">#999999</color>
+    <color name="budget_page_bg">#F8F9FC</color>
+    <color name="budget_card_bg">#FFFFFF</color>
+    <color name="budget_light_theme_bg">#EBEDFF</color>
+    <color name="budget_divider">#EEEEEE</color>
 </resources>

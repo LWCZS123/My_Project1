@@ -4,7 +4,7 @@
     <item>
         <shape>
             <corners android:radius="12dp" />
-            <solid android:color="#F7F8FA" />
+            <solid android:color="@color/white" />
         </shape>
     </item>
     <!-- Progress layer -->
@@ -12,7 +12,7 @@
         <scale android:scaleWidth="100%">
             <shape>
                 <corners android:radius="12dp" />
-                <solid android:color="#FFF0F1" />
+                <solid android:color="#FFF2F2" />
             </shape>
         </scale>
     </item>

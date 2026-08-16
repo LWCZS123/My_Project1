@@ -91,48 +91,82 @@ public class BudgetViewModel extends AndroidViewModel {
             String tt = getTransactionType();
             Long startTime = selectedStartTime.getValue();
             Long endTime = selectedEndTime.getValue();
-            
+
             if (startTime == null || endTime == null) return;
 
-            int period = Budget.PERIOD_MONTH;
-            boolean isWeek = Budget.TYPE_WEEK.equals(type);
+            // 1. 加载当前周期的统计数据 (周/月/年)
             boolean isYear = Budget.TYPE_YEAR.equals(type);
-            if (isWeek) period = Budget.PERIOD_WEEK;
-            else if (isYear) period = Budget.PERIOD_YEAR;
+            boolean isWeek = Budget.TYPE_WEEK.equals(type);
 
             double inc = repo.getTotalIncomeInPeriod(userId, startTime, endTime);
             double exp = repo.getTotalSpentInPeriod(userId, startTime, endTime);
-            
+
             Budget bud;
             if (isYear) bud = repo.getYearBudgetSync(userId, tt, getCurrentYear());
             else if (isWeek) bud = repo.getWeekBudgetSyncByStart(userId, tt, startTime);
             else bud = repo.getMonthBudgetSync(userId, tt, getCurrentYear(), getCurrentMonth());
 
-            BudgetStats stats = new BudgetStats();
-            stats.totalIncome = inc;
-            stats.totalExpense = exp;
-            stats.expenseBudget = (bud != null) ? bud.getAmount() : 0.0;
-            
-            // 如果是收入预算模式，将收入视为“已达成”进度，支出不直接体现为超支逻辑（UI自行处理）
+            BudgetStats currentStats = new BudgetStats();
+            currentStats.totalIncome = inc;
+            currentStats.totalExpense = exp;
+            currentStats.expenseBudget = (bud != null) ? bud.getAmount() : 0.0;
+
             if (Budget.TYPE_INCOME.equals(tt)) {
-                stats.totalExpense = inc; // 劫持变量用于 UI 显示
-                stats.expenseBudget = (bud != null) ? bud.getAmount() : 0.0;
-                stats.totalIncome = exp; // 劫持
+                currentStats.totalExpense = inc;
+                currentStats.expenseBudget = (bud != null) ? bud.getAmount() : 0.0;
+                currentStats.totalIncome = exp;
             }
-            
+
             Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(startTime);
             int days;
             if (isYear) days = cal.getActualMaximum(Calendar.DAY_OF_YEAR);
             else if (isWeek) days = 7;
             else days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
-            
-            stats.dailyAvgIncome = inc / days;
-            stats.dailyAvgExpense = exp / days;
-            
+
+            currentStats.dailyAvgIncome = inc / days;
+            currentStats.dailyAvgExpense = exp / days;
+
+            // 2. 如果当前不是“年”模式，额外加载一整年的统计数据用于“年度概览”卡片
+            BudgetStats yearlyStats = null;
+            if (!isYear) {
+                int year = getCurrentYear();
+                Calendar yCal = Calendar.getInstance();
+                yCal.set(year, Calendar.JANUARY, 1, 0, 0, 0);
+                long yStart = yCal.getTimeInMillis();
+                yCal.set(year, Calendar.DECEMBER, 31, 23, 59, 59);
+                long yEnd = yCal.getTimeInMillis();
+
+                double yInc = repo.getTotalIncomeInPeriod(userId, yStart, yEnd);
+                double yExp = repo.getTotalSpentInPeriod(userId, yStart, yEnd);
+                Budget yBud = repo.getYearBudgetSync(userId, tt, year);
+
+                yearlyStats = new BudgetStats();
+                yearlyStats.totalIncome = yInc;
+                yearlyStats.totalExpense = yExp;
+                yearlyStats.expenseBudget = (yBud != null) ? yBud.getAmount() : 0.0;
+
+                if (Budget.TYPE_INCOME.equals(tt)) {
+                    yearlyStats.totalExpense = yInc;
+                    yearlyStats.expenseBudget = (yBud != null) ? yBud.getAmount() : 0.0;
+                    yearlyStats.totalIncome = yExp;
+                }
+                
+                int yDays = yCal.getActualMaximum(Calendar.DAY_OF_YEAR);
+                yearlyStats.dailyAvgIncome = yInc / yDays;
+                yearlyStats.dailyAvgExpense = yExp / yDays;
+            }
+
+            final BudgetStats finalYearly = yearlyStats;
             AppExecutors.get().mainThread().execute(() -> {
-                if (isYear) yearlyStatsLive.setValue(stats);
-                else monthlyStatsLive.setValue(stats);
+                if (isYear) {
+                    yearlyStatsLive.setValue(currentStats);
+                } else {
+                    monthlyStatsLive.setValue(currentStats);
+                    if (finalYearly != null) {
+                        yearlyStatsLive.setValue(finalYearly);
+                    }
+                }
             });
         });
     }

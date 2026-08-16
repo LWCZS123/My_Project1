@@ -51,7 +51,7 @@
             android:gravity="center"
             android:text="购物"
             android:textSize="12sp"
-            android:textColor="#333333"
+            android:textColor="@color/budget_text_main"
             android:maxLines="1"
             android:ellipsize="end"
             android:layout_marginTop="5dp"/>
@@ -64,7 +64,7 @@
             android:gravity="center"
             android:text="未设置"
             android:textSize="10sp"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/budget_text_aux"
             android:maxLines="1"
             android:ellipsize="end"
             android:layout_marginTop="2dp"/>

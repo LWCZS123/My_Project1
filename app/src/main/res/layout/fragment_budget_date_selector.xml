@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/bg_bottom_sheet1"
-    android:padding="16dp">
+    android:background="@drawable/bg_bottom_sheet_white"
+    android:padding="20dp">
 
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="20dp">
         <ImageView
             android:id="@+id/iv_close"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_close"
-            android:layout_centerVertical="true"/>
+            android:layout_centerVertical="true"
+            android:contentDescription="关闭"
+            app:tint="@color/budget_text_main"/>
         <TextView
             android:id="@+id/tv_title"
             android:layout_width="wrap_content"
@@ -23,13 +26,15 @@
             android:text="选择时间"
             android:textStyle="bold"
             android:textSize="16sp"
+            android:textColor="@color/budget_text_main"
             android:layout_centerInParent="true"/>
         <TextView
             android:id="@+id/tv_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="本月"
-            android:textColor="#5B8DEF"
+            android:textColor="@color/budget_primary"
+            android:textStyle="bold"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"/>
     </RelativeLayout>
@@ -39,21 +44,22 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingBottom="8dp"
+        android:paddingBottom="12dp"
         android:visibility="gone">
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周日" android:textSize="12sp" android:textColor="#999999"/>
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周一" android:textSize="12sp" android:textColor="#999999"/>
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周二" android:textSize="12sp" android:textColor="#999999"/>
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周三" android:textSize="12sp" android:textColor="#999999"/>
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周四" android:textSize="12sp" android:textColor="#999999"/>
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周五" android:textSize="12sp" android:textColor="#999999"/>
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="周六" android:textSize="12sp" android:textColor="#999999"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="日" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="一" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="二" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="三" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="四" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="五" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="六" android:textSize="12sp" android:textColor="@color/budget_text_aux"/>
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_selector"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:overScrollMode="never"/>
 
 </LinearLayout>

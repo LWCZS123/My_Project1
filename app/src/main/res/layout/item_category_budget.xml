@@ -9,7 +9,9 @@
     android:layout_marginBottom="6dp"
     app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
-    app:cardBackgroundColor="#FFFFFF">
+    app:cardBackgroundColor="@color/budget_card_bg"
+    app:strokeColor="@color/budget_divider"
+    app:strokeWidth="0.5dp">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -53,7 +55,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="餐饮"
-                    android:textColor="#333333"
+                    android:textColor="@color/budget_text_main"
                     android:textSize="16sp"
                     android:textStyle="bold"/>
 
@@ -62,7 +64,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0% | 8333.33"
-                    android:textColor="#999999"
+                    android:textColor="@color/budget_text_aux"
                     android:textSize="11sp"
                     android:layout_marginTop="2dp"/>
             </LinearLayout>
@@ -74,7 +76,7 @@
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:text="0"
-                android:textColor="#333333"
+                android:textColor="@color/budget_text_main"
                 android:textSize="20sp"
                 android:textStyle="bold"/>
         </RelativeLayout>

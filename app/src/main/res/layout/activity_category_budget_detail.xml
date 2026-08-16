@@ -5,29 +5,33 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F4F8"
+    android:background="@color/budget_page_bg"
     tools:context=".ui.activity.CategoryBudgetDetailActivity">
 
-    <!-- 顶部栏（与 BudgetActivity 保持一致） -->
+    <!-- 顶部栏 -->
     <LinearLayout
         android:id="@+id/top_bar"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="#F2F4F8"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:minHeight="64dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
         <ImageView
             android:id="@+id/iv_back"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="10dp"
             android:src="@drawable/ic_back3"
             android:clickable="true"
             android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/budget_text_main"
             android:contentDescription="返回"/>
 
         <TextView
@@ -36,19 +40,21 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="预算详情"
-            android:textColor="#333333"
-            android:textSize="18sp"
+            android:textColor="@color/budget_text_main"
+            android:textSize="17sp"
             android:textStyle="bold"
             android:gravity="center"/>
 
         <ImageView
             android:id="@+id/iv_menu"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="10dp"
             android:src="@drawable/ic_more_vert"
             android:clickable="true"
             android:focusable="true"
-            app:tint="#333333"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/budget_text_main"
             android:contentDescription="更多"/>
     </LinearLayout>
 
@@ -76,15 +82,17 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="16dp"
+                app:cardCornerRadius="20dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/budget_card_bg"
+                app:strokeColor="@color/budget_divider"
+                app:strokeWidth="0.5dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="18dp">
+                    android:padding="20dp">
 
                     <!-- 分类图标 + 名称 + 周期标签 -->
                     <LinearLayout
@@ -92,30 +100,39 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="14dp">
+                        android:layout_marginBottom="20dp">
 
-                        <ImageView
-                            android:id="@+id/iv_category_icon"
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
-                            android:padding="8dp"
-                            android:src="@drawable/ic_category_default"
-                            android:scaleType="fitCenter"/>
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            app:cardCornerRadius="24dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="@color/budget_light_theme_bg">
+
+                            <ImageView
+                                android:id="@+id/iv_category_icon"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_category_default"
+                                android:scaleType="centerInside"
+                                android:contentDescription="分类图标"/>
+                        </com.google.android.material.card.MaterialCardView>
 
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical"
-                            android:layout_marginStart="12dp">
+                            android:layout_marginStart="16dp">
 
                             <TextView
                                 android:id="@+id/tv_category_name"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="分类名称"
-                                android:textColor="#333333"
-                                android:textSize="16sp"
+                                android:textColor="@color/budget_text_main"
+                                android:textSize="18sp"
                                 android:textStyle="bold"/>
 
                             <TextView
@@ -123,7 +140,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="月预算"
-                                android:textColor="#888888"
+                                android:textColor="@color/budget_text_secondary"
                                 android:textSize="12sp"
                                 android:layout_marginTop="2dp"/>
                         </LinearLayout>
@@ -134,7 +151,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginBottom="14dp">
+                        android:layout_marginBottom="20dp">
 
                         <!-- 总预算 -->
                         <LinearLayout
@@ -148,23 +165,24 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="¥0.00"
-                                android:textColor="#333333"
+                                android:textColor="@color/budget_text_main"
                                 android:textSize="18sp"
                                 android:textStyle="bold"/>
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="总预算"
-                                android:textColor="#888888"
+                                android:textColor="@color/budget_text_aux"
                                 android:textSize="12sp"
-                                android:layout_marginTop="2dp"/>
+                                android:layout_marginTop="4dp"/>
                         </LinearLayout>
 
                         <!-- 分隔线 -->
                         <View
                             android:layout_width="1dp"
-                            android:layout_height="40dp"
-                            android:background="#F0F0F0"/>
+                            android:layout_height="32dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="@color/budget_divider"/>
 
                         <!-- 已用 -->
                         <LinearLayout
@@ -185,16 +203,17 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="已用"
-                                android:textColor="#888888"
+                                android:textColor="@color/budget_text_aux"
                                 android:textSize="12sp"
-                                android:layout_marginTop="2dp"/>
+                                android:layout_marginTop="4dp"/>
                         </LinearLayout>
 
                         <!-- 分隔线 -->
                         <View
                             android:layout_width="1dp"
-                            android:layout_height="40dp"
-                            android:background="#F0F0F0"/>
+                            android:layout_height="32dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="@color/budget_divider"/>
 
                         <!-- 剩余/超支 -->
                         <LinearLayout
@@ -208,7 +227,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="¥0.00"
-                                android:textColor="#4CAF50"
+                                android:textColor="@color/income_color"
                                 android:textSize="18sp"
                                 android:textStyle="bold"/>
                             <TextView
@@ -216,9 +235,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="剩余"
-                                android:textColor="#888888"
+                                android:textColor="@color/budget_text_aux"
                                 android:textSize="12sp"
-                                android:layout_marginTop="2dp"/>
+                                android:layout_marginTop="4dp"/>
                         </LinearLayout>
                     </LinearLayout>
 
@@ -227,8 +246,8 @@
                         android:id="@+id/progress_detail"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:progressDrawable="@drawable/bg_progress_budget_blue"
+                        android:layout_height="6dp"
+                        android:progressDrawable="@drawable/bg_progress_thin"
                         android:max="100"
                         android:progress="0"/>
 
@@ -239,16 +258,18 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:cardCornerRadius="16dp"
+                android:layout_marginTop="16dp"
+                app:cardCornerRadius="20dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/budget_card_bg"
+                app:strokeColor="@color/budget_divider"
+                app:strokeWidth="0.5dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="20dp">
 
                     <!-- 标题行 + 周期 Tab -->
                     <LinearLayout
@@ -256,52 +277,52 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="12dp">
+                        android:layout_marginBottom="16dp">
 
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="消费趋势"
-                            android:textColor="#333333"
+                            android:textColor="@color/budget_text_main"
                             android:textSize="15sp"
                             android:textStyle="bold"/>
 
                         <!-- 趋势周期 Tab（周/月/年） -->
                         <LinearLayout
                             android:layout_width="wrap_content"
-                            android:layout_height="28dp"
+                            android:layout_height="32dp"
                             android:orientation="horizontal"
-                            android:background="@drawable/bg_capsule_small"
-                            android:padding="3dp">
+                            android:background="@drawable/bg_capsule_gray"
+                            android:padding="2dp">
 
                             <TextView
                                 android:id="@+id/tab_trend_week"
-                                android:layout_width="40dp"
+                                android:layout_width="44dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
                                 android:text="周"
                                 android:textSize="11sp"
-                                android:textColor="#888888"/>
+                                android:textColor="@color/budget_text_aux"/>
 
                             <TextView
                                 android:id="@+id/tab_trend_month"
-                                android:layout_width="40dp"
+                                android:layout_width="44dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
                                 android:text="月"
                                 android:textSize="11sp"
-                                android:background="@drawable/bg_tab_selected_blue"
-                                android:textColor="#FFFFFF"/>
+                                android:background="@drawable/bg_tab_selected_white"
+                                android:textColor="@color/budget_text_main"/>
 
                             <TextView
                                 android:id="@+id/tab_trend_year"
-                                android:layout_width="40dp"
+                                android:layout_width="44dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
                                 android:text="年"
                                 android:textSize="11sp"
-                                android:textColor="#888888"/>
+                                android:textColor="@color/budget_text_aux"/>
                         </LinearLayout>
                     </LinearLayout>
 
@@ -317,19 +338,19 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center"
-                        android:layout_marginTop="8dp">
+                        android:layout_marginTop="12dp">
 
                         <View
-                            android:layout_width="14dp"
+                            android:layout_width="12dp"
                             android:layout_height="3dp"
-                            android:background="#5B8DEF"/>
+                            android:background="@color/budget_primary"/>
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="消费金额"
                             android:textSize="11sp"
-                            android:textColor="#888888"
-                            android:layout_marginStart="4dp"/>
+                            android:textColor="@color/budget_text_aux"
+                            android:layout_marginStart="6dp"/>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -338,16 +359,18 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:cardCornerRadius="16dp"
+                android:layout_marginTop="16dp"
+                app:cardCornerRadius="20dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/budget_card_bg"
+                app:strokeColor="@color/budget_divider"
+                app:strokeWidth="0.5dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingTop="18dp"
+                    android:paddingTop="20dp"
                     android:paddingBottom="8dp">
 
                     <!-- 标题行 -->
@@ -356,16 +379,16 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:paddingStart="18dp"
-                        android:paddingEnd="18dp"
-                        android:layout_marginBottom="12dp">
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:layout_marginBottom="16dp">
 
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="消费记录"
-                            android:textColor="#333333"
+                            android:textColor="@color/budget_text_main"
                             android:textSize="15sp"
                             android:textStyle="bold"/>
 
@@ -374,7 +397,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="共 0 笔消费"
-                            android:textColor="#888888"
+                            android:textColor="@color/budget_text_aux"
                             android:textSize="12sp"/>
                     </LinearLayout>
 
@@ -384,7 +407,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="暂无消费记录"
-                        android:textColor="#BBBBBB"
+                        android:textColor="@color/budget_text_aux"
                         android:textSize="13sp"
                         android:gravity="center"
                         android:paddingTop="32dp"

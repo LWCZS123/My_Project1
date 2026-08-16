@@ -58,7 +58,7 @@ public class MonthAdapter extends RecyclerView.Adapter<MonthAdapter.ViewHolder> 
         
         if (item.selected) {
             holder.textView.setBackgroundResource(R.drawable.bg_tab_selected_white);
-            holder.textView.setTextColor(0xFF333333);
+            holder.textView.setTextColor(0xFF222222);
         } else {
             holder.textView.setBackgroundResource(R.drawable.bg_capsule_gray);
             holder.textView.setTextColor(0xFF999999);
