@@ -37,9 +37,14 @@ public class BalanceAdjustmentBottomSheetFragment extends BottomSheetDialogFragm
     private boolean isCalculating = false;
 
     public static BalanceAdjustmentBottomSheetFragment newInstance(Account account) {
+        return newInstance(account, null);
+    }
+
+    public static BalanceAdjustmentBottomSheetFragment newInstance(Account account, String title) {
         BalanceAdjustmentBottomSheetFragment fragment = new BalanceAdjustmentBottomSheetFragment();
         Bundle args = new Bundle();
         args.putSerializable("account", account);
+        if (title != null) args.putString("title", title);
         fragment.setArguments(args);
         return fragment;
     }
@@ -83,7 +88,12 @@ public class BalanceAdjustmentBottomSheetFragment extends BottomSheetDialogFragm
         super.onViewCreated(view, savedInstanceState);
 
         if (account != null) {
-            binding.tvTitle.setText(account.isCredit() ? "欠款调整" : "余额调整");
+            String title = getArguments() != null ? getArguments().getString("title") : null;
+            if (title != null) {
+                binding.tvTitle.setText(title);
+            } else {
+                binding.tvTitle.setText(account.isCredit() ? "欠款调整" : "余额调整");
+            }
             currentInput.append(String.format(Locale.US, "%.2f", Math.abs(account.getBalance())));
             if (currentInput.toString().endsWith(".00")) {
                 currentInput.setLength(currentInput.length() - 3);

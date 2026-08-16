@@ -52,7 +52,13 @@ public class CloudBudget extends BmobObject {
     private long     startTime;
     private long     endTime;
 
+    /** "EXPENSE" / "INCOME" */
+    private String transactionType = "EXPENSE";
+
     // ── Getters / Setters ──────────────────────────────────
+
+    public String getTransactionType()         { return transactionType; }
+    public void setTransactionType(String t)   { this.transactionType = t; }
 
     public int getLocalId()                    { return localId; }
     public void setLocalId(int localId)        { this.localId = localId; }
@@ -105,6 +111,7 @@ public class CloudBudget extends BmobObject {
         b.setAmount(amount);
         b.setPeriod(period);
         b.setBudgetType(budgetType);
+        b.setTransactionType(transactionType); // ← 新增
         b.setYear(year);
         b.setMonth(month);
         b.setStartTime(startTime);
@@ -134,6 +141,7 @@ public class CloudBudget extends BmobObject {
         cloud.setAmount(local.getAmount());
         cloud.setPeriod(local.getPeriod());
         cloud.setBudgetType(local.getBudgetType());
+        cloud.setTransactionType(local.getTransactionType()); // ← 新增
         cloud.setYear(local.getYear());
         cloud.setMonth(local.getMonth());
         cloud.setStartTime(local.getStartTime());

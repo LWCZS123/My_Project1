@@ -14,29 +14,33 @@ import java.util.List;
 
 public class MonthAdapter extends RecyclerView.Adapter<MonthAdapter.ViewHolder> {
 
-    private List<String> months = new ArrayList<>();
-    private int selectedPosition = -1;
-    private OnMonthClickListener listener;
-
-    public interface OnMonthClickListener {
-        void onMonthClick(int month);
+    public static class PeriodItem {
+        public String label;
+        public long startTime;
+        public long endTime;
+        public boolean selected;
+        
+        public PeriodItem(String label, long startTime, long endTime) {
+            this.label = label;
+            this.startTime = startTime;
+            this.endTime = endTime;
+        }
     }
 
-    public MonthAdapter(OnMonthClickListener listener) {
+    private List<PeriodItem> items = new ArrayList<>();
+    private OnPeriodClickListener listener;
+
+    public interface OnPeriodClickListener {
+        void onPeriodClick(PeriodItem item);
+    }
+
+    public MonthAdapter(OnPeriodClickListener listener) {
         this.listener = listener;
     }
 
-    public void setItems(List<String> newItems, int selectedIndex) {
-        this.months = newItems;
-        this.selectedPosition = selectedIndex;
+    public void setItems(List<PeriodItem> newItems) {
+        this.items = newItems;
         notifyDataSetChanged();
-    }
-
-    public void setSelectedMonth(int month) {
-        int old = selectedPosition;
-        selectedPosition = month - 1;
-        if (old >= 0 && old < months.size()) notifyItemChanged(old);
-        if (selectedPosition >= 0 && selectedPosition < months.size()) notifyItemChanged(selectedPosition);
     }
 
     @NonNull
@@ -49,10 +53,10 @@ public class MonthAdapter extends RecyclerView.Adapter<MonthAdapter.ViewHolder> 
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.textView.setText(months.get(position));
-        boolean selected = position == selectedPosition;
+        PeriodItem item = items.get(position);
+        holder.textView.setText(item.label);
         
-        if (selected) {
+        if (item.selected) {
             holder.textView.setBackgroundResource(R.drawable.bg_tab_selected_white);
             holder.textView.setTextColor(0xFF333333);
         } else {
@@ -62,13 +66,13 @@ public class MonthAdapter extends RecyclerView.Adapter<MonthAdapter.ViewHolder> 
         }
 
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onMonthClick(position + 1);
+            if (listener != null) listener.onPeriodClick(item);
         });
     }
 
     @Override
     public int getItemCount() {
-        return months.size();
+        return items.size();
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {

@@ -140,6 +140,10 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
         if (args != null) {
             isEditMode = args.getBoolean(ARG_IS_EDIT, false);
             isSimplifiedMode = args.getBoolean(ARG_SIMPLIFIED, false);
+            
+            String transType = budgetVm.getTransactionType();
+            boolean isIncome = Budget.TYPE_INCOME.equals(transType);
+            
             if (isEditMode) {
                 editBudgetId = args.getInt(ARG_BUDGET_ID, -1);
                 selectedCatCloudId = args.getString(ARG_TARGET_ID);
@@ -152,11 +156,13 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
                 binding.etAmount.setSelection(binding.etAmount.getText().length());
                 
                 if (isSimplifiedMode) {
-                    binding.tvTitle.setText("编辑分类预算");
+                    binding.tvTitle.setText(isIncome ? "编辑收入目标" : "编辑分类预算");
                     binding.cardSelectedCategory.setClickable(false);
                     binding.btnSmartAllocate.setVisibility(View.GONE);
                     binding.btnConfirm.setText("确 认");
                 }
+            } else {
+                binding.tvTitle.setText(isIncome ? "添加收入目标" : "添加分类预算");
             }
         }
     }
@@ -192,6 +198,9 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
     }
 
     private void initSmartAllocation() {
+        boolean isIncome = Budget.TYPE_INCOME.equals(budgetVm.getTransactionType());
+        binding.btnSmartAllocate.setText(isIncome ? "根据历史收入智能填充" : "根据消费历史智能填充");
+        
         binding.btnSmartAllocate.setOnClickListener(v -> {
             if (selectedCatCloudId == null) {
                 Toast.makeText(requireContext(), "请先选择分类", Toast.LENGTH_SHORT).show();
@@ -199,11 +208,11 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
             }
             
             AppExecutors.get().diskIO().execute(() -> {
-                double spent = budgetVm.getSpentByCategorySync(selectedCatCloudId);
+                double historical = budgetVm.getSpentByCategorySync(selectedCatCloudId);
                 AppExecutors.get().mainThread().execute(() -> {
-                    if (spent > 0) {
-                        binding.etAmount.setText(String.format(Locale.getDefault(), "%.2f", spent));
-                        Toast.makeText(requireContext(), "已根据消费历史智能分配", Toast.LENGTH_SHORT).show();
+                    if (historical > 0) {
+                        binding.etAmount.setText(String.format(Locale.getDefault(), "%.2f", historical));
+                        Toast.makeText(requireContext(), isIncome ? "已根据历史收入智能分配" : "已根据消费历史智能分配", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(requireContext(), "暂无消费历史，建议手动设置", Toast.LENGTH_SHORT).show();
                     }
@@ -312,15 +321,39 @@ public class AddCategoryBudgetFragment extends BottomSheetDialogFragment {
         }
 
         double amount = Double.parseDouble(amountStr);
-        if (isEditMode) {
-            Budget b = new Budget();
-            b.setId(editBudgetId);
-            b.setTargetId(selectedCatCloudId);
-            budgetVm.updateCategoryBudget(b, amount, selectedPeriod);
-        } else {
-            budgetVm.addCategoryBudget(selectedCatCloudId, amount, selectedPeriod, selectedCatName, selectedCatIconUri);
+        String bType = budgetVm.getBudgetType();
+        String tType = budgetVm.getTransactionType();
+        int year = budgetVm.getCurrentYear();
+        int month = budgetVm.getCurrentMonth();
+        
+        Budget b = new Budget();
+        b.setAmount(amount);
+        b.setTargetType(Budget.TARGET_CATEGORY);
+        b.setTargetId(selectedCatCloudId);
+        b.setBudgetType(bType);
+        b.setTransactionType(tType); // 关键：保存当前的收支类型
+        b.setYear(year);
+        b.setMonth(month);
+        b.setOwnerId(budgetVm.getUserId());
+        b.setCategoryName(selectedCatName);
+        b.setCategoryIconUrl(selectedCatIconUri);
+        b.setPeriod(selectedPeriod);
+        
+        // 设置时间范围
+        Long start = budgetVm.getSelectedStartTime().getValue();
+        Long end = budgetVm.getSelectedEndTime().getValue();
+        if (start != null && end != null) {
+            b.setStartTime(start);
+            b.setEndTime(end);
         }
-        dismiss();
+
+        if (isEditMode) {
+            b.setId(editBudgetId);
+        }
+        
+        budgetVm.addOrUpdateCategoryBudget(b, action -> {
+            dismiss();
+        });
     }
 
     @Override

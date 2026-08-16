@@ -96,7 +96,14 @@ public class Budget {
     @ColumnInfo(name = "category_icon_url")
     private String categoryIconUrl;
 
+    /** "EXPENSE" 或 "INCOME"，区分支出/收入预算 */
+    @ColumnInfo(name = "transaction_type", defaultValue = "EXPENSE")
+    private String transactionType = "EXPENSE";
+
     // ── 常量 ──────────────────────────────────────────────
+
+    public static final String TYPE_EXPENSE = "EXPENSE";
+    public static final String TYPE_INCOME  = "INCOME";
 
     public static final int TARGET_CATEGORY = 1;
     public static final int TARGET_TOTAL    = 2;
@@ -111,6 +118,9 @@ public class Budget {
     public static final String TYPE_YEAR  = "YEAR";
 
     // ── Getters / Setters ──────────────────────────────────
+
+    public String getTransactionType()          { return transactionType; }
+    public void setTransactionType(String type) { this.transactionType = type; }
 
     public int getId()                         { return id; }
     public void setId(int id)                  { this.id = id; }

@@ -3,6 +3,7 @@ package com.example.my_project1.utils;
 import com.example.my_project1.data.model.budget.Budget;
 
 import java.util.Calendar;
+import java.util.Locale;
 
 /**
  * BudgetPeriodHelper
@@ -36,10 +37,12 @@ public class BudgetPeriodHelper {
                 break;
 
             case Budget.PERIOD_WEEK:
-                // 周预算默认从周日开始（符合截图展示）
+                // 周预算固定从周日开始（符合截图展示）
+                start.setFirstDayOfWeek(Calendar.SUNDAY);
                 int dow = start.get(Calendar.DAY_OF_WEEK);
                 int offset = Calendar.SUNDAY - dow;
                 start.add(Calendar.DAY_OF_MONTH, offset);
+
                 end.setTimeInMillis(start.getTimeInMillis());
                 end.add(Calendar.DAY_OF_MONTH, 6);
                 resetToEndOfDay(end);
@@ -109,6 +112,34 @@ public class BudgetPeriodHelper {
                 return s.get(Calendar.YEAR) + "年";
             default:
                 return "";
+        }
+    }
+
+    /**
+     * 格式化周范围显示，例如 "2026年8月10日 - 16日" 或 "8月31日 - 9月6日"
+     */
+    public static String formatWeekRange(long startMs, long endMs) {
+        Calendar s = Calendar.getInstance();
+        Calendar e = Calendar.getInstance();
+        s.setTimeInMillis(startMs);
+        e.setTimeInMillis(endMs);
+
+        int sYear = s.get(Calendar.YEAR);
+        int eYear = e.get(Calendar.YEAR);
+        int sMonth = s.get(Calendar.MONTH) + 1;
+        int eMonth = e.get(Calendar.MONTH) + 1;
+        int sDay = s.get(Calendar.DAY_OF_MONTH);
+        int eDay = e.get(Calendar.DAY_OF_MONTH);
+
+        if (sYear != eYear) {
+            return String.format(Locale.getDefault(), "%d年%d月%d日 - %d年%d月%d日",
+                    sYear, sMonth, sDay, eYear, eMonth, eDay);
+        } else if (sMonth != eMonth) {
+            return String.format(Locale.getDefault(), "%d年%d月%d日 - %d月%d日",
+                    sYear, sMonth, sDay, eMonth, eDay);
+        } else {
+            return String.format(Locale.getDefault(), "%d年%d月%d日 - %d日",
+                    sYear, sMonth, sDay, eDay);
         }
     }
 

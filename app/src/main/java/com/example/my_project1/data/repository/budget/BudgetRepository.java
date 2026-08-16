@@ -60,60 +60,68 @@ public class BudgetRepository {
 
     // ── 总预算 LiveData ────────────────────────────────────
 
-    public LiveData<Budget> getMonthBudgetLive(String userId, int year, int month) {
-        return dao.getMonthBudgetLive(userId, year, month);
+    public LiveData<Budget> getMonthBudgetLive(String userId, String transType, int year, int month) {
+        return dao.getMonthBudgetLive(userId, transType, year, month);
     }
 
-    public LiveData<Budget> getWeekBudgetLive(String userId, int year, int month) {
-        return dao.getWeekBudgetLive(userId, year, month);
+    public LiveData<Budget> getWeekBudgetLiveByStart(String userId, String transType, long startTime) {
+        return dao.getWeekBudgetLiveByStart(userId, transType, startTime);
     }
 
-    public LiveData<Budget> getYearBudgetLive(String userId, int year) {
-        return dao.getYearBudgetLive(userId, year);
+    public LiveData<Budget> getYearBudgetLive(String userId, String transType, int year) {
+        return dao.getYearBudgetLive(userId, transType, year);
     }
 
     // ── 总预算同步读取 ─────────────────────────────────────
 
-    public Budget getMonthBudgetSync(String userId, int year, int month) {
-        return dao.getMonthBudgetSync(userId, year, month);
+    public Budget getMonthBudgetSync(String userId, String transType, int year, int month) {
+        return dao.getMonthBudgetSync(userId, transType, year, month);
     }
 
-    public Budget getWeekBudgetSync(String userId, int year, int month) {
-        return dao.getWeekBudgetSync(userId, year, month);
+    public Budget getWeekBudgetSync(String userId, String transType, int year, int month) {
+        return dao.getWeekBudgetSync(userId, transType, year, month);
     }
 
-    public Budget getYearBudgetSync(String userId, int year) {
-        return dao.getYearBudgetSync(userId, year);
+    public Budget getWeekBudgetSyncByStart(String userId, String transType, long startTime) {
+        return dao.getWeekBudgetSyncByStart(userId, transType, startTime);
+    }
+
+    public Budget getYearBudgetSync(String userId, String transType, int year) {
+        return dao.getYearBudgetSync(userId, transType, year);
     }
 
     // ── 分类预算 ───────────────────────────────────────────
 
     public LiveData<List<Budget>> getCategoryBudgetsLive(
-            String userId, String budgetType, int year, int month) {
-        return dao.getCategoryBudgetsLive(userId, budgetType, year, month);
+            String userId, String transType, String budgetType, int year, int month) {
+        return dao.getCategoryBudgetsLive(userId, transType, budgetType, year, month);
     }
 
-    public Budget getCategoryBudget(String userId, String catId,
+    public LiveData<List<Budget>> getCategoryBudgetsLiveByStart(
+            String userId, String transType, String budgetType, long startTime) {
+        return dao.getCategoryBudgetsLiveByStart(userId, transType, budgetType, startTime);
+    }
+
+    public Budget getCategoryBudget(String userId, String transType, String catId,
                                     String budgetType, int year, int month) {
-        return dao.getCategoryBudget(userId, catId, budgetType, year, month);
+        return dao.getCategoryBudget(userId, transType, catId, budgetType, year, month);
     }
 
-    public Budget getCategoryBudgetByPeriod(String userId, String catId,
-                                            String budgetType, int period,
-                                            int year, int month) {
-        return dao.getCategoryBudgetWithPeriod(userId, catId, budgetType, period, year, month);
+    public Budget getCategoryBudgetByStart(String userId, String transType, String catId,
+                                           String budgetType, long startTime) {
+        return dao.getCategoryBudgetByStart(userId, transType, catId, budgetType, startTime);
     }
 
-    public List<Budget> getCategoryBudgetsSync(String userId,
+    public List<Budget> getCategoryBudgetsSync(String userId, String transType,
                                                String budgetType, int year, int month) {
-        return dao.getCategoryBudgetsSyncByType(userId, budgetType, year, month);
+        return dao.getCategoryBudgetsSyncByType(userId, transType, budgetType, year, month);
     }
 
     // ── 剩余可分配预算 ─────────────────────────────────────
 
-    public double getRemainingAllocation(double totalAmount, String userId,
+    public double getRemainingAllocation(double totalAmount, String userId, String transType,
                                          String budgetType, int year, int month) {
-        double allocated = dao.getTotalAllocatedAmount(userId, budgetType, year, month);
+        double allocated = dao.getTotalAllocatedAmount(userId, transType, budgetType, year, month);
         return totalAmount - allocated;
     }
 
@@ -158,12 +166,17 @@ public class BudgetRepository {
         AppExecutors.get().diskIO().execute(() -> {
             String userId     = budget.getOwnerId();
             String catId      = budget.getTargetId();
+            String transType  = budget.getTransactionType();
             String budgetType = budget.getBudgetType();
             int    year       = budget.getYear();
             int    month      = budget.getMonth();
 
-            Budget existing = dao.getExistingCategoryBudget(
-                    userId, catId, budgetType, year, month);
+            Budget existing;
+            if (Budget.TYPE_WEEK.equals(budgetType)) {
+                existing = dao.getCategoryBudgetByStart(userId, transType, catId, budgetType, budget.getStartTime());
+            } else {
+                existing = dao.getExistingCategoryBudget(userId, transType, catId, budgetType, year, month);
+            }
 
             String action;
             if (existing != null) {
@@ -297,6 +310,7 @@ public class BudgetRepository {
                         || local.getStartTime()  != cloud.getStartTime()
                         || local.getEndTime()    != cloud.getEndTime()
                         || local.getTargetType() != cloud.getTargetType()
+                        || !safeEquals(local.getTransactionType(), cloud.getTransactionType())
                         || !safeEquals(local.getTargetId(),   cloud.getTargetId())
                         || !safeEquals(local.getBudgetType(), cloud.getBudgetType())
                         || local.getYear()       != cloud.getYear()
@@ -310,6 +324,7 @@ public class BudgetRepository {
             local.setStartTime(cloud.getStartTime());
             local.setEndTime(cloud.getEndTime());
             local.setTargetType(cloud.getTargetType());
+            local.setTransactionType(cloud.getTransactionType());
             local.setTargetId(cloud.getTargetId());
             local.setBudgetType(cloud.getBudgetType());
             local.setYear(cloud.getYear());

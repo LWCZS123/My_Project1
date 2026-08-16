@@ -258,6 +258,21 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
+        <!-- Smart Yearly Allocation Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_smart_allocation"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:text="将年预算平均分配到12个月"
+            android:textColor="#304FFE"
+            android:visibility="gone"
+            app:backgroundTint="#F2F4FF"
+            app:cornerRadius="24dp"
+            app:strokeColor="#304FFE"
+            app:strokeWidth="1dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
         <!-- Confirm Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_confirm"

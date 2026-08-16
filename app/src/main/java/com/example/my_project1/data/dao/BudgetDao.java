@@ -50,33 +50,68 @@ public interface BudgetDao {
 
     /** 同步查询：指定年月的月预算 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = 'MONTH' AND year = :year AND month = :month LIMIT 1")
-    Budget getMonthBudgetSync(String userId, int year, int month);
+    Budget getMonthBudgetSync(String userId, String transType, int year, int month);
 
     /** 同步查询：指定年月的周预算 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = 'WEEK' AND year = :year AND month = :month LIMIT 1")
-    Budget getWeekBudgetSync(String userId, int year, int month);
+    Budget getWeekBudgetSync(String userId, String transType, int year, int month);
 
     /** 同步查询：指定年份的年预算 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = 'YEAR' AND year = :year LIMIT 1")
-    Budget getYearBudgetSync(String userId, int year);
+    Budget getYearBudgetSync(String userId, String transType, int year);
 
     /** LiveData：监听指定年月的月预算变化 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = 'MONTH' AND year = :year AND month = :month LIMIT 1")
-    LiveData<Budget> getMonthBudgetLive(String userId, int year, int month);
+    LiveData<Budget> getMonthBudgetLive(String userId, String transType, int year, int month);
 
     /** LiveData：监听指定年月的周预算变化 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = 'WEEK' AND year = :year AND month = :month LIMIT 1")
-    LiveData<Budget> getWeekBudgetLive(String userId, int year, int month);
+    LiveData<Budget> getWeekBudgetLive(String userId, String transType, int year, int month);
 
     /** LiveData：监听指定年份的年预算变化 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = 'YEAR' AND year = :year LIMIT 1")
-    LiveData<Budget> getYearBudgetLive(String userId, int year);
+    LiveData<Budget> getYearBudgetLive(String userId, String transType, int year);
+
+    /** LiveData：监听指定开始时间的周预算变化 */
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
+            "AND budget_type = 'WEEK' AND start_time = :startTime LIMIT 1")
+    LiveData<Budget> getWeekBudgetLiveByStart(String userId, String transType, long startTime);
+
+    /** 同步查询：指定开始时间的周预算 */
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
+            "AND transaction_type = :transType " +
+            "AND budget_type = 'WEEK' AND start_time = :startTime LIMIT 1")
+    Budget getWeekBudgetSyncByStart(String userId, String transType, long startTime);
+
+    /** LiveData：监听指定开始时间的分类预算列表 */
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
+            "AND budget_type = :budgetType AND start_time = :startTime " +
+            "AND sync_state != 3 " +
+            "ORDER BY updated_at DESC")
+    LiveData<List<Budget>> getCategoryBudgetsLiveByStart(
+            String userId, String transType, String budgetType, long startTime);
+    
+    /** 同步查询：指定开始时间的分类预算 */
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
+            "AND target_id = :categoryId AND budget_type = :budgetType " +
+            "AND start_time = :startTime LIMIT 1")
+    Budget getCategoryBudgetByStart(String userId, String transType, String categoryId,
+                                    String budgetType, long startTime);
 
     // ── 分类预算 ─────────────────────────────────────────────
 
@@ -85,11 +120,12 @@ public interface BudgetDao {
      * 排除 TO_DELETE 状态的记录，避免已标记删除的数据出现在列表中。
      */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = :budgetType AND year = :year AND month = :month " +
             "AND sync_state != 3 " +
             "ORDER BY updated_at DESC")
     LiveData<List<Budget>> getCategoryBudgetsLive(
-            String userId, String budgetType, int year, int month);
+            String userId, String transType, String budgetType, int year, int month);
 
     /**
      * 同步查询：同一分类 + 同一 budgetType + 同一年月 下的唯一预算（不区分 period）。
@@ -105,9 +141,10 @@ public interface BudgetDao {
      * 已移除该参数。调用方如需按 period 过滤请改用 getCategoryBudgetWithPeriod()。
      */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND target_id = :categoryId AND budget_type = :budgetType " +
             "AND year = :year AND month = :month LIMIT 1")
-    Budget getCategoryBudgetByPeriod(String userId, String categoryId,
+    Budget getCategoryBudgetByPeriod(String userId, String transType, String categoryId,
                                      String budgetType, int year, int month);
 
     /**
@@ -116,10 +153,11 @@ public interface BudgetDao {
      * 参数名使用 budgetPeriod 避免与 Budget.PERIOD_* 常量名冲突导致 lint 误判。
      */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND target_id = :categoryId AND budget_type = :budgetType " +
             "AND period = :budgetPeriod " +
             "AND year = :year AND month = :month LIMIT 1")
-    Budget getCategoryBudgetWithPeriod(String userId, String categoryId,
+    Budget getCategoryBudgetWithPeriod(String userId, String transType, String categoryId,
                                        String budgetType, int budgetPeriod, int year, int month);
 
     /**
@@ -127,9 +165,10 @@ public interface BudgetDao {
      * 用于判断新增前是否已存在同分类预算。
      */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND target_id = :categoryId AND budget_type = :budgetType " +
             "AND year = :year AND month = :month LIMIT 1")
-    Budget getExistingCategoryBudget(String userId, String categoryId,
+    Budget getExistingCategoryBudget(String userId, String transType, String categoryId,
                                      String budgetType, int year, int month);
 
     /**
@@ -137,16 +176,18 @@ public interface BudgetDao {
      * 用于云端同步及分类选择器 tag 展示场景。
      */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND target_id = :categoryId AND budget_type = :budgetType " +
             "AND year = :year AND month = :month LIMIT 1")
-    Budget getCategoryBudget(String userId, String categoryId,
+    Budget getCategoryBudget(String userId, String transType, String categoryId,
                              String budgetType, int year, int month);
 
     /** 同步查询：指定类型+年月下所有分类预算列表（排除待删除） */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = :budgetType AND year = :year AND month = :month " +
             "AND sync_state != 3")
-    List<Budget> getCategoryBudgetsSyncByType(String userId, String budgetType,
+    List<Budget> getCategoryBudgetsSyncByType(String userId, String transType, String budgetType,
                                               int year, int month);
 
     /** 同步查询：当前用户所有分类预算，用于周期性重置（BudgetResetWorker） */
@@ -189,7 +230,8 @@ public interface BudgetDao {
      */
     @Query("SELECT COALESCE(SUM(amount), 0) FROM budgets " +
             "WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType " +
             "AND budget_type = :budgetType AND year = :year AND month = :month " +
             "AND sync_state != 3")
-    double getTotalAllocatedAmount(String userId, String budgetType, int year, int month);
+    double getTotalAllocatedAmount(String userId, String transType, String budgetType, int year, int month);
 }
