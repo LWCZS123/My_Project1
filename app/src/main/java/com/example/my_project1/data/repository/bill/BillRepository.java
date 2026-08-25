@@ -69,7 +69,6 @@ public class BillRepository {
                 bill.setUpdatedAt(now);
                 bill.setSyncState(SyncState.TO_CREATE);
 
-                // 🔑 关键: 在插入时处理图片URL
                 processImageUrls(bill);
 
                 long id = billDao.insert(bill);

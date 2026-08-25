@@ -378,17 +378,6 @@
                 android:textColor="#1C1C1E"
                 android:paddingBottom="12dp" />
 
-            <!--
-                RecyclerView 注意事项：
-                1. nestedScrollingEnabled="false" ← 必须设置！
-                   否则 RecyclerView 会自己拦截滚动，导致外层 ScrollView 无法滚动
-                2. 高度用 wrap_content，配合外层 ScrollView 整体滚动
-                3. overScrollMode="never" 去掉边缘过渡动画，避免与 ScrollView 冲突
-                4. 在代码中绑定：
-                   rv_history.layoutManager = LinearLayoutManager(context)
-                   rv_history.adapter = HistoryAdapter(list)
-                   // 不需要额外设置 hasFixedSize(true)，因为数据量可变
-            -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_history"
                 android:layout_width="match_parent"
