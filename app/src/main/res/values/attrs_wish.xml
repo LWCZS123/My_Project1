@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="RoundedRingProgressView">
+        <attr name="ringProgress" format="float" />
+        <attr name="ringMax" format="float" />
+        <attr name="ringStrokeWidth" format="dimension" />
+        <attr name="ringProgressColor" format="color" />
+        <attr name="ringTrackColor" format="color" />
+    </declare-styleable>
+</resources>

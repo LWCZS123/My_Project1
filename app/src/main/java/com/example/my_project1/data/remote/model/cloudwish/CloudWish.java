@@ -23,6 +23,7 @@ public class CloudWish extends BmobObject {
     private BmobDate startDate;   // 开始时间
     private String remark;        // 备注
     private Integer status;       // 状态
+    private String clientKey;     // 客户端幂等键
 
 
     public CloudWish() {}
@@ -97,6 +98,14 @@ public class CloudWish extends BmobObject {
         this.status = status;
     }
 
+    public String getClientKey() {
+        return clientKey;
+    }
+
+    public void setClientKey(String clientKey) {
+        this.clientKey = clientKey;
+    }
+
     // ==================== 本地 → 云端 ====================
 
     /**
@@ -157,14 +166,12 @@ public class CloudWish extends BmobObject {
         local.setRemark(remark);
         local.setStatus(status != null ? status : 0);
 
-        // 🔥 关键修复 1：转换 startDate
-        // startDate 是 BmobDate 对象，需要调用 getDate() 获取字符串后再转换
+        // BmobDate 需要先取出服务端日期字符串，再交给统一日期转换器处理。
         if (startDate != null) {
             local.setStartDate(DateConvertUtil.safeConvertToDate(startDate.getDate()));
         }
 
-        // 🔥 关键修复 2：转换系统时间字段
-        // getCreatedAt() 和 getUpdatedAt() 返回的是 String，可以直接转换
+        // Bmob 的系统时间字段是字符串，统一转换为 Room 使用的 Date。
         local.setCreatedAt(DateConvertUtil.safeConvertToDate(getCreatedAt()));
         local.setUpdatedAt(DateConvertUtil.safeConvertToDate(getUpdatedAt()));
 

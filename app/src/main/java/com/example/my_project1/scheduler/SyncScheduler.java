@@ -9,6 +9,7 @@ import androidx.work.WorkManager;
 
 import com.example.my_project1.work.CategorySyncWorker;
 import com.example.my_project1.work.SubCategorySyncWorker;
+import com.example.my_project1.work.WishSyncWorker;
 
 import java.util.concurrent.TimeUnit;
 
@@ -41,6 +42,11 @@ public class SyncScheduler {
                         .setConstraints(SubCategorySyncWorker.getDefaultConstraints())
                         .build();
 
+        PeriodicWorkRequest wishPeriodicSync =
+                new PeriodicWorkRequest.Builder(WishSyncWorker.class, 1, TimeUnit.HOURS)
+                        .setConstraints(WishSyncWorker.getDefaultConstraints())
+                        .build();
+
         // 避免重复注册，用唯一名称确保只存在一个周期任务
         wm.enqueueUniquePeriodicWork(
                 "CategoryPeriodicSync",
@@ -51,6 +57,11 @@ public class SyncScheduler {
                 "SubCategoryPeriodicSync",
                 ExistingPeriodicWorkPolicy.KEEP,
                 subCategoryPeriodicSync);
+
+        wm.enqueueUniquePeriodicWork(
+                "WishPeriodicSync",
+                ExistingPeriodicWorkPolicy.KEEP,
+                wishPeriodicSync);
 
         Log.d(TAG, "🕒 周期性同步任务已注册（每 1 小时执行一次）");
     }

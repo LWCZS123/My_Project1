@@ -10,6 +10,7 @@ import androidx.work.WorkManager;
 import com.example.my_project1.work.CategorySyncWorker;
 import com.example.my_project1.work.SubCategorySyncWorker;
 import com.example.my_project1.work.AccountSyncWorker;
+import com.example.my_project1.work.WishSyncWorker;
 
 /**
  * SyncRepository
@@ -53,6 +54,11 @@ public class SyncRepository {
                         .setConstraints(AccountSyncWorker.getDefaultConstraints())
                         .build();
 
+        OneTimeWorkRequest wishSync =
+                new OneTimeWorkRequest.Builder(WishSyncWorker.class)
+                        .setConstraints(WishSyncWorker.getDefaultConstraints())
+                        .build();
+
         /** 🔥 链式执行顺序非常关键！
          *  第一步必须是分类 → 再子分类
          *  AccountSyncWorker 内部已处理 先删→组→账户
@@ -62,7 +68,8 @@ public class SyncRepository {
                 ExistingWorkPolicy.KEEP,
                 categorySync
         ).then(subCategorySync)
-                .then(accountSync)  // ← 第三步执行账户同步
+                .then(accountSync)
+                .then(wishSync)
                 .enqueue();
 
         Log.d(TAG,"✔ 全量同步任务已提交 → 等待WorkManager逐个执行");
@@ -99,5 +106,9 @@ public class SyncRepository {
                         .setConstraints(AccountSyncWorker.getDefaultConstraints())
                         .build()
         );
+    }
+
+    public void syncWishesOnly() {
+        WishSyncWorker.enqueue(context);
     }
 }

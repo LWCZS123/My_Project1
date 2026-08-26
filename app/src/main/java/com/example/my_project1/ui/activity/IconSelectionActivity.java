@@ -50,6 +50,7 @@ public class IconSelectionActivity extends AppCompatActivity {
     public static final String EXTRA_NAME = "extra_name";
     public static final String EXTRA_ICON_URI = "extra_icon_uri";
     public static final String EXTRA_ICON_BG_COLOR = "extra_icon_bg_color";
+    public static final String EXTRA_PICK_ONLY = "extra_pick_only";
     public static final String EXTRA_EXCLUDE_BUDGET = "extra_exclude_budget";
     public static final String EXTRA_ID = "extra_id";
     public static final String EXTRA_PARENT_ID = "extra_parent_id";
@@ -66,6 +67,8 @@ public class IconSelectionActivity extends AppCompatActivity {
     private IconSelectionColorAdapter colorAdapter;
 
     private String userId;
+    private boolean pickOnly;
+    private String initialIconUri;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,11 +115,19 @@ public class IconSelectionActivity extends AppCompatActivity {
         String title = intent.getStringExtra(EXTRA_TITLE);
         String name = intent.getStringExtra(EXTRA_NAME);
         String iconUri = intent.getStringExtra(EXTRA_ICON_URI);
+        initialIconUri = iconUri;
         String iconBgColor = intent.getStringExtra(EXTRA_ICON_BG_COLOR);
         boolean excludeBudget = intent.getBooleanExtra(EXTRA_EXCLUDE_BUDGET, false);
+        pickOnly = intent.getBooleanExtra(EXTRA_PICK_ONLY, false);
 
         viewModel.setMode(mode, type, id);
-        if (title != null) binding.tvTitle.setText(title);
+        if (pickOnly) {
+            binding.tvTitle.setText(title == null ? "选择愿望图标" : title);
+            binding.cardPreview.setVisibility(View.GONE);
+            binding.cardBudget.setVisibility(View.GONE);
+        } else if (title != null) {
+            binding.tvTitle.setText(title);
+        }
         if (name != null) binding.etCategoryName.setText(name);
         if (iconBgColor != null) viewModel.selectColor(iconBgColor);
         if (iconUri != null) {
@@ -139,6 +150,7 @@ public class IconSelectionActivity extends AppCompatActivity {
         iconGridAdapter = new IconSelectionGridAdapter(icon -> {
             viewModel.selectIcon(icon);
         });
+        iconGridAdapter.setSelectedIconUrl(initialIconUri);
         binding.rvIconGrid.setLayoutManager(new GridLayoutManager(this, 4));
         binding.rvIconGrid.setAdapter(iconGridAdapter);
 
@@ -184,12 +196,6 @@ public class IconSelectionActivity extends AppCompatActivity {
     }
 
     private void handleConfirm() {
-        String name = binding.etCategoryName.getText().toString().trim();
-        if (name.isEmpty()) {
-            SnackbarUtils.showError(binding.getRoot(), "请输入类型名称");
-            return;
-        }
-
         IconItem selectedIcon = viewModel.selectedIcon.getValue();
         String iconUri = (selectedIcon != null) ? selectedIcon.getUrl() : getIntent().getStringExtra(EXTRA_ICON_URI);
         
@@ -199,6 +205,22 @@ public class IconSelectionActivity extends AppCompatActivity {
         }
 
         String color = viewModel.selectedColor.getValue();
+        if (pickOnly) {
+            // 仅选择模式只返回图标信息，不创建或修改收支分类。
+            Intent result = new Intent();
+            result.putExtra(EXTRA_ICON_URI, iconUri);
+            result.putExtra(EXTRA_ICON_BG_COLOR, color);
+            setResult(RESULT_OK, result);
+            finish();
+            return;
+        }
+
+        String name = binding.etCategoryName.getText().toString().trim();
+        if (name.isEmpty()) {
+            SnackbarUtils.showError(binding.getRoot(), "请输入类型名称");
+            return;
+        }
+
         boolean excludeBudget = !binding.switchBudget.isChecked();
 
         String mode = viewModel.mode.getValue();
@@ -239,6 +261,7 @@ public class IconSelectionActivity extends AppCompatActivity {
         viewModel.iconItems.observe(this, list -> iconGridAdapter.submitList(list));
 
         viewModel.selectedIcon.observe(this, icon -> {
+            iconGridAdapter.setSelectedIcon(icon);
             if (icon != null) {
                 ImageLoaderUtils.load(this, icon.getUrl(), binding.ivSelectedIcon);
                 binding.etCategoryName.setText(icon.getName());

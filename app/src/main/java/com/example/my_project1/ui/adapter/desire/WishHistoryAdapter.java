@@ -1,5 +1,6 @@
 package com.example.my_project1.ui.adapter.desire;
 
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -10,19 +11,27 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.data.model.wish.WishRecord;
 import com.example.my_project1.databinding.ItemWishHistoryBinding;
+import com.example.my_project1.ui.wish.WishUiFormatter;
 
 public class WishHistoryAdapter extends ListAdapter<WishRecord, WishHistoryAdapter.ViewHolder> {
 
-    public WishHistoryAdapter() {
+    public interface Listener {
+        void onEdit(WishRecord record);
+        void onDelete(WishRecord record);
+    }
+
+    private final Listener listener;
+
+    public WishHistoryAdapter(Listener listener) {
         super(DIFF_CALLBACK);
+        this.listener = listener;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        ItemWishHistoryBinding binding = ItemWishHistoryBinding.inflate(
-                LayoutInflater.from(parent.getContext()), parent, false);
-        return new ViewHolder(binding);
+        return new ViewHolder(ItemWishHistoryBinding.inflate(
+                LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
@@ -30,7 +39,7 @@ public class WishHistoryAdapter extends ListAdapter<WishRecord, WishHistoryAdapt
         holder.bind(getItem(position));
     }
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
+    class ViewHolder extends RecyclerView.ViewHolder {
         private final ItemWishHistoryBinding binding;
 
         ViewHolder(ItemWishHistoryBinding binding) {
@@ -39,7 +48,11 @@ public class WishHistoryAdapter extends ListAdapter<WishRecord, WishHistoryAdapt
         }
 
         void bind(WishRecord record) {
-            // 绑定数据到 UI
+            binding.tvRecordDate.setText(WishUiFormatter.date(record.getRecordDate()));
+            binding.tvRecordAmount.setText(WishUiFormatter.money(record.getAmount()));
+            binding.tvRecordNote.setText(TextUtils.isEmpty(record.getNote()) ? "存钱记录" : record.getNote());
+            binding.getRoot().setOnClickListener(v -> listener.onEdit(record));
+            binding.btnDeleteRecord.setOnClickListener(v -> listener.onDelete(record));
         }
     }
 
@@ -52,7 +65,10 @@ public class WishHistoryAdapter extends ListAdapter<WishRecord, WishHistoryAdapt
 
                 @Override
                 public boolean areContentsTheSame(@NonNull WishRecord oldItem, @NonNull WishRecord newItem) {
-                    return oldItem.equals(newItem);
+                    return oldItem.getAmount() == newItem.getAmount()
+                            && TextUtils.equals(oldItem.getNote(), newItem.getNote())
+                            && TextUtils.equals(String.valueOf(oldItem.getRecordDate()), String.valueOf(newItem.getRecordDate()))
+                            && oldItem.getSyncState() == newItem.getSyncState();
                 }
             };
 }

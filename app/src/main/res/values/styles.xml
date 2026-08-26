@@ -237,4 +237,9 @@
         <item name="colorSwitchThumbNormal">#F1F5F9</item>
         <item name="android:colorForeground">#E2E8F0</item>
     </style>
+
+    <style name="CircleShape">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
 </resources>

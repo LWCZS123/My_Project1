@@ -1,392 +1,285 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F2F7"
-    android:fillViewport="true">
+    android:background="#F7F6FA"
+    android:fitsSystemWindows="true">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="32dp">
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true">
 
-        <!-- Top Bar -->
-        <RelativeLayout
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="96dp">
 
-            <TextView
-                android:id="@+id/tv_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:text="手机"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="#1C1C1E" />
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
 
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:padding="8dp"
-                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/tv_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:maxWidth="180dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#17151A"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
 
-                <ImageView
-                    android:id="@+id/btn_edit"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/ic_edit1"
-                    android:scaleType="centerInside"
-                    app:tint="#8E8E93"
-                     />
-                <View
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"/>
-
+                <TextView
+                    android:id="@+id/tv_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_toEndOf="@id/tv_title"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="10dp"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <ImageView
                     android:id="@+id/btn_delete"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:contentDescription="删除愿望"
+                    android:focusable="true"
+                    android:padding="8dp"
                     android:src="@drawable/ic_trash"
-                    android:scaleType="centerInside"
-                    app:tint="#8E8E93"
-                    />
-            </LinearLayout>
-        </RelativeLayout>
+                    app:tint="#5F5963" />
 
+                <ImageView
+                    android:id="@+id/btn_edit"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_centerVertical="true"
+                    android:layout_toStartOf="@id/btn_delete"
+                    android:layout_marginEnd="14dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:contentDescription="编辑愿望"
+                    android:focusable="true"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_edit1"
+                    app:tint="#5F5963" />
+            </RelativeLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:paddingTop="20dp"
-            android:paddingBottom="8dp">
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="36dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="20dp">
 
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="240dp"
-                android:layout_height="240dp"
-                app:cardCornerRadius="120dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:strokeWidth="0dp"
-                app:cardUseCompatPadding="true"
-                app:cardPreventCornerOverlap="false">
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/donut_card"
+                    android:layout_width="196dp"
+                    android:layout_height="196dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="98dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="#F0F4FA"
+                    app:strokeWidth="1dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
 
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="18dp">
 
-                    <!-- 圆形进度条（DonutProgress） -->
-                    <com.github.lzyzsd.circleprogress.DonutProgress
-                        android:id="@+id/donut_progress"
-                        android:layout_width="200dp"
-                        android:layout_height="200dp"
-                        android:layout_gravity="center"
-                        app:donut_progress="16"
-                        app:donut_finished_color="#1C1C1E"
-                        app:donut_unfinished_color="#E5E5EA"
-                        app:donut_finished_stroke_width="14dp"
-                        app:donut_unfinished_stroke_width="14dp"
-                        app:donut_show_text="false" />
+                        <com.example.my_project1.ui.custom.RoundedRingProgressView
+                            android:id="@+id/donut_progress"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_gravity="center"
+                            app:ringMax="100"
+                            app:ringProgress="0"
+                            app:ringProgressColor="#315CF5"
+                            app:ringStrokeWidth="10dp"
+                            app:ringTrackColor="#EFF3F8" />
 
-                    <!-- 中心文字 -->
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:orientation="vertical"
-                        android:gravity="center">
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:gravity="center"
+                            android:orientation="vertical">
 
                         <TextView
-                            android:id="@+id/tv_saved_label"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="已存"
-                            android:textSize="13sp"
-                            android:textColor="#8E8E93" />
+                            android:textColor="#918B95"
+                            android:textSize="14sp" />
 
-                        <TextView
-                            android:id="@+id/tv_percent"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="16%"
-                            android:textSize="36sp"
-                            android:textStyle="bold"
-                            android:textColor="#1C1C1E"
-                            android:layout_marginTop="2dp" />
+                            <TextView
+                                android:id="@+id/tv_percent"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="0%"
+                                android:textColor="#315CF5"
+                                android:textSize="34sp"
+                                android:textStyle="bold" />
 
-                        <TextView
-                            android:id="@+id/tv_amount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="$ 310"
-                            android:textSize="14sp"
-                            android:textColor="#1C1C1E"
-                            android:background="@drawable/bg_pill_gray"
-                            android:paddingStart="14dp"
-                            android:paddingEnd="14dp"
-                            android:paddingTop="6dp"
-                            android:paddingBottom="6dp"
-                            android:layout_marginTop="8dp" />
-                    </LinearLayout>
+                            <TextView
+                                android:id="@+id/tv_amount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:background="@drawable/bg_wish_amount"
+                                android:paddingStart="10dp"
+                                android:paddingTop="4dp"
+                                android:paddingEnd="10dp"
+                                android:paddingBottom="4dp"
+                                android:textColor="#315CF5"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </FrameLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                </FrameLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/add_record_group"
+                    android:layout_width="92dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginStart="12dp"
+                    app:layout_constraintStart_toEndOf="@id/donut_card"
+                    app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Add Record Button -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="16dp"
-            android:paddingBottom="4dp">
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_add"
-                android:layout_width="wrap_content"
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/fab_add"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:contentDescription="添加记录"
+                        android:src="@drawable/ic_add"
+                        app:backgroundTint="#FFFFFF"
+                        app:borderWidth="0dp"
+                        app:elevation="4dp"
+                        app:fabCustomSize="72dp"
+                        app:maxImageSize="32dp"
+                        app:tint="#315CF5" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="添加记录"
+                        android:textColor="#77727A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <GridLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:src="@drawable/ic_add"
-                app:backgroundTint="#FFFFFF"
-                app:tint="#1C1C1E"
-                app:fabSize="normal"
-                app:elevation="4dp"
-                android:contentDescription="添加记录" />
+                android:columnCount="2"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp">
 
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="132dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_wish_card"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_wish_icon" android:contentDescription="目标金额" android:padding="8dp" android:src="@drawable/ic_target" />
+                    <TextView android:id="@+id/tv_goal_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#17151A" android:textSize="20sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="目标金额" android:textColor="#918B95" android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="132dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_wish_card"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_icon_blue" android:contentDescription="剩余金额" android:padding="8dp" android:src="@drawable/ic_piggy_bank" />
+                    <TextView android:id="@+id/tv_remaining" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#17151A" android:textSize="20sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="剩余金额" android:textColor="#918B95" android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="132dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_wish_card"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_icon_purple" android:contentDescription="开始日期" android:padding="8dp" android:src="@drawable/ic_save_calendar" />
+                    <TextView android:id="@+id/tv_start_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#17151A" android:textSize="18sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="开始日期" android:textColor="#918B95" android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="132dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_wish_card"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_icon_teal" android:contentDescription="已经过天数" android:padding="8dp" android:src="@drawable/ic_history" />
+                    <TextView android:id="@+id/tv_days" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#17151A" android:textSize="20sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="已经过天数" android:textColor="#918B95" android:textSize="13sp" />
+                </LinearLayout>
+            </GridLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="添加记录"
-                android:textSize="13sp"
-                android:textColor="#8E8E93"
-                android:layout_marginTop="8dp" />
-        </LinearLayout>
-
-        <!-- Stats Grid (2x2) -->
-        <GridLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnCount="2"
-            android:rowCount="2"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="16dp"
-            android:useDefaultMargins="false">
-
-            <!-- Card 1: Target Amount -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_margin="6dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:src="@drawable/ic_target"
-                        android:background="@drawable/bg_icon_orange"
-                        android:padding="8dp"
-                        android:contentDescription="目标" />
-
-                    <TextView
-                        android:id="@+id/tv_goal_amount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="$ 2,000"
-                        android:textSize="22sp"
-                        android:textStyle="bold"
-                        android:textColor="#1C1C1E"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="目标金额"
-                        android:textSize="13sp"
-                        android:textColor="#8E8E93"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Card 2: Remaining Amount -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_margin="6dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:src="@drawable/ic_piggy_bank"
-                        android:background="@drawable/bg_icon_blue"
-                        android:padding="8dp"
-                        android:contentDescription="剩余" />
-
-                    <TextView
-                        android:id="@+id/tv_remaining"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="$ 1,690"
-                        android:textSize="22sp"
-                        android:textStyle="bold"
-                        android:textColor="#1C1C1E"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="剩余金额"
-                        android:textSize="13sp"
-                        android:textColor="#8E8E93"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Card 3: Start Date -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_margin="6dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:src="@drawable/ic_save_calendar"
-                        android:background="@drawable/bg_icon_purple"
-                        android:padding="8dp"
-                        android:contentDescription="日期" />
-
-                    <TextView
-                        android:id="@+id/tv_start_date"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="2026.02.17"
-                        android:textSize="22sp"
-                        android:textStyle="bold"
-                        android:textColor="#1C1C1E"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="开始日期"
-                        android:textSize="13sp"
-                        android:textColor="#8E8E93"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Card 4: Days Elapsed -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_margin="6dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFFFFF">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:src="@drawable/ic_clock1"
-                        android:background="@drawable/bg_icon_teal"
-                        android:padding="8dp"
-                        android:contentDescription="已过天数" />
-
-                    <TextView
-                        android:id="@+id/tv_days_elapsed"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="55"
-                        android:textSize="22sp"
-                        android:textStyle="bold"
-                        android:textColor="#1C1C1E"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="已过天数"
-                        android:textSize="13sp"
-                        android:textColor="#8E8E93"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-        </GridLayout>
-
-        <!-- =========================================
-             历史记录区域
-             ========================================= -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="24dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="30dp"
                 android:text="历史记录"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:textColor="#1C1C1E"
-                android:paddingBottom="12dp" />
+                android:textColor="#17151A"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_history_empty"
+                android:layout_width="match_parent"
+                android:layout_height="96dp"
+                android:gravity="center"
+                android:text="暂无记录"
+                android:textColor="#918B95"
+                android:textSize="14sp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_history"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipToPadding="false"
                 android:nestedScrollingEnabled="false"
-                android:overScrollMode="never"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
+                android:paddingStart="20dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="20dp" />
         </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
-    </LinearLayout>
-</ScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

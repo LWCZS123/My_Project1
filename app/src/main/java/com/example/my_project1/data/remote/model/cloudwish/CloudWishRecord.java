@@ -19,6 +19,7 @@ public class CloudWishRecord extends BmobObject {
     private String note;
     private BmobDate recordDate; // 这是一个 BmobDate 对象
     private String wishObjectId;
+    private String clientKey;
 
     public CloudWishRecord() {}
 
@@ -35,6 +36,8 @@ public class CloudWishRecord extends BmobObject {
     public void setRecordDate(BmobDate recordDate) { this.recordDate = recordDate; }
     public String getWishObjectId() { return wishObjectId; }
     public void setWishObjectId(String wishObjectId) { this.wishObjectId = wishObjectId; }
+    public String getClientKey() { return clientKey; }
+    public void setClientKey(String clientKey) { this.clientKey = clientKey; }
 
     /**
      * 本地 → 云端
@@ -77,7 +80,7 @@ public class CloudWishRecord extends BmobObject {
         local.setAmount(amount != null ? amount : 0d);
         local.setNote(note);
 
-        // 🔥 关键修复：BmobDate 需要调用 .getDate() 获取字符串后再转换
+        // BmobDate 需要先取出服务端日期字符串，再交给统一日期转换器处理。
         if (recordDate != null) {
             // recordDate.getDate() 返回 "yyyy-MM-dd HH:mm:ss" 格式的字符串
             local.setRecordDate(DateConvertUtil.safeConvertToDate(recordDate.getDate()));
