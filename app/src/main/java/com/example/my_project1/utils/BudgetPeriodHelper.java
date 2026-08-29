@@ -17,6 +17,14 @@ import java.util.Locale;
  */
 public class BudgetPeriodHelper {
 
+    private BudgetPeriodHelper() {}
+
+    public static int periodForType(String type) {
+        if (Budget.TYPE_WEEK.equals(type)) return Budget.PERIOD_WEEK;
+        if (Budget.TYPE_YEAR.equals(type)) return Budget.PERIOD_YEAR;
+        return Budget.PERIOD_MONTH;
+    }
+
     /** 返回 [startTime, endTime] 毫秒时间戳数组 */
     public static long[] getPeriodRange(int period) {
         return getPeriodRange(period, 1);
@@ -27,13 +35,14 @@ public class BudgetPeriodHelper {
     }
 
     public static long[] getPeriodRange(int period, int startDay, Calendar baseDate) {
+        if (baseDate == null) throw new IllegalArgumentException("baseDate == null");
         Calendar start = (Calendar) baseDate.clone();
-        Calendar end   = (Calendar) baseDate.clone();
         resetToStartOfDay(start);
-        resetToEndOfDay(end);
+        Calendar next = (Calendar) start.clone();
 
         switch (period) {
             case Budget.PERIOD_DAY:
+                next.add(Calendar.DAY_OF_MONTH, 1);
                 break;
 
             case Budget.PERIOD_WEEK:
@@ -43,43 +52,56 @@ public class BudgetPeriodHelper {
                 int offset = Calendar.SUNDAY - dow;
                 start.add(Calendar.DAY_OF_MONTH, offset);
 
-                end.setTimeInMillis(start.getTimeInMillis());
-                end.add(Calendar.DAY_OF_MONTH, 6);
-                resetToEndOfDay(end);
+                next.setTimeInMillis(start.getTimeInMillis());
+                next.add(Calendar.DAY_OF_MONTH, 7);
                 break;
 
             case Budget.PERIOD_MONTH:
-                if (startDay == 1) {
+                int normalizedStartDay = Math.max(1, Math.min(31, startDay));
+                if (normalizedStartDay == 1) {
                     start.set(Calendar.DAY_OF_MONTH, 1);
-                    end.set(Calendar.DAY_OF_MONTH,
-                            start.getActualMaximum(Calendar.DAY_OF_MONTH));
+                    next.setTimeInMillis(start.getTimeInMillis());
+                    next.add(Calendar.MONTH, 1);
                 } else {
-                    int today = start.get(Calendar.DAY_OF_MONTH);
-                    if (today >= startDay) {
-                        start.set(Calendar.DAY_OF_MONTH, startDay);
-                        end.setTimeInMillis(start.getTimeInMillis());
-                        end.add(Calendar.MONTH, 1);
-                        end.add(Calendar.DAY_OF_MONTH, -1);
-                    } else {
+                    Calendar anchor = (Calendar) start.clone();
+                    setClampedDayOfMonth(anchor, normalizedStartDay);
+                    if (start.before(anchor)) {
                         start.add(Calendar.MONTH, -1);
-                        start.set(Calendar.DAY_OF_MONTH, startDay);
-                        end.setTimeInMillis(start.getTimeInMillis());
-                        end.add(Calendar.MONTH, 1);
-                        end.add(Calendar.DAY_OF_MONTH, -1);
                     }
+                    setClampedDayOfMonth(start, normalizedStartDay);
+                    next.setTimeInMillis(start.getTimeInMillis());
+                    next.add(Calendar.MONTH, 1);
+                    setClampedDayOfMonth(next, normalizedStartDay);
                 }
-                resetToEndOfDay(end);
                 break;
 
             case Budget.PERIOD_YEAR:
                 start.set(Calendar.DAY_OF_YEAR, 1);
-                end.set(Calendar.MONTH, Calendar.DECEMBER);
-                end.set(Calendar.DAY_OF_MONTH, 31);
-                resetToEndOfDay(end);
+                next.setTimeInMillis(start.getTimeInMillis());
+                next.add(Calendar.YEAR, 1);
                 break;
+
+            default:
+                throw new IllegalArgumentException("Unsupported budget period: " + period);
         }
 
-        return new long[]{start.getTimeInMillis(), end.getTimeInMillis()};
+        return new long[]{start.getTimeInMillis(), next.getTimeInMillis() - 1L};
+    }
+
+    public static int getCalendarDayCount(long startMs, long endMs) {
+        if (endMs < startMs) return 0;
+        Calendar cursor = Calendar.getInstance();
+        cursor.setTimeInMillis(startMs);
+        resetToStartOfDay(cursor);
+        Calendar end = Calendar.getInstance();
+        end.setTimeInMillis(endMs);
+        resetToStartOfDay(end);
+        int days = 0;
+        while (!cursor.after(end) && days < 370) {
+            days++;
+            cursor.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return days;
     }
 
     /** 返回周期的显示文字，如 "3.1-3.31" */
@@ -150,10 +172,9 @@ public class BudgetPeriodHelper {
         c.set(Calendar.MILLISECOND, 0);
     }
 
-    private static void resetToEndOfDay(Calendar c) {
-        c.set(Calendar.HOUR_OF_DAY, 23);
-        c.set(Calendar.MINUTE, 59);
-        c.set(Calendar.SECOND, 59);
-        c.set(Calendar.MILLISECOND, 999);
+    private static void setClampedDayOfMonth(Calendar calendar, int desiredDay) {
+        calendar.set(Calendar.DAY_OF_MONTH,
+                Math.min(desiredDay, calendar.getActualMaximum(Calendar.DAY_OF_MONTH)));
+        resetToStartOfDay(calendar);
     }
 }

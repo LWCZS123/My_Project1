@@ -5,6 +5,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -39,8 +40,24 @@ public class MonthAdapter extends RecyclerView.Adapter<MonthAdapter.ViewHolder> 
     }
 
     public void setItems(List<PeriodItem> newItems) {
-        this.items = newItems;
-        notifyDataSetChanged();
+        List<PeriodItem> oldItems = this.items;
+        List<PeriodItem> replacement = new ArrayList<>(newItems);
+        DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return oldItems.size(); }
+            @Override public int getNewListSize() { return replacement.size(); }
+            @Override public boolean areItemsTheSame(int oldPos, int newPos) {
+                return oldItems.get(oldPos).startTime == replacement.get(newPos).startTime;
+            }
+            @Override public boolean areContentsTheSame(int oldPos, int newPos) {
+                PeriodItem oldItem = oldItems.get(oldPos);
+                PeriodItem newItem = replacement.get(newPos);
+                return oldItem.endTime == newItem.endTime
+                        && oldItem.selected == newItem.selected
+                        && oldItem.label.equals(newItem.label);
+            }
+        });
+        this.items = replacement;
+        diff.dispatchUpdatesTo(this);
     }
 
     @NonNull

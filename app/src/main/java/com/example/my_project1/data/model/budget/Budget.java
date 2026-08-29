@@ -2,6 +2,7 @@ package com.example.my_project1.data.model.budget;
 
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 /**
@@ -9,7 +10,7 @@ import androidx.room.PrimaryKey;
  *
  * ┌─────────────────────────────────────────────────────────────┐
  * │  独立存储设计                                                 │
- * │  月预算与年预算通过 budgetType + year + month 唯一标识，       │
+ * │  月/年预算使用归属年月，周预算使用规范化 startTime 唯一定位。   │
  * │  互不覆盖，例如：                                             │
  * │    2026年预算   → budgetType=YEAR,  year=2026, month=0      │
  * │    2026年3月预算 → budgetType=MONTH, year=2026, month=3     │
@@ -17,7 +18,7 @@ import androidx.room.PrimaryKey;
  *
  * targetType      : 1 = 分类预算  2 = 总预算
  * period          : 0=日 1=周 2=月 3=年
- * budgetType      : "MONTH" | "YEAR"
+ * budgetType      : "WEEK" | "MONTH" | "YEAR"
  * year            : 所属年份（2026）
  * month           : 所属月份 1-12；年预算时为 0
  * categoryName    : 分类名称快照（仅分类预算有值），本地展示用，不上传云端
@@ -30,7 +31,19 @@ import androidx.room.PrimaryKey;
  *   分类信息变更时（如用户改了分类名称），在保存/更新预算时一并刷新即可。
  *   这两个字段仅用于本地展示，不参与云端同步（CloudBudget 不含此字段）。
  */
-@Entity(tableName = "budgets")
+@Entity(
+        tableName = "budgets",
+        indices = {
+                @Index(
+                        value = {"owner_id", "transaction_type", "budget_type", "start_time", "target_type"},
+                        name = "index_budgets_period_lookup"
+                ),
+                @Index(
+                        value = {"owner_id", "transaction_type", "budget_type", "year", "month", "target_type"},
+                        name = "index_budgets_legacy_period_lookup"
+                )
+        }
+)
 public class Budget {
 
     @PrimaryKey(autoGenerate = true)
@@ -52,7 +65,7 @@ public class Budget {
     @ColumnInfo(name = "period")
     private int period;
 
-    /** "MONTH" 或 "YEAR"，区分月/年预算独立记录 */
+    /** "WEEK"、"MONTH" 或 "YEAR" */
     @ColumnInfo(name = "budget_type")
     private String budgetType;
 

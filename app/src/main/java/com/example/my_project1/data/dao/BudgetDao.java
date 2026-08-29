@@ -46,19 +46,13 @@ public interface BudgetDao {
     @Query("SELECT * FROM budgets WHERE id = :id LIMIT 1")
     LiveData<Budget> getByIdLive(int id);
 
-    // ── 总预算查询（按 budgetType + year + month 精确定位）───
+    // ── 总预算查询（月/年按年月，周按规范化 start_time 定位）───
 
     /** 同步查询：指定年月的月预算 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
             "AND transaction_type = :transType " +
             "AND budget_type = 'MONTH' AND year = :year AND month = :month LIMIT 1")
     Budget getMonthBudgetSync(String userId, String transType, int year, int month);
-
-    /** 同步查询：指定年月的周预算 */
-    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
-            "AND transaction_type = :transType " +
-            "AND budget_type = 'WEEK' AND year = :year AND month = :month LIMIT 1")
-    Budget getWeekBudgetSync(String userId, String transType, int year, int month);
 
     /** 同步查询：指定年份的年预算 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
@@ -71,12 +65,6 @@ public interface BudgetDao {
             "AND transaction_type = :transType " +
             "AND budget_type = 'MONTH' AND year = :year AND month = :month LIMIT 1")
     LiveData<Budget> getMonthBudgetLive(String userId, String transType, int year, int month);
-
-    /** LiveData：监听指定年月的周预算变化 */
-    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
-            "AND transaction_type = :transType " +
-            "AND budget_type = 'WEEK' AND year = :year AND month = :month LIMIT 1")
-    LiveData<Budget> getWeekBudgetLive(String userId, String transType, int year, int month);
 
     /** LiveData：监听指定年份的年预算变化 */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 2 " +
@@ -130,7 +118,7 @@ public interface BudgetDao {
     /**
      * 同步查询：同一分类 + 同一 budgetType + 同一年月 下的唯一预算（不区分 period）。
      *
-     * ⚠️ 业务约束：一个分类在同一 budgetType+年月 下只允许存在一条预算记录，
+     * 业务约束：周预算按 start_time，月/年预算按 budgetType+年月保持唯一，
      * period 选择后不可与已有记录共存（如已有月预算，不能再添加日预算）。
      * 写入前用此方法检查，有记录则做更新而非新增。
      */
@@ -190,6 +178,12 @@ public interface BudgetDao {
     List<Budget> getCategoryBudgetsSyncByType(String userId, String transType, String budgetType,
                                               int year, int month);
 
+    @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType AND budget_type = :budgetType " +
+            "AND start_time = :startTime AND sync_state != 3")
+    List<Budget> getCategoryBudgetsSyncByStart(
+            String userId, String transType, String budgetType, long startTime);
+
     /** 同步查询：当前用户所有分类预算，用于周期性重置（BudgetResetWorker） */
     @Query("SELECT * FROM budgets WHERE owner_id = :userId AND target_type = 1 " +
             "AND sync_state != 3")
@@ -234,4 +228,11 @@ public interface BudgetDao {
             "AND budget_type = :budgetType AND year = :year AND month = :month " +
             "AND sync_state != 3")
     double getTotalAllocatedAmount(String userId, String transType, String budgetType, int year, int month);
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM budgets " +
+            "WHERE owner_id = :userId AND target_type = 1 " +
+            "AND transaction_type = :transType AND budget_type = :budgetType " +
+            "AND start_time = :startTime AND sync_state != 3")
+    double getTotalAllocatedAmountByStart(
+            String userId, String transType, String budgetType, long startTime);
 }

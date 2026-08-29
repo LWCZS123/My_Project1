@@ -14,10 +14,16 @@ import java.util.List;
 
 @Entity(
         tableName = "bills",
-        indices = @Index(
-                value = {"user_id", "billTime"},
-                name = "index_bills_user_id_billTime"
-        )
+        indices = {
+                @Index(
+                        value = {"user_id", "billTime"},
+                        name = "index_bills_user_id_billTime"
+                ),
+                @Index(
+                        value = {"user_id", "type", "excludeBudget", "billTime", "category_id"},
+                        name = "index_bills_budget_stats"
+                )
+        }
 )
 public class Bill implements Serializable {
 

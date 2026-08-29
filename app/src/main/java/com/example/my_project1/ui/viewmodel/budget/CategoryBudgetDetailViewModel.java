@@ -18,6 +18,9 @@ import com.example.my_project1.utils.BudgetPeriodHelper;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
@@ -31,7 +34,7 @@ import io.reactivex.annotations.NonNull;
  *   3. Trend data (Week / Month / Year views)
  *
  * Time Range:
- *   Bills and spent amount use real-time calculated range from BudgetPeriodHelper.
+ *   Bills and spent amount use the canonical range persisted on the budget record.
  */
 public class CategoryBudgetDetailViewModel extends AndroidViewModel {
 
@@ -66,6 +69,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
     // 当前周期实际生效的时间范围，由 init() 时计算并固定，整个页面生命周期内不变
     private long effectiveStartTime;
     private long effectiveEndTime;
+    private final AtomicInteger trendGeneration = new AtomicInteger();
 
     public CategoryBudgetDetailViewModel(@NonNull Application app) {
         super(app);
@@ -85,30 +89,20 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
         budgetAmountLive.setValue(budget.getAmount());
         budgetLive = repo.getByIdLive(budget.getId());
 
-        int period = budget.getPeriod();
-        int year = budget.getYear();
-        int month = budget.getMonth(); // Stores weekNum for week budget
-        
-        Calendar cal = Calendar.getInstance();
-        cal.setFirstDayOfWeek(Calendar.SUNDAY);
-        cal.set(Calendar.YEAR, year);
-        
-        if (period == Budget.PERIOD_WEEK) {
-            cal.set(Calendar.WEEK_OF_YEAR, month);
-            cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
-        } else if (period == Budget.PERIOD_MONTH) {
-            cal.set(Calendar.MONTH, month > 0 ? month - 1 : 0);
-            cal.set(Calendar.DAY_OF_MONTH, 1);
-        } else if (period == Budget.PERIOD_YEAR) {
-            cal.set(Calendar.MONTH, 0);
-            cal.set(Calendar.DAY_OF_MONTH, 1);
+        // The persisted range is the canonical period key. Reconstruct only legacy rows.
+        if (budget.getStartTime() > 0 && budget.getEndTime() >= budget.getStartTime()) {
+            effectiveStartTime = budget.getStartTime();
+            effectiveEndTime = budget.getEndTime();
+        } else {
+            Calendar fallback = Calendar.getInstance();
+            fallback.clear();
+            fallback.set(budget.getYear(),
+                    Math.max(0, budget.getMonth() - 1), 1);
+            long[] range = BudgetPeriodHelper.getPeriodRange(
+                    budget.getPeriod(), 1, fallback);
+            effectiveStartTime = range[0];
+            effectiveEndTime = range[1];
         }
-
-        // Calculate effective range consistently with main screen
-        int startDay = com.example.my_project1.utils.BudgetConfig.getStartDay(getApplication());
-        long[] range = BudgetPeriodHelper.getPeriodRange(period, startDay, cal);
-        effectiveStartTime = range[0];
-        effectiveEndTime   = range[1];
 
         loadBills();
         loadTrendData(trendTypeLive.getValue());
@@ -127,7 +121,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
         AppExecutors.get().diskIO().execute(() -> {
             try {
                 List<Bill> bills = billDao.getBillsByCategoryInRange(
-                        userId, currentCatCloudId, start, end);
+                        userId, currentCatCloudId, currentBillType(), start, end);
                 if (bills == null) bills = new ArrayList<>();
 
                 double spent = 0;
@@ -164,18 +158,11 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
         if (trendType == null) trendType = TREND_MONTH;
 
         final String type = trendType;
+        final int requestId = trendGeneration.incrementAndGet();
 
         AppExecutors.get().diskIO().execute(() -> {
-            // Base date based on budget year/month to align trend with budget period
             Calendar cal = Calendar.getInstance();
-            cal.setFirstDayOfWeek(Calendar.SUNDAY);
-            cal.set(Calendar.YEAR, currentBudget.getYear());
-            
-            if (currentBudget.isMonthType()) {
-                cal.set(Calendar.MONTH, currentBudget.getMonth() - 1);
-            } else if (Budget.TYPE_WEEK.equals(currentBudget.getBudgetType())) {
-                cal.set(Calendar.WEEK_OF_YEAR, currentBudget.getMonth());
-            }
+            cal.setTimeInMillis(effectiveStartTime);
 
             long   periodStart;
             long   periodEnd;
@@ -184,16 +171,11 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
 
             switch (type) {
                 case TREND_WEEK: {
-                    // Sunday to Saturday of the budget week
-                    cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
-                    cal.set(Calendar.HOUR_OF_DAY, 0);
-                    cal.set(Calendar.MINUTE, 0);
-                    cal.set(Calendar.SECOND, 0);
-                    cal.set(Calendar.MILLISECOND, 0);
-                    periodStart = cal.getTimeInMillis();
+                    long[] range = BudgetPeriodHelper.getPeriodRange(
+                            Budget.PERIOD_WEEK, 1, cal);
+                    periodStart = range[0];
+                    periodEnd = range[1];
                     points      = 7;
-                    cal.add(Calendar.DAY_OF_YEAR, 7);
-                    periodEnd   = cal.getTimeInMillis() - 1;
                     labels = new String[]{"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
                     break;
                 }
@@ -211,19 +193,17 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
                     break;
                 }
                 default: { // TREND_MONTH
-                    // 1st to last day of the budget month
-                    int year  = cal.get(Calendar.YEAR);
-                    int month = cal.get(Calendar.MONTH);
-                    cal.set(year, month, 1, 0, 0, 0);
-                    cal.set(Calendar.MILLISECOND, 0);
-                    periodStart = cal.getTimeInMillis();
-                    int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
-                    points    = daysInMonth;
-                    
-                    labels = buildDayLabels(daysInMonth, year, month + 1);
-
-                    cal.add(Calendar.MONTH, 1);
-                    periodEnd = cal.getTimeInMillis() - 1;
+                    if (Budget.TYPE_MONTH.equals(currentBudget.getBudgetType())) {
+                        periodStart = effectiveStartTime;
+                        periodEnd = effectiveEndTime;
+                    } else {
+                        long[] range = BudgetPeriodHelper.getPeriodRange(
+                                Budget.PERIOD_MONTH, 1, cal);
+                        periodStart = range[0];
+                        periodEnd = range[1];
+                    }
+                    points = BudgetPeriodHelper.getCalendarDayCount(periodStart, periodEnd);
+                    labels = buildDayLabels(points, periodStart);
                     break;
                 }
             }
@@ -241,6 +221,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
             final String[] finalLabels = labels;
 
             AppExecutors.get().mainThread().execute(() -> {
+                if (requestId != trendGeneration.get()) return;
                 trendDataLive.setValue(finalData);
                 trendLabelsLive.setValue(finalLabels);
             });
@@ -254,15 +235,25 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
         double[] result = new double[days];
         try {
             List<Bill> bills = billDao.getBillsByCategoryInRange(
-                    userId, currentCatCloudId, periodStart, periodEnd);
+                    userId, currentCatCloudId, currentBillType(), periodStart, periodEnd);
             if (bills == null) return result;
 
-            long msPerDay = 86_400_000L;
+            Map<Long, Integer> dayIndexes = new HashMap<>(days);
+            Calendar cursor = Calendar.getInstance();
+            cursor.setTimeInMillis(periodStart);
+            for (int i = 0; i < days; i++) {
+                resetToStartOfDay(cursor);
+                dayIndexes.put(cursor.getTimeInMillis(), i);
+                cursor.add(Calendar.DAY_OF_MONTH, 1);
+            }
             for (Bill b : bills) {
                 if (b.isExcludeBudget()) continue;
                 long billTime = b.getBillTime() != null ? b.getBillTime().getTime() : 0;
-                int idx = (int) ((billTime - periodStart) / msPerDay);
-                if (idx >= 0 && idx < days) {
+                Calendar billDay = Calendar.getInstance();
+                billDay.setTimeInMillis(billTime);
+                resetToStartOfDay(billDay);
+                Integer idx = dayIndexes.get(billDay.getTimeInMillis());
+                if (idx != null) {
                     result[idx] += b.getAmount();
                 }
             }
@@ -279,7 +270,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
         double[] result = new double[12];
         try {
             List<Bill> bills = billDao.getBillsByCategoryInRange(
-                    userId, currentCatCloudId, periodStart, periodEnd);
+                    userId, currentCatCloudId, currentBillType(), periodStart, periodEnd);
             if (bills == null) return result;
 
             for (Bill b : bills) {
@@ -300,12 +291,29 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
     /**
      * Build day labels for month view.
      */
-    private String[] buildDayLabels(int days, int year, int month) {
+    private String[] buildDayLabels(int days, long startTime) {
         String[] labels = new String[days];
+        Calendar day = Calendar.getInstance();
+        day.setTimeInMillis(startTime);
         for (int i = 0; i < days; i++) {
-            labels[i] = ((i + 1) % 5 == 1) ? (month + "." + (i + 1)) : "";
+            labels[i] = i % 5 == 0
+                    ? (day.get(Calendar.MONTH) + 1) + "." + day.get(Calendar.DAY_OF_MONTH)
+                    : "";
+            day.add(Calendar.DAY_OF_MONTH, 1);
         }
         return labels;
+    }
+
+    private static void resetToStartOfDay(Calendar calendar) {
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+    }
+
+    private int currentBillType() {
+        return currentBudget != null
+                && Budget.TYPE_INCOME.equals(currentBudget.getTransactionType()) ? 1 : 0;
     }
 
     /**

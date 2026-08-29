@@ -39,7 +39,7 @@ import com.example.my_project1.data.model.wish.WishRecord;
                 SearchHistory.class, UserProfile.class, Budget.class,
                 Wish.class, WishRecord.class
         },
-        version = 28,
+        version = 29,
         exportSchema = true
 )
 
@@ -56,6 +56,17 @@ public abstract class AppDatabase extends RoomDatabase {
         public void migrate(@NonNull SupportSQLiteDatabase database) {
             database.execSQL("CREATE INDEX IF NOT EXISTS `index_bills_user_id_billTime` "
                     + "ON `bills` (`user_id`, `billTime`)");
+        }
+    };
+    static final Migration MIGRATION_28_29 = new Migration(28, 29) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_bills_budget_stats` "
+                    + "ON `bills` (`user_id`, `type`, `excludeBudget`, `billTime`, `category_id`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_budgets_period_lookup` "
+                    + "ON `budgets` (`owner_id`, `transaction_type`, `budget_type`, `start_time`, `target_type`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_budgets_legacy_period_lookup` "
+                    + "ON `budgets` (`owner_id`, `transaction_type`, `budget_type`, `year`, `month`, `target_type`)");
         }
     };
 
@@ -78,7 +89,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "accounting_app_db"
                     )
-                            .addMigrations(MIGRATION_27_28)
+                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29)
                             .fallbackToDestructiveMigration() // 调试阶段允许重建数据库
                             .build();
                 }

@@ -152,8 +152,12 @@ public class CategorySelectFragment extends BottomSheetDialogFragment {
         cn.bmob.v3.BmobUser currentUser = cn.bmob.v3.BmobUser.getCurrentUser(cn.bmob.v3.BmobUser.class);
         String userId = (currentUser != null) ? currentUser.getObjectId() : null;
 
-        // 观察分类
-        categoryVm.getExpenseCategories(userId).observe(getViewLifecycleOwner(), cats -> {
+        // 分类数据源必须与当前预算的收支类型一致，否则收入目标会混入支出分类。
+        androidx.lifecycle.LiveData<List<CategoryWithSubCategories>> categorySource =
+                Budget.TYPE_INCOME.equals(budgetVm.getTransactionType())
+                        ? categoryVm.getIncomeCategories(userId)
+                        : categoryVm.getExpenseCategories(userId);
+        categorySource.observe(getViewLifecycleOwner(), cats -> {
             if (cats != null) {
                 allCategories = cats;
                 refreshList();

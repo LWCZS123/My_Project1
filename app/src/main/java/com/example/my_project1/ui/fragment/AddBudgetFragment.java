@@ -39,6 +39,8 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
     private static final String ARG_IS_EDIT     = "arg_is_edit";
     private static final String ARG_TARGET_YEAR = "arg_target_year";
     private static final String ARG_TARGET_MONTH = "arg_target_month";
+    private static final String ARG_START_TIME = "arg_start_time";
+    private static final String ARG_END_TIME = "arg_end_time";
 
     private FragmentAddBudgetBinding binding;
     private BudgetViewModel          vm;
@@ -47,6 +49,7 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
     private String selectedTransType = Budget.TYPE_EXPENSE; // ← 新增
     private boolean isEditMode = false;
     private int targetYear, targetMonth;
+    private long targetStartTime, targetEndTime;
 
     public static AddBudgetFragment newInstance(@Nullable Budget existingBudget) {
         return newInstance(existingBudget, null, 0, 0);
@@ -64,6 +67,8 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
                             : Budget.TYPE_MONTH);
             args.putInt(ARG_TARGET_YEAR, existingBudget.getYear());
             args.putInt(ARG_TARGET_MONTH, existingBudget.getMonth());
+            args.putLong(ARG_START_TIME, existingBudget.getStartTime());
+            args.putLong(ARG_END_TIME, existingBudget.getEndTime());
             args.putBoolean(ARG_IS_EDIT, true);
         } else {
             args.putBoolean(ARG_IS_EDIT, false);
@@ -134,6 +139,10 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
             selectedTransType = vm.getTransactionType();
             targetYear = vm.getCurrentYear();
             targetMonth = vm.getCurrentMonth();
+            Long start = vm.getSelectedStartTime().getValue();
+            Long end = vm.getSelectedEndTime().getValue();
+            targetStartTime = start != null ? start : System.currentTimeMillis();
+            targetEndTime = end != null ? end : targetStartTime;
             return;
         }
 
@@ -147,6 +156,13 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         } else {
             targetYear = vm.getCurrentYear();
             targetMonth = vm.getCurrentMonth();
+        }
+
+        if (args.containsKey(ARG_START_TIME)) {
+            targetStartTime = args.getLong(ARG_START_TIME);
+            targetEndTime = args.getLong(ARG_END_TIME);
+        } else {
+            calculateTargetRange();
         }
 
         if (isEditMode) {
@@ -173,6 +189,7 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
             } else if (checkedId == R.id.rb_year) {
                 selectedBudgetType = Budget.TYPE_YEAR;
             }
+            calculateTargetRange();
             updateDateDisplayText();
             binding.switchCarryOver.setChecked(false); // Reset switch when type changes
         });
@@ -184,7 +201,7 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         // Carry Over Switch
         binding.switchCarryOver.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
-                vm.getPreviousPeriodBudget(selectedBudgetType, targetYear, targetMonth, prev -> {
+                vm.getPreviousPeriodBudget(selectedBudgetType, targetStartTime, prev -> {
                     if (prev != null) {
                         setAmount(String.format(Locale.getDefault(), "%.2f", prev.getAmount()));
                         Toast.makeText(requireContext(), "已沿用上期预算 ¥" + prev.getAmount(), Toast.LENGTH_SHORT).show();
@@ -235,14 +252,8 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
             binding.tvSelectedDate.setText(String.format(Locale.getDefault(), "%d年", targetYear));
             binding.btnSmartAllocation.setVisibility(View.VISIBLE);
         } else if (Budget.TYPE_WEEK.equals(selectedBudgetType)) {
-            Calendar cal = Calendar.getInstance();
-            cal.setFirstDayOfWeek(Calendar.SUNDAY);
-            cal.set(Calendar.YEAR, targetYear);
-            cal.set(Calendar.WEEK_OF_YEAR, targetMonth);
-            cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
-            
-            long[] range = BudgetPeriodHelper.getPeriodRange(Budget.PERIOD_WEEK, 1, cal);
-            binding.tvSelectedDate.setText(BudgetPeriodHelper.formatWeekRange(range[0], range[1]));
+            binding.tvSelectedDate.setText(BudgetPeriodHelper.formatWeekRange(
+                    targetStartTime, targetEndTime));
             binding.btnSmartAllocation.setVisibility(View.GONE);
         } else {
             binding.tvSelectedDate.setText(String.format(Locale.getDefault(), "%d年%d月", targetYear, targetMonth));
@@ -252,9 +263,14 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
 
     private void showDateSelector() {
         BudgetDateSelectorFragment selector = BudgetDateSelectorFragment.newInstance(
-                selectedBudgetType, targetYear, targetMonth, (type, year, month) -> {
-                    this.targetYear = year;
-                    this.targetMonth = month;
+                selectedBudgetType, targetStartTime, targetEndTime,
+                (type, startTime, endTime) -> {
+                    targetStartTime = startTime;
+                    targetEndTime = endTime;
+                    Calendar selected = Calendar.getInstance();
+                    selected.setTimeInMillis(startTime);
+                    targetYear = selected.get(Calendar.YEAR);
+                    targetMonth = selected.get(Calendar.MONTH) + 1;
                     updateDateDisplayText();
                     binding.switchCarryOver.setChecked(false);
                 }
@@ -269,13 +285,17 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
 
     private void loadSuggestion() {
         vm.getMonthlyStats().observe(getViewLifecycleOwner(), stats -> {
-            if (stats != null && stats.totalExpense > 0) {
-                double lastMonthExp = stats.totalExpense;
-                double suggestMin = Math.floor(lastMonthExp / 100) * 100;
-                double suggestMax = Math.ceil(lastMonthExp * 1.1 / 100) * 100;
+            if (stats != null && selectedTransType.equals(stats.transactionType)) {
+                boolean isIncome = Budget.TYPE_INCOME.equals(selectedTransType);
+                double recentAmount = isIncome ? stats.totalIncome : stats.totalExpense;
+                if (recentAmount <= 0) return;
+                double suggestMin = Math.floor(recentAmount / 100) * 100;
+                double suggestMax = Math.ceil(recentAmount * 1.1 / 100) * 100;
                 binding.tvSuggestionContent.setText(String.format(Locale.getDefault(),
-                        "根据近期支出 ¥%.2f，建议预算 ¥%.0f ~ ¥%.0f", 
-                        lastMonthExp, suggestMin, suggestMax));
+                        isIncome
+                                ? "根据近期收入 ¥%.2f，建议目标 ¥%.0f ~ ¥%.0f"
+                                : "根据近期支出 ¥%.2f，建议预算 ¥%.0f ~ ¥%.0f",
+                        recentAmount, suggestMin, suggestMax));
             }
         });
     }
@@ -303,7 +323,7 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
         if (isEditMode) {
             doSave(finalAmount);
         } else {
-            vm.checkDuplicate(selectedBudgetType, targetYear, targetMonth, duplicateMsg -> {
+            vm.checkDuplicate(selectedBudgetType, targetStartTime, duplicateMsg -> {
                 if (duplicateMsg != null) {
                     Toast.makeText(requireContext(), duplicateMsg, Toast.LENGTH_LONG).show();
                 } else {
@@ -314,20 +334,32 @@ public class AddBudgetFragment extends BottomSheetDialogFragment {
     }
 
     private void doSave(double amount) {
-        vm.saveTotalBudget(amount, selectedBudgetType, targetYear, targetMonth);
-        
-        // 关键修复：保存成功后，立即更新 ViewModel 的状态，触发主界面刷新
-        vm.setYear(targetYear);
-        vm.setMonth(targetMonth);
-        if (Budget.TYPE_YEAR.equals(selectedBudgetType)) {
-            vm.switchToYear();
-        } else if (Budget.TYPE_WEEK.equals(selectedBudgetType)) {
-            vm.switchToWeek();
-        } else {
-            vm.switchToMonth();
-        }
+        vm.saveTotalBudget(amount, selectedBudgetType, targetStartTime, targetEndTime);
+        vm.selectPeriod(selectedBudgetType, targetStartTime, targetEndTime);
 
         Toast.makeText(requireContext(), "总预算已保存", Toast.LENGTH_SHORT).show();
         dismiss();
+    }
+
+    private void calculateTargetRange() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.clear();
+        calendar.set(Calendar.YEAR, targetYear);
+        calendar.set(Calendar.MONTH, Math.max(0, targetMonth - 1));
+        calendar.set(Calendar.DAY_OF_MONTH, 1);
+        int startDay = Budget.TYPE_MONTH.equals(selectedBudgetType)
+                ? com.example.my_project1.utils.BudgetConfig.getStartDay(requireContext()) : 1;
+        if (Budget.TYPE_MONTH.equals(selectedBudgetType)) {
+            calendar.set(Calendar.DAY_OF_MONTH,
+                    Math.min(startDay, calendar.getActualMaximum(Calendar.DAY_OF_MONTH)));
+        }
+        long[] range = BudgetPeriodHelper.getPeriodRange(
+                BudgetPeriodHelper.periodForType(selectedBudgetType), startDay, calendar);
+        targetStartTime = range[0];
+        targetEndTime = range[1];
+        Calendar start = Calendar.getInstance();
+        start.setTimeInMillis(targetStartTime);
+        targetYear = start.get(Calendar.YEAR);
+        targetMonth = start.get(Calendar.MONTH) + 1;
     }
 }

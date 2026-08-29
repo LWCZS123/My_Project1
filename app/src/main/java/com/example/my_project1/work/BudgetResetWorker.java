@@ -25,7 +25,7 @@ import io.reactivex.annotations.NonNull;
  *
  * 重置规则：
  *   - PERIOD_DAY：当新的一天开始，且当前时间已超出预算的 endTime，则重置为今日范围。
- *   - PERIOD_WEEK：在周一凌晨，且当前时间已超出预算的 endTime，则重置为本周范围。
+ *   - PERIOD_WEEK：旧窗口过期后重置为当前周；不依赖任务恰好在周首运行。
  *
  * 重置只更新时间窗口（startTime / endTime），预算金额保持不变。
  * 重置后将 syncState 标记为 TO_UPDATE，触发后续云端同步。
@@ -51,7 +51,6 @@ public class BudgetResetWorker extends Worker {
 
             Calendar now = Calendar.getInstance();
             long nowMs = now.getTimeInMillis();
-            int dayOfWeek = now.get(Calendar.DAY_OF_WEEK);
 
             // 获取所有分类预算（target_type = 1，包含天/周周期）
             List<Budget> allCategoryBudgets = dao.getCategoryBudgetsSync(userId);
@@ -59,6 +58,7 @@ public class BudgetResetWorker extends Worker {
                 return Result.success();
             }
 
+            boolean changed = false;
             for (Budget b : allCategoryBudgets) {
                 int period = b.getPeriod();
 
@@ -66,17 +66,21 @@ public class BudgetResetWorker extends Worker {
                     // 当当前时间超出预算窗口 endTime 时，说明旧周期已过，需要重置
                     if (nowMs > b.getEndTime()) {
                         resetBudgetPeriod(dao, b, Budget.PERIOD_DAY);
+                        changed = true;
                         Log.d(TAG, "天预算已重置 id=" + b.getId());
                     }
 
                 } else if (period == Budget.PERIOD_WEEK) {
-                    // 仅在周一且旧周期已过时才重置
-                    if (dayOfWeek == Calendar.MONDAY && nowMs > b.getEndTime()) {
+                    // WorkManager may run late; an expired window must not wait another week.
+                    if (nowMs > b.getEndTime()) {
                         resetBudgetPeriod(dao, b, Budget.PERIOD_WEEK);
+                        changed = true;
                         Log.d(TAG, "周预算已重置 id=" + b.getId());
                     }
                 }
             }
+
+            if (changed) BudgetSyncWorker.enqueue(ctx);
 
             return Result.success();
         } catch (Exception e) {

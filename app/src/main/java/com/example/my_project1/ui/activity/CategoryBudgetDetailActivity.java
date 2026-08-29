@@ -55,8 +55,7 @@ import java.util.Locale;
  *   - 周期内关联账单列表
  *   - 消费趋势折线图（周 / 月 / 年视图）
  *
- * 账单和已用金额的时间范围由 CategoryBudgetDetailViewModel 统一计算，
- * 天/周预算以当前时间实时计算窗口，保证与列表进度条数据的统计口径一致。
+ * 账单和已用金额使用预算记录保存的规范起止时间，保证与主列表统计口径一致。
  */
 public class CategoryBudgetDetailActivity extends AppCompatActivity {
 
@@ -72,6 +71,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
     public static final String EXTRA_END_TIME      = "extra_end_time";
     public static final String EXTRA_YEAR          = "extra_year";
     public static final String EXTRA_MONTH         = "extra_month";
+    public static final String EXTRA_TRANSACTION_TYPE = "extra_transaction_type";
 
     private ActivityCategoryBudgetDetailBinding binding;
     private CategoryBudgetDetailViewModel vm;
@@ -93,6 +93,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         i.putExtra(EXTRA_END_TIME,     budget.getEndTime());
         i.putExtra(EXTRA_YEAR,         budget.getYear());
         i.putExtra(EXTRA_MONTH,        budget.getMonth());
+        i.putExtra(EXTRA_TRANSACTION_TYPE, budget.getTransactionType());
         ctx.startActivity(i);
     }
 
@@ -140,6 +141,7 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         long   startTime = intent.getLongExtra(EXTRA_START_TIME, 0);
         long   endTime   = intent.getLongExtra(EXTRA_END_TIME, 0);
         String budgetType= intent.getStringExtra(EXTRA_BUDGET_TYPE);
+        String transactionType = intent.getStringExtra(EXTRA_TRANSACTION_TYPE);
         int    year      = intent.getIntExtra(EXTRA_YEAR, Calendar.getInstance().get(Calendar.YEAR));
         int    month     = intent.getIntExtra(EXTRA_MONTH, Calendar.getInstance().get(Calendar.MONTH) + 1);
 
@@ -153,6 +155,8 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         budget.setEndTime(endTime);
         budget.setYear(year);
         budget.setMonth(month);
+        budget.setTransactionType(transactionType != null
+                ? transactionType : Budget.TYPE_EXPENSE);
         budget.setTargetId(catCloudId);
         budget.setCategoryName(catName);
         budget.setCategoryIconUrl(catIcon);

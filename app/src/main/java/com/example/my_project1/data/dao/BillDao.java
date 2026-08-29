@@ -10,6 +10,7 @@ import androidx.room.Update;
 
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.budget.CategoryAmount;
 import com.example.my_project1.data.model.bill.SearchSummary;
 
 import java.util.Date;
@@ -284,12 +285,12 @@ public interface BillDao {
     @Query("SELECT * FROM bills " +
             "WHERE user_id = :userId " +
             "AND category_id = :catCloudId " +
-            "AND type = 0 " +
+            "AND type = :billType " +
             "AND excludeBudget = 0 " +
             "AND billTime >= :startMs AND billTime <= :endMs " +
             "AND sync_state != 'TO_DELETE'")
     List<Bill> getBillsByCategoryInRange(String userId, String catCloudId,
-                                         long startMs, long endMs);
+                                         int billType, long startMs, long endMs);
 
 
 
@@ -308,6 +309,20 @@ public interface BillDao {
                  "AND billTime >= :startMs AND billTime <= :endMs " +
                  "AND sync_state != 'TO_DELETE'")
      List<Bill> getIncomeBillsInRange(String userId, long startMs, long endMs);
+
+     @Query("SELECT COALESCE(SUM(amount), 0) FROM bills " +
+             "WHERE user_id = :userId AND type = :type AND excludeBudget = 0 " +
+             "AND billTime >= :startMs AND billTime <= :endMs " +
+             "AND sync_state != 'TO_DELETE'")
+     double getBudgetAmountInRange(String userId, int type, long startMs, long endMs);
+
+     @Query("SELECT category_id, COALESCE(SUM(amount), 0) AS total_amount FROM bills " +
+             "WHERE user_id = :userId AND type = :billType AND excludeBudget = 0 " +
+             "AND billTime >= :startMs AND billTime <= :endMs " +
+             "AND sync_state != 'TO_DELETE' AND category_id IS NOT NULL " +
+             "GROUP BY category_id")
+     List<CategoryAmount> getBudgetAmountsByCategoryInRange(
+             String userId, int billType, long startMs, long endMs);
 
 
 

@@ -17,6 +17,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.budget.Budget;
+import com.example.my_project1.utils.BudgetConfig;
+import com.example.my_project1.utils.BudgetPeriodHelper;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
@@ -29,18 +31,19 @@ import java.util.Locale;
 public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
 
     public interface OnDateSelectedListener {
-        void onDateSelected(String type, int year, int month);
+        void onDateSelected(String type, long startTime, long endTime);
     }
 
     private String type;
-    private int initialYear, initialMonth;
+    private long initialStartTime, initialEndTime;
     private OnDateSelectedListener listener;
 
-    public static BudgetDateSelectorFragment newInstance(String type, int year, int month, OnDateSelectedListener listener) {
+    public static BudgetDateSelectorFragment newInstance(
+            String type, long startTime, long endTime, OnDateSelectedListener listener) {
         BudgetDateSelectorFragment f = new BudgetDateSelectorFragment();
         f.type = type;
-        f.initialYear = year;
-        f.initialMonth = month;
+        f.initialStartTime = startTime;
+        f.initialEndTime = endTime;
         f.listener = listener;
         return f;
     }
@@ -71,16 +74,11 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
         tvAction.setText(actionText);
         tvAction.setOnClickListener(v -> {
             Calendar c = Calendar.getInstance();
-            int year = c.get(Calendar.YEAR);
-            int val;
-            if (Budget.TYPE_WEEK.equals(type)) {
-                val = c.get(Calendar.WEEK_OF_YEAR);
-            } else if (Budget.TYPE_YEAR.equals(type)) {
-                val = 1;
-            } else {
-                val = c.get(Calendar.MONTH) + 1;
-            }
-            if (listener != null) listener.onDateSelected(type, year, val);
+            int startDay = Budget.TYPE_MONTH.equals(type)
+                    ? BudgetConfig.getStartDay(requireContext()) : 1;
+            long[] range = BudgetPeriodHelper.getPeriodRange(
+                    BudgetPeriodHelper.periodForType(type), startDay, c);
+            if (listener != null) listener.onDateSelected(type, range[0], range[1]);
             dismiss();
         });
 
@@ -112,11 +110,18 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
                 TextView tv = holder.itemView.findViewById(R.id.tv_year);
                 int year = years.get(position);
                 tv.setText(year + "年");
-                boolean sel = year == initialYear;
+                Calendar initial = Calendar.getInstance();
+                initial.setTimeInMillis(initialStartTime);
+                boolean sel = year == initial.get(Calendar.YEAR);
                 tv.setBackgroundResource(sel ? R.drawable.bg_tab_selected_white : R.drawable.bg_capsule_gray);
                 tv.setTextColor(sel ? ContextCompat.getColor(getContext(), R.color.calendar_selection) : 0xFF333333);
                 holder.itemView.setOnClickListener(v -> {
-                    if (listener != null) listener.onDateSelected(type, year, 1);
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.clear();
+                    calendar.set(year, Calendar.JANUARY, 1);
+                    long[] range = BudgetPeriodHelper.getPeriodRange(
+                            Budget.PERIOD_YEAR, 1, calendar);
+                    if (listener != null) listener.onDateSelected(type, range[0], range[1]);
                     dismiss();
                 });
             }
@@ -159,11 +164,20 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
                         TextView tv = (TextView) h.itemView;
                         int month = p + 1;
                         tv.setText(month + "月");
-                        boolean sel = (year == initialYear && month == initialMonth);
+                        Calendar calendar = Calendar.getInstance();
+                        calendar.clear();
+                        calendar.set(year, month - 1, 1);
+                        int startDay = BudgetConfig.getStartDay(requireContext());
+                        calendar.set(Calendar.DAY_OF_MONTH,
+                                Math.min(startDay, calendar.getActualMaximum(Calendar.DAY_OF_MONTH)));
+                        long[] range = BudgetPeriodHelper.getPeriodRange(
+                                Budget.PERIOD_MONTH, startDay, calendar);
+                        boolean sel = range[0] == initialStartTime;
                         tv.setBackgroundResource(sel ? R.drawable.bg_tab_selected_white : R.drawable.bg_capsule_gray);
                         tv.setTextColor(sel ? ContextCompat.getColor(getContext(), R.color.calendar_selection) : 0xFF333333);
                         h.itemView.setOnClickListener(v -> {
-                            if (listener != null) listener.onDateSelected(Budget.TYPE_MONTH, year, month);
+                            if (listener != null) listener.onDateSelected(
+                                    Budget.TYPE_MONTH, range[0], range[1]);
                             dismiss();
                         });
                     }
@@ -181,39 +195,22 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
         
         List<WeekInfo> weeks = new ArrayList<>();
         int curYear = Calendar.getInstance().get(Calendar.YEAR);
-        for (int y = curYear - 3; y <= curYear + 3; y++) {
-            Calendar cal = Calendar.getInstance();
-            cal.set(Calendar.YEAR, y);
-            cal.set(Calendar.MONTH, Calendar.JANUARY);
-            cal.set(Calendar.DAY_OF_MONTH, 1);
-            cal.set(Calendar.HOUR_OF_DAY, 0);
-            cal.set(Calendar.MINUTE, 0);
-            cal.set(Calendar.SECOND, 0);
-            cal.set(Calendar.MILLISECOND, 0);
-            
-            // Adjust to the first Sunday of the year (or just before)
-            while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
-                cal.add(Calendar.DAY_OF_MONTH, -1);
-            }
-            
-            // Loop through the whole year
-            while (true) {
-                Calendar start = (Calendar) cal.clone();
-                Calendar end = (Calendar) cal.clone();
-                end.add(Calendar.DAY_OF_MONTH, 6);
-                
-                // Get the representative week number for this period
-                // We use the week number of the midpoint or the Thursday as per ISO, 
-                // but here we'll just use what WEEK_OF_YEAR gives us for the start of the week.
-                weeks.add(new WeekInfo(y, start.get(Calendar.WEEK_OF_YEAR), start, end));
-                
-                cal.add(Calendar.WEEK_OF_YEAR, 1);
-                
-                // Stop when we reach the next year's first week
-                if (cal.get(Calendar.YEAR) > y && cal.get(Calendar.WEEK_OF_YEAR) == 1) break;
-                // Safety break
-                if (cal.get(Calendar.YEAR) > y + 1) break;
-            }
+        Calendar cursor = Calendar.getInstance();
+        cursor.clear();
+        cursor.set(curYear - 3, Calendar.JANUARY, 1);
+        long[] firstRange = BudgetPeriodHelper.getPeriodRange(Budget.PERIOD_WEEK, 1, cursor);
+        cursor.setTimeInMillis(firstRange[0]);
+        Calendar limit = Calendar.getInstance();
+        limit.clear();
+        limit.set(curYear + 4, Calendar.JANUARY, 1);
+        while (cursor.before(limit)) {
+            long[] range = BudgetPeriodHelper.getPeriodRange(Budget.PERIOD_WEEK, 1, cursor);
+            Calendar start = Calendar.getInstance();
+            Calendar end = Calendar.getInstance();
+            start.setTimeInMillis(range[0]);
+            end.setTimeInMillis(range[1]);
+            weeks.add(new WeekInfo(range[0], range[1], start, end));
+            cursor.add(Calendar.DAY_OF_MONTH, 7);
         }
 
         rv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -234,7 +231,7 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
                         e.get(Calendar.YEAR), e.get(Calendar.MONTH)+1, e.get(Calendar.DAY_OF_MONTH));
                 tvRange.setText(rangeStr);
 
-                boolean isSelectedWeek = (info.year == initialYear && info.weekNum == initialMonth);
+                boolean isSelectedWeek = info.startTime == initialStartTime;
                 
                 RecyclerView rvDays = holder.itemView.findViewById(R.id.rv_days);
                 rvDays.setLayoutManager(new GridLayoutManager(getContext(), 7));
@@ -261,7 +258,8 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
                         }
                         
                         h.itemView.setOnClickListener(v -> {
-                            if (listener != null) listener.onDateSelected(Budget.TYPE_WEEK, info.year, info.weekNum);
+                            if (listener != null) listener.onDateSelected(
+                                    Budget.TYPE_WEEK, info.startTime, info.endTime);
                             dismiss();
                         });
                     }
@@ -270,7 +268,8 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
                 });
                 
                 holder.itemView.setOnClickListener(v -> {
-                    if (listener != null) listener.onDateSelected(Budget.TYPE_WEEK, info.year, info.weekNum);
+                    if (listener != null) listener.onDateSelected(
+                            Budget.TYPE_WEEK, info.startTime, info.endTime);
                     dismiss();
                 });
             }
@@ -280,7 +279,7 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
         
         // Scroll to initial week if possible
         for (int i = 0; i < weeks.size(); i++) {
-            if (weeks.get(i).year == initialYear && weeks.get(i).weekNum == initialMonth) {
+            if (weeks.get(i).startTime == initialStartTime) {
                 rv.scrollToPosition(i);
                 break;
             }
@@ -288,12 +287,14 @@ public class BudgetDateSelectorFragment extends BottomSheetDialogFragment {
     }
 
     private static class WeekInfo {
-        int year;
-        int weekNum;
+        long startTime;
+        long endTime;
         Calendar start;
         Calendar end;
-        WeekInfo(int y, int w, Calendar s, Calendar e) {
-            year = y; weekNum = w; start = s; end = e;
+        WeekInfo(long startTime, long endTime, Calendar s, Calendar e) {
+            this.startTime = startTime;
+            this.endTime = endTime;
+            start = s; end = e;
         }
     }
 

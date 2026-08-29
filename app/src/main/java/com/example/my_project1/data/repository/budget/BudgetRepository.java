@@ -11,12 +11,17 @@ import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.budget.Budget;
+import com.example.my_project1.data.model.budget.CategoryAmount;
 import com.example.my_project1.data.remote.model.cloudbudget.BmobBudgetApiImpl;
 import com.example.my_project1.data.remote.model.cloudbudget.CloudBudget;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.work.BudgetSyncWorker;
 
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import cn.bmob.v3.exception.BmobException;
@@ -28,8 +33,8 @@ import cn.bmob.v3.listener.FindListener;
  * 核心修复：
  *
  * 1. 【修复重复金额叠加 Bug】
- *    addOrUpdateCategoryBudget() 在插入前调用 getExistingCategoryBudget() 唯一性检查：
- *    同一分类在同一 budgetType + year + month 下若已存在记录则执行更新而非插入，
+ *    addOrUpdateCategoryBudget() 在事务内完成唯一性检查和写入：
+ *    周预算按 startTime，月/年预算按 budgetType + year + month 定位，
  *    彻底杜绝重复记录导致的金额叠加问题。
  *
  * 2. 【一分类一周期约束】
@@ -78,10 +83,6 @@ public class BudgetRepository {
         return dao.getMonthBudgetSync(userId, transType, year, month);
     }
 
-    public Budget getWeekBudgetSync(String userId, String transType, int year, int month) {
-        return dao.getWeekBudgetSync(userId, transType, year, month);
-    }
-
     public Budget getWeekBudgetSyncByStart(String userId, String transType, long startTime) {
         return dao.getWeekBudgetSyncByStart(userId, transType, startTime);
     }
@@ -117,6 +118,11 @@ public class BudgetRepository {
         return dao.getCategoryBudgetsSyncByType(userId, transType, budgetType, year, month);
     }
 
+    public List<Budget> getCategoryBudgetsSyncByStart(
+            String userId, String transType, String budgetType, long startTime) {
+        return dao.getCategoryBudgetsSyncByStart(userId, transType, budgetType, startTime);
+    }
+
     // ── 剩余可分配预算 ─────────────────────────────────────
 
     public double getRemainingAllocation(double totalAmount, String userId, String transType,
@@ -148,12 +154,57 @@ public class BudgetRepository {
         });
     }
 
+    /** Atomically inserts or updates one total budget and calls back after Room commits. */
+    public void saveTotalBudget(Budget candidate, Consumer<Budget> onSaved) {
+        AppExecutors.get().diskIO().execute(() -> {
+            final Budget[] saved = new Budget[1];
+            db.runInTransaction(() -> {
+                Budget existing;
+                if (Budget.TYPE_YEAR.equals(candidate.getBudgetType())) {
+                    existing = dao.getYearBudgetSync(candidate.getOwnerId(),
+                            candidate.getTransactionType(), candidate.getYear());
+                } else if (Budget.TYPE_WEEK.equals(candidate.getBudgetType())) {
+                    existing = dao.getWeekBudgetSyncByStart(candidate.getOwnerId(),
+                            candidate.getTransactionType(), candidate.getStartTime());
+                } else {
+                    existing = dao.getMonthBudgetSync(candidate.getOwnerId(),
+                            candidate.getTransactionType(), candidate.getYear(), candidate.getMonth());
+                }
+
+                long now = System.currentTimeMillis();
+                if (existing != null) {
+                    existing.setAmount(candidate.getAmount());
+                    existing.setPeriod(candidate.getPeriod());
+                    existing.setStartTime(candidate.getStartTime());
+                    existing.setEndTime(candidate.getEndTime());
+                    existing.setYear(candidate.getYear());
+                    existing.setMonth(candidate.getMonth());
+                    existing.setUpdatedAt(now);
+                    existing.setSyncState(existing.getCloudId() == null || existing.getCloudId().isEmpty()
+                            ? SyncState.TO_CREATE.getValue() : SyncState.TO_UPDATE.getValue());
+                    dao.update(existing);
+                    saved[0] = existing;
+                } else {
+                    candidate.setUpdatedAt(now);
+                    candidate.setSyncState(SyncState.TO_CREATE.getValue());
+                    candidate.setId((int) dao.insert(candidate));
+                    saved[0] = candidate;
+                }
+            });
+            enqueueSync();
+            if (onSaved != null) {
+                Budget result = saved[0];
+                AppExecutors.get().mainThread().execute(() -> onSaved.accept(result));
+            }
+        });
+    }
+
     // ── 分类预算写操作（核心修复）─────────────────────────
 
     /**
      * 新增或更新分类预算（唯一性约束版本）。
      *
-     * 规则：同一分类在同一 budgetType + year + month 下只允许存在一条记录。
+     * 规则：周预算按 startTime，月/年预算按 budgetType + year + month 保持唯一。
      *   - 若已存在（不论 period）→ 执行更新（amount + period + 时间范围一并更新）。
      *   - 若不存在              → 执行插入。
      *
@@ -171,45 +222,48 @@ public class BudgetRepository {
             int    year       = budget.getYear();
             int    month      = budget.getMonth();
 
-            Budget existing;
-            if (Budget.TYPE_WEEK.equals(budgetType)) {
-                existing = dao.getCategoryBudgetByStart(userId, transType, catId, budgetType, budget.getStartTime());
-            } else {
-                existing = dao.getExistingCategoryBudget(userId, transType, catId, budgetType, year, month);
-            }
+            final String[] action = new String[1];
+            db.runInTransaction(() -> {
+                Budget existing;
+                if (Budget.TYPE_WEEK.equals(budgetType)) {
+                    existing = dao.getCategoryBudgetByStart(
+                            userId, transType, catId, budgetType, budget.getStartTime());
+                } else {
+                    existing = dao.getExistingCategoryBudget(
+                            userId, transType, catId, budgetType, year, month);
+                }
 
-            String action;
-            if (existing != null) {
-                // 已存在 → 更新，保留 cloudId 和 ownerId
-                existing.setAmount(budget.getAmount());
-                existing.setPeriod(budget.getPeriod());
-                existing.setStartTime(budget.getStartTime());
-                existing.setEndTime(budget.getEndTime());
-                // 同步更新分类展示信息快照（分类名称/图标可能已变更）
-                if (budget.getCategoryName() != null)
-                    existing.setCategoryName(budget.getCategoryName());
-                if (budget.getCategoryIconUrl() != null)
-                    existing.setCategoryIconUrl(budget.getCategoryIconUrl());
-                existing.setSyncState(SyncState.TO_UPDATE.getValue());
-                existing.setUpdatedAt(System.currentTimeMillis());
-                dao.update(existing);
-                Log.d(TAG, "addOrUpdateCategoryBudget UPDATE id=" + existing.getId()
-                        + " catId=" + catId + " amount=" + budget.getAmount());
-                action = "update";
-            } else {
-                // 不存在 → 插入
-                budget.setSyncState(SyncState.TO_CREATE.getValue());
-                budget.setUpdatedAt(System.currentTimeMillis());
-                long id = dao.insert(budget);
-                Log.d(TAG, "addOrUpdateCategoryBudget INSERT id=" + id
-                        + " catId=" + catId + " amount=" + budget.getAmount());
-                action = "insert";
-            }
+                if (existing != null) {
+                    // 已存在 -> 更新，保留 cloudId 和 ownerId。
+                    existing.setAmount(budget.getAmount());
+                    existing.setPeriod(budget.getPeriod());
+                    existing.setStartTime(budget.getStartTime());
+                    existing.setEndTime(budget.getEndTime());
+                    if (budget.getCategoryName() != null)
+                        existing.setCategoryName(budget.getCategoryName());
+                    if (budget.getCategoryIconUrl() != null)
+                        existing.setCategoryIconUrl(budget.getCategoryIconUrl());
+                    existing.setSyncState(existing.getCloudId() == null || existing.getCloudId().isEmpty()
+                            ? SyncState.TO_CREATE.getValue() : SyncState.TO_UPDATE.getValue());
+                    existing.setUpdatedAt(System.currentTimeMillis());
+                    dao.update(existing);
+                    Log.d(TAG, "addOrUpdateCategoryBudget UPDATE id=" + existing.getId()
+                            + " catId=" + catId + " amount=" + budget.getAmount());
+                    action[0] = "update";
+                } else {
+                    budget.setSyncState(SyncState.TO_CREATE.getValue());
+                    budget.setUpdatedAt(System.currentTimeMillis());
+                    long id = dao.insert(budget);
+                    Log.d(TAG, "addOrUpdateCategoryBudget INSERT id=" + id
+                            + " catId=" + catId + " amount=" + budget.getAmount());
+                    action[0] = "insert";
+                }
+            });
 
             enqueueSync();
 
             if (onDone != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                final String a = action;
+                final String a = action[0];
                 AppExecutors.get().mainThread().execute(() -> onDone.accept(a));
             }
         });
@@ -221,9 +275,16 @@ public class BudgetRepository {
      * 按主键软删除：有 cloudId → 标记 TO_DELETE；无 cloudId → 直接删本地。
      */
     public void markDeleteById(int budgetId) {
+        markDeleteById(budgetId, null);
+    }
+
+    public void markDeleteById(int budgetId, Runnable onDeleted) {
         AppExecutors.get().diskIO().execute(() -> {
             Budget b = dao.getById(budgetId);
-            if (b == null) return;
+            if (b == null) {
+                if (onDeleted != null) AppExecutors.get().mainThread().execute(onDeleted);
+                return;
+            }
             if (b.getCloudId() != null && !b.getCloudId().isEmpty()) {
                 b.setSyncState(SyncState.TO_DELETE.getValue());
                 dao.update(b);
@@ -231,6 +292,7 @@ public class BudgetRepository {
                 dao.deleteById(budgetId);
             }
             enqueueSync();
+            if (onDeleted != null) AppExecutors.get().mainThread().execute(onDeleted);
         });
     }
 
@@ -277,7 +339,9 @@ public class BudgetRepository {
                         AppExecutors.get().diskIO().execute(() -> {
                             String userId = api.getCurrentUserId();
                             if (userId == null) { postCallback(callback, false); return; }
-                            for (CloudBudget cloud : list) mergeCloudBudget(cloud, userId);
+                            db.runInTransaction(() -> {
+                                for (CloudBudget cloud : list) mergeCloudBudget(cloud, userId);
+                            });
                             postCallback(callback, true);
                         });
                     }
@@ -349,12 +413,13 @@ public class BudgetRepository {
         return dao.getBudgetsInRange(userId, from, to);
     }
 
-    public double getSpentAmountByCategory(String userId, String catCloudId,
-                                           long startMs, long endMs) {
+    public double getSpentAmountByCategory(String userId, String transType,
+                                           String catCloudId, long startMs, long endMs) {
         if (userId == null || catCloudId == null) return 0;
         try {
             List<Bill> bills = db.billDao()
-                    .getBillsByCategoryInRange(userId, catCloudId, startMs, endMs);
+                    .getBillsByCategoryInRange(userId, catCloudId,
+                            Budget.TYPE_INCOME.equals(transType) ? 1 : 0, startMs, endMs);
             if (bills == null) return 0;
             double sum = 0;
             for (Bill b : bills) { if (!b.isExcludeBudget()) sum += b.getAmount(); }
@@ -365,14 +430,33 @@ public class BudgetRepository {
         }
     }
 
+    public double getRemainingAllocationByStart(double totalAmount, String userId,
+                                                String transType, String budgetType,
+                                                long startTime) {
+        double allocated = dao.getTotalAllocatedAmountByStart(
+                userId, transType, budgetType, startTime);
+        return totalAmount - allocated;
+    }
+
+    /** Returns all category spending with one grouped query instead of one query per row. */
+    public Map<String, Double> getBudgetAmountsByCategory(
+            String userId, String transType, long startMs, long endMs) {
+        if (userId == null || userId.isEmpty()) return Collections.emptyMap();
+        List<CategoryAmount> rows = db.billDao()
+                .getBudgetAmountsByCategoryInRange(userId,
+                        Budget.TYPE_INCOME.equals(transType) ? 1 : 0, startMs, endMs);
+        if (rows == null || rows.isEmpty()) return Collections.emptyMap();
+        Map<String, Double> result = new HashMap<>(rows.size());
+        for (CategoryAmount row : rows) {
+            if (row.categoryId != null) result.put(row.categoryId, row.totalAmount);
+        }
+        return result;
+    }
+
     public double getTotalSpentInPeriod(String userId, long startMs, long endMs) {
         if (userId == null) return 0;
         try {
-            List<Bill> bills = db.billDao().getExpenseBillsInRange(userId, startMs, endMs);
-            if (bills == null) return 0;
-            double sum = 0;
-            for (Bill b : bills) { if (!b.isExcludeBudget()) sum += b.getAmount(); }
-            return sum;
+            return db.billDao().getBudgetAmountInRange(userId, 0, startMs, endMs);
         } catch (Exception e) {
             Log.e(TAG, "统计总支出失败：" + e.getMessage());
             return 0;
@@ -382,11 +466,7 @@ public class BudgetRepository {
     public double getTotalIncomeInPeriod(String userId, long startMs, long endMs) {
         if (userId == null) return 0;
         try {
-            List<Bill> bills = db.billDao().getIncomeBillsInRange(userId, startMs, endMs);
-            if (bills == null) return 0;
-            double sum = 0;
-            for (Bill b : bills) { if (!b.isExcludeBudget()) sum += b.getAmount(); }
-            return sum;
+            return db.billDao().getBudgetAmountInRange(userId, 1, startMs, endMs);
         } catch (Exception e) {
             Log.e(TAG, "统计总收入失败：" + e.getMessage());
             return 0;
@@ -402,12 +482,28 @@ public class BudgetRepository {
                     .getExpenseBillsInRange(userId, periodStartMs, periodEndMs);
             if (bills == null) return result;
             double[] daily = new double[days];
-            long msPerDay = 86_400_000L;
+            Map<Long, Integer> dayIndexes = new HashMap<>(days);
+            Calendar cursor = Calendar.getInstance();
+            cursor.setTimeInMillis(periodStartMs);
+            for (int i = 0; i < days; i++) {
+                cursor.set(Calendar.HOUR_OF_DAY, 0);
+                cursor.set(Calendar.MINUTE, 0);
+                cursor.set(Calendar.SECOND, 0);
+                cursor.set(Calendar.MILLISECOND, 0);
+                dayIndexes.put(cursor.getTimeInMillis(), i);
+                cursor.add(Calendar.DAY_OF_MONTH, 1);
+            }
             for (Bill b : bills) {
                 if (b.isExcludeBudget()) continue;
                 long bt = b.getBillTime() != null ? b.getBillTime().getTime() : 0;
-                int idx = (int) ((bt - periodStartMs) / msPerDay);
-                if (idx >= 0 && idx < days) daily[idx] += b.getAmount();
+                Calendar billDay = Calendar.getInstance();
+                billDay.setTimeInMillis(bt);
+                billDay.set(Calendar.HOUR_OF_DAY, 0);
+                billDay.set(Calendar.MINUTE, 0);
+                billDay.set(Calendar.SECOND, 0);
+                billDay.set(Calendar.MILLISECOND, 0);
+                Integer idx = dayIndexes.get(billDay.getTimeInMillis());
+                if (idx != null) daily[idx] += b.getAmount();
             }
             double acc = 0;
             for (int i = 0; i < days; i++) { acc += daily[i]; result[i] = acc; }
