@@ -245,15 +245,15 @@ public class BillStatisticsActivity extends AppCompatActivity {
 
     private void applyPieTabStyle(boolean isExpense) {
         if (isExpense) {
-            binding.tabPieExpense.setBackgroundResource(R.drawable.bg_tab_selected_blue);
-            binding.tabPieExpense.setTextColor(0xFFFFFFFF);
+            binding.tabPieExpense.setBackgroundResource(R.drawable.bg_white_capsule);
+            binding.tabPieExpense.setTextColor(0xFF333333);
             binding.tabPieIncome.setBackgroundResource(0);
-            binding.tabPieIncome.setTextColor(0xFF888888);
+            binding.tabPieIncome.setTextColor(0xFF999999);
         } else {
-            binding.tabPieIncome.setBackgroundResource(R.drawable.bg_tab_selected_blue);
-            binding.tabPieIncome.setTextColor(0xFFFFFFFF);
+            binding.tabPieIncome.setBackgroundResource(R.drawable.bg_white_capsule);
+            binding.tabPieIncome.setTextColor(0xFF333333);
             binding.tabPieExpense.setBackgroundResource(0);
-            binding.tabPieExpense.setTextColor(0xFF888888);
+            binding.tabPieExpense.setTextColor(0xFF999999);
         }
     }
 
@@ -268,22 +268,46 @@ public class BillStatisticsActivity extends AppCompatActivity {
         binding.rvCategoryList.setNestedScrollingEnabled(false);
 
         categoryAdapter.setOnItemClickListener((item, position) -> {
-            // 高亮选中状态
-            categoryAdapter.setSelectedPosition(position);
-
-            // 跳转分类明细页
+            // 点击分类：跳转明细
             Intent intent = new Intent(this, CategoryBillsActivity.class);
             intent.putExtra(CategoryBillsActivity.EXTRA_CATEGORY_NAME,   item.categoryName);
             intent.putExtra(CategoryBillsActivity.EXTRA_CATEGORY_ICON,   item.categoryIconUrl);
+            intent.putExtra(CategoryBillsActivity.EXTRA_CATEGORY_ID,     item.categoryId);
             intent.putExtra(CategoryBillsActivity.EXTRA_BILL_COUNT,      item.billCount);
             intent.putExtra(CategoryBillsActivity.EXTRA_PERIOD_START_MS, viewModel.getWindowStartMs());
             intent.putExtra(CategoryBillsActivity.EXTRA_PERIOD_END_MS,   viewModel.getWindowEndMs());
             intent.putExtra(CategoryBillsActivity.EXTRA_BILL_TYPE,       viewModel.getCurrentPieType());
             startActivity(intent);
-
-            // 跳转动画：新页从右侧滑入，当前页向左滑出
             overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
         });
+
+        categoryAdapter.setOnExpandClickListener(item -> {
+            viewModel.toggleExpand(item.categoryId);
+        });
+
+        // 层级切换
+        binding.tabHierarchyPrimary.setOnClickListener(v -> {
+            viewModel.setHierarchyMode(0);
+            applyHierarchyTabStyle(true);
+        });
+        binding.tabHierarchyAll.setOnClickListener(v -> {
+            viewModel.setHierarchyMode(1);
+            applyHierarchyTabStyle(false);
+        });
+    }
+
+    private void applyHierarchyTabStyle(boolean isPrimary) {
+        if (isPrimary) {
+            binding.tabHierarchyPrimary.setBackgroundResource(R.drawable.bg_white_capsule);
+            binding.tabHierarchyPrimary.setTextColor(0xFF333333);
+            binding.tabHierarchyAll.setBackgroundResource(0);
+            binding.tabHierarchyAll.setTextColor(0xFF999999);
+        } else {
+            binding.tabHierarchyAll.setBackgroundResource(R.drawable.bg_white_capsule);
+            binding.tabHierarchyAll.setTextColor(0xFF333333);
+            binding.tabHierarchyPrimary.setBackgroundResource(0);
+            binding.tabHierarchyPrimary.setTextColor(0xFF999999);
+        }
     }
 
     // ================================================================
@@ -358,6 +382,10 @@ public class BillStatisticsActivity extends AppCompatActivity {
             if (items != null) {
                 categoryAdapter.submitList(items, this::hideLoading);
             }
+        });
+
+        viewModel.hierarchyMode.observe(this, mode -> {
+            applyHierarchyTabStyle(mode == 0);
         });
     }
 

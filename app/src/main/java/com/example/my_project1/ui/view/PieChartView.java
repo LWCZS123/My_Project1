@@ -80,8 +80,8 @@ public class PieChartView extends View {
     private float labelMargin;
     private float labelTextSize; // 缩小标签字号
     private float centerTextSize; // 不再使用
-    private float innerRatio   = 0.45f; // 内圈半径比例
-    private float sliceGapDeg  = 2.0f;   // 扇区间隙角度
+    private float innerRatio   = 0.50f; // 进一步调小中心，增大扇形面积
+    private float sliceGapDeg  = 8.0f;   // 进一步增大间隙以突出独立色块感
 
     // ── Paints ────────────────────────────────────────────────────────
     private Paint slicePaint;
@@ -116,7 +116,9 @@ public class PieChartView extends View {
         centerTextSize = 24 * d; // 不再使用
 
         slicePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        slicePaint.setStyle(Paint.Style.FILL);
+        slicePaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        slicePaint.setStrokeJoin(Paint.Join.ROUND);
+        slicePaint.setStrokeWidth(6 * d); // 通过描边圆角实现 3dp 的圆角效果
 
         holePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         holePaint.setColor(Color.WHITE);
@@ -205,8 +207,8 @@ public class PieChartView extends View {
         float cy = getHeight() / 2f;
         float d = getResources().getDisplayMetrics().density;
 
-        float avail = Math.min(cx, cy) - expandPx - leaderRadial - 30 * d;
-        float radius = Math.max(avail, 48 * d);
+        float avail = Math.min(cx, cy) - expandPx - 5 * d; // 进一步压缩 padding
+        float radius = Math.max(avail, 70 * d); // 增大最小半径到 70d
         float innerR = radius * innerRatio;
 
         float startAngle = -90 + rotationOffset;
@@ -226,8 +228,10 @@ public class PieChartView extends View {
                 offsetPx = expandPx * (1f - highlightAnim);
             }
 
-            float outerR = radius + offsetPx;
-            float innerRCurrent = innerR + offsetPx;
+            // 关键：为了圆角平滑，收缩绘图半径，由 StrokeJoin.ROUND 补偿回来
+            float strokeW = slicePaint.getStrokeWidth();
+            float outerR = radius + offsetPx - strokeW / 2f;
+            float innerRCurrent = innerR + offsetPx + strokeW / 2f;
 
             Path path = new Path();
 
@@ -243,20 +247,11 @@ public class PieChartView extends View {
             float inEndX = cx + innerRCurrent * (float) Math.cos(startRad);
             float inEndY = cy + innerRCurrent * (float) Math.sin(startRad);
 
-            // 使用 arcTo 绘制扇形
+            // 使用 lineTo 连接，配合 FILL_AND_STROKE + Join.ROUND 实现完美 4 角圆角
             path.moveTo(outStartX, outStartY);
-            path.arcTo(
-                    new RectF(cx - outerR, cy - outerR, cx + outerR, cy + outerR),
-                    actualSt,
-                    actualSw,
-                    false
-            );
-            path.arcTo(
-                    new RectF(cx - innerRCurrent, cy - innerRCurrent, cx + innerRCurrent, cy + innerRCurrent),
-                    actualSt + actualSw,
-                    -actualSw,
-                    false
-            );
+            path.arcTo(new RectF(cx - outerR, cy - outerR, cx + outerR, cy + outerR), actualSt, actualSw, false);
+            path.lineTo(inStartX, inStartY);
+            path.arcTo(new RectF(cx - innerRCurrent, cy - innerRCurrent, cx + innerRCurrent, cy + innerRCurrent), actualSt + actualSw, -actualSw, false);
             path.close();
 
             slicePaint.setColor(e.color);
@@ -368,8 +363,8 @@ public class PieChartView extends View {
 
     private int sliceAtAngle(float touchAngle, float cx, float cy, float tx, float ty) {
         float d = getResources().getDisplayMetrics().density;
-        float avail = Math.min(cx, cy) - expandPx - leaderRadial - 30 * d;
-        float radius = Math.max(avail, 48 * d);
+        float avail = Math.min(cx, cy) - expandPx - 5 * d; // 进一步压缩 padding
+        float radius = Math.max(avail, 70 * d); // 增大最小半径到 70d
         float distSq = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
         float innerR = radius * innerRatio;
         if (distSq < innerR * innerR || distSq > (radius + expandPx) * (radius + expandPx))

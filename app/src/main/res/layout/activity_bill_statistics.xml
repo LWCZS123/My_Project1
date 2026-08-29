@@ -683,7 +683,8 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="24dp"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="0dp">
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFFFF">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -691,88 +692,94 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <!-- 标题 + 支出/收入切换 -->
-                    <LinearLayout
+                    <!-- 顶部标题与层级切换 -->
+                    <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="12dp">
+                        android:layout_marginBottom="16dp">
 
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="支出分类构成"
-                            android:textColor="#1A1A1A"
-                            android:textSize="16sp"
-                            android:textStyle="bold"/>
-
-                        <!-- 支出/收入胶囊切换 -->
                         <LinearLayout
-                            android:id="@+id/ll_pie_type_tabs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+                            <View
+                                android:layout_width="4dp"
+                                android:layout_height="16dp"
+                                android:background="#FFD54F"
+                                android:layout_marginEnd="8dp"/>
+                            <TextView
+                                android:id="@+id/tv_pie_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="支出分类详情"
+                                android:textColor="#1A1A1A"
+                                android:textSize="15sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/ll_hierarchy_tabs"
                             android:layout_width="wrap_content"
                             android:layout_height="32dp"
+                            android:layout_alignParentEnd="true"
                             android:orientation="horizontal"
-                            android:background="@drawable/bg_capsule_small"
-                            android:padding="3dp">
+                            android:background="@drawable/bg_capsule_gray"
+                            android:padding="2dp">
 
                             <TextView
-                                android:id="@+id/tab_pie_expense"
-                                android:layout_width="56dp"
+                                android:id="@+id/tab_hierarchy_primary"
+                                android:layout_width="60dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:text="支出"
-                                android:textSize="13sp"
-                                android:background="@drawable/bg_tab_selected_blue"
-                                android:textColor="#FFFFFF"/>
+                                android:text="一级"
+                                android:textSize="12sp"
+                                android:background="@drawable/bg_white_capsule"
+                                android:textColor="#333333"/>
 
                             <TextView
-                                android:id="@+id/tab_pie_income"
-                                android:layout_width="56dp"
+                                android:id="@+id/tab_hierarchy_all"
+                                android:layout_width="60dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:text="收入"
-                                android:textSize="13sp"
-                                android:textColor="#888"/>
+                                android:text="全部"
+                                android:textSize="12sp"
+                                android:textColor="#999999"/>
                         </LinearLayout>
-                    </LinearLayout>
+                    </RelativeLayout>
 
-                    <!-- 饼图 + 中心文字 -->
+                    <!-- 饼图 -->
                     <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="260dp"
-                        android:layout_gravity="center_horizontal">
+                        android:layout_height="240dp">
 
                         <com.example.my_project1.ui.view.PieChartView
                             android:id="@+id/pie_chart"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"/>
 
-                        <!-- 中心信息 -->
                         <LinearLayout
-                            android:layout_width="100dp"
-                            android:layout_height="100dp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
                             android:layout_gravity="center"
                             android:orientation="vertical"
                             android:gravity="center">
-
                             <TextView
                                 android:id="@+id/tv_pie_center_label"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="本月支出"
-                                android:textColor="#888"
-                                android:textSize="12sp"/>
-
+                                android:text="总支出"
+                                android:textColor="#999999"
+                                android:textSize="11sp"/>
                             <TextView
                                 android:id="@+id/tv_pie_center_amount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="¥0.00"
                                 android:textColor="#1A1A1A"
-                                android:textSize="16sp"
-                                android:textStyle="bold"/>
+                                android:textSize="15sp"
+                                android:textStyle="bold"
+                                android:layout_marginTop="2dp"/>
                         </LinearLayout>
 
                         <LinearLayout
@@ -782,29 +789,56 @@
                             android:gravity="center"
                             android:orientation="vertical"
                             android:visibility="gone">
-
                             <ImageView
-                                android:layout_width="120dp"
-                                android:layout_height="120dp"
-                                android:layout_gravity="center"
+                                android:layout_width="80dp"
+                                android:layout_height="80dp"
                                 android:src="@drawable/ic_no_data1"/>
-
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="暂无数据"
-                                android:textColor="#888888"
-                                android:textSize="14sp"
+                                android:textColor="#CCCCCC"
+                                android:textSize="12sp"
                                 android:layout_marginTop="8dp"/>
                         </LinearLayout>
                     </FrameLayout>
+
+                    <!-- 支出/收入切换胶囊 -->
+                    <LinearLayout
+                        android:id="@+id/ll_pie_type_tabs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginBottom="16dp"
+                        android:background="@drawable/bg_capsule_gray"
+                        android:padding="2dp">
+
+                        <TextView
+                            android:id="@+id/tab_pie_expense"
+                            android:layout_width="60dp"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="支出"
+                            android:textSize="13sp"
+                            android:background="@drawable/bg_white_capsule"
+                            android:textColor="#333333"/>
+
+                        <TextView
+                            android:id="@+id/tab_pie_income"
+                            android:layout_width="60dp"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="收入"
+                            android:textSize="13sp"
+                            android:textColor="#999999"/>
+                    </LinearLayout>
 
                     <!-- 分类列表 -->
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/rv_category_list"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
                         android:nestedScrollingEnabled="false"/>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

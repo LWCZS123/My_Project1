@@ -71,6 +71,10 @@ public interface CategoryDao {
     @Query("SELECT * FROM categories WHERE owner_id = :userId AND type = :type AND sync_state != 3 ORDER BY sort_index ASC")
     LiveData<List<CategoryWithSubCategories>> getCategoriesWithSubs(String userId, String type);
 
+    @Transaction
+    @Query("SELECT * FROM categories WHERE owner_id = :userId AND type = :type AND sync_state != 3 ORDER BY sort_index ASC")
+    List<CategoryWithSubCategories> getCategoriesWithSubsSync(String userId, String type);
+
     @Query("SELECT * FROM categories WHERE sync_state != 0")
     List<Category> getPendingSyncCategories();
 

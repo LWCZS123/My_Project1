@@ -7,7 +7,11 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.my_project1.data.dao.BillDao;
+import com.example.my_project1.data.dao.CategoryDao;
+import com.example.my_project1.data.dao.SubCategoryDao;
 import com.example.my_project1.data.database.AppDatabase;
+import com.example.my_project1.data.model.Category;
+import com.example.my_project1.data.model.SubCategory;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.ui.adapter.bill.CategoryStatAdapter.CategoryStatItem;
 import com.example.my_project1.ui.view.BarChartView.BarEntry;
@@ -20,13 +24,16 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
+import com.example.my_project1.data.model.CategoryWithSubCategories;
 
 /**
  * BillStatisticsViewModel
@@ -44,6 +51,7 @@ public class BillStatisticsViewModel extends AndroidViewModel {
     public final MutableLiveData<List<LineEntry>>             lineEntries   = new MutableLiveData<>();
     public final MutableLiveData<List<PieChartView.PieEntry>> pieEntries    = new MutableLiveData<>();
     public final MutableLiveData<List<CategoryStatItem>>      categoryItems = new MutableLiveData<>();
+    public final MutableLiveData<Integer>                     hierarchyMode = new MutableLiveData<>(0); // 0=一级, 1=全部
     public final MutableLiveData<Float>  totalExpense = new MutableLiveData<>(0f);
     public final MutableLiveData<Float>  totalIncome  = new MutableLiveData<>(0f);
     public final MutableLiveData<Float>  totalBalance = new MutableLiveData<>(0f);
@@ -51,7 +59,9 @@ public class BillStatisticsViewModel extends AndroidViewModel {
 
     public final MutableLiveData<Integer> pieType = new MutableLiveData<>(0);
 
-    private final BillDao      billDao;
+    private final BillDao        billDao;
+    private final CategoryDao    categoryDao;
+    private final SubCategoryDao subCategoryDao;
     private final AppExecutors executors;
     private final String       currentUserId;
 
@@ -63,10 +73,13 @@ public class BillStatisticsViewModel extends AndroidViewModel {
 
     public BillStatisticsViewModel(@NonNull Application app) {
         super(app);
-        billDao       = AppDatabase.getInstance(app).billDao();
-        executors     = AppExecutors.get();
-        BmobUser u    = BmobUser.getCurrentUser();
-        currentUserId = (u != null) ? u.getObjectId() : null;
+        AppDatabase db = AppDatabase.getInstance(app);
+        billDao        = db.billDao();
+        categoryDao    = db.categoryDao();
+        subCategoryDao = db.subCategoryDao();
+        executors      = AppExecutors.get();
+        BmobUser u     = BmobUser.getCurrentUser();
+        currentUserId  = (u != null) ? u.getObjectId() : null;
         resetWindowToToday(Period.MONTH);
         loadData();
     }
@@ -96,6 +109,38 @@ public class BillStatisticsViewModel extends AndroidViewModel {
         currentPieType = type;
         pieType.setValue(type);
         if (cachedBills != null) buildAndPostPieData(cachedBills, type);
+    }
+
+    public void setHierarchyMode(int mode) {
+        if (hierarchyMode.getValue() != null && hierarchyMode.getValue() == mode) return;
+        hierarchyMode.setValue(mode);
+        if (cachedBills != null) buildAndPostPieData(cachedBills, currentPieType);
+    }
+
+    private List<CategoryStatItem> currentTree = new ArrayList<>();
+
+    public void toggleExpand(String categoryId) {
+        for (CategoryStatItem item : currentTree) {
+            if (item.level == 1 && Objects.equals(item.categoryId, categoryId)) {
+                item.isExpanded = !item.isExpanded;
+                break;
+            }
+        }
+        updateFlatList();
+    }
+
+    private void updateFlatList() {
+        List<CategoryStatItem> flat = new ArrayList<>();
+        Integer mode = hierarchyMode.getValue();
+        if (mode == null) mode = 0;
+
+        for (CategoryStatItem pItem : currentTree) {
+            flat.add(pItem);
+            if (mode == 1 || pItem.isExpanded) {
+                flat.addAll(pItem.subItems);
+            }
+        }
+        categoryItems.setValue(flat);
     }
 
     /** 供 Activity 读取当前窗口起点毫秒（跳转分类明细页用） */
@@ -201,62 +246,136 @@ public class BillStatisticsViewModel extends AndroidViewModel {
     }
 
     private void buildAndPostPieData(List<Bill> bills, int type) {
-        Map<String, float[]>  map     = new LinkedHashMap<>();
-        Map<String, String>   iconMap = new LinkedHashMap<>();
+        executors.diskIO().execute(() -> {
+            String typeStr = (type == 0 ? "expense" : "income");
+            // 1. 获取所有分类层级关系
+            List<CategoryWithSubCategories> allTree = categoryDao.getCategoriesWithSubsSync(currentUserId, typeStr);
 
-        for (Bill b : bills) {
-            if (b.getType() != type) continue;
-            String name = b.getCategoryName() != null ? b.getCategoryName() : "其他";
-            if (!iconMap.containsKey(name)) {
-                iconMap.put(name, b.getCategoryIconUrl());
+            // 映射关系
+            Map<String, Category> idToParent = new HashMap<>();
+            Map<String, String> childToParentId = new HashMap<>();
+            Map<String, SubCategory> idToSub = new HashMap<>();
+
+            for (CategoryWithSubCategories node : allTree) {
+                Category p = node.category;
+                idToParent.put(p.cloudId, p);
+                if (node.subCategories != null) {
+                    for (SubCategory sub : node.subCategories) {
+                        idToSub.put(sub.cloudId, sub);
+                        childToParentId.put(sub.cloudId, p.cloudId);
+                    }
+                }
             }
-            float[] v;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                v = map.computeIfAbsent(name, k -> new float[2]);
-            } else {
-                v = map.get(name);
-                if (v == null) { v = new float[2]; map.put(name, v); }
+
+            // 2. 聚合统计
+            // parentId -> {totalAmount, count}
+            Map<String, float[]> parentStats = new HashMap<>();
+            // parentId -> { childId -> {amount, count} }
+            Map<String, Map<String, float[]>> childStatsMap = new HashMap<>();
+
+            float grandTotal = 0f;
+
+            for (Bill b : bills) {
+                if (b.getType() != type) continue;
+                String bid = b.getCategoryId();
+                if (bid == null) continue;
+
+                String pid = childToParentId.get(bid);
+                String cid = null;
+                if (pid == null) {
+                    // bid 本身是一级分类，或者未知
+                    if (idToParent.containsKey(bid)) {
+                        pid = bid;
+                    } else {
+                        // 未知分类处理为“其他”
+                        pid = "other";
+                    }
+                } else {
+                    // bid 是二级分类
+                    cid = bid;
+                }
+
+                grandTotal += b.getAmount();
+
+                // 更新父级统计
+                float[] ps = parentStats.get(pid);
+                if (ps == null) { ps = new float[2]; parentStats.put(pid, ps); }
+                ps[0] += b.getAmount();
+                ps[1]++;
+
+                // 更新子级统计
+                if (cid != null) {
+                    Map<String, float[]> cMap = childStatsMap.get(pid);
+                    if (cMap == null) { cMap = new HashMap<>(); childStatsMap.put(pid, cMap); }
+                    float[] cs = cMap.get(cid);
+                    if (cs == null) { cs = new float[2]; cMap.put(cid, cs); }
+                    cs[0] += b.getAmount();
+                    cs[1]++;
+                }
             }
-            v[0] += b.getAmount();
-            v[1]++;
-        }
 
-        float sum = 0;
-        for (float[] v : map.values()) sum += v[0];
-        if (sum == 0) sum = 1f;
-        final float fSum = sum;
+            final float fGrandTotal = (grandTotal == 0 ? 1f : grandTotal);
 
-        List<PieChartView.PieEntry> pie = new ArrayList<>();
-        List<CategoryStatItem>      cat = new ArrayList<>();
+            // 3. 构建结果列表
+            List<CategoryStatItem> resultList = new ArrayList<>();
+            List<PieChartView.PieEntry> pieEntriesList = new ArrayList<>();
 
-        int idx = 0;
-        for (Map.Entry<String, float[]> e : map.entrySet()) {
-            int   color = PieChartView.getPresetColor(idx++);
-            float pct   = e.getValue()[0] / fSum * 100f;
+            // 排序父分类
+            List<String> sortedParentIds = new ArrayList<>(parentStats.keySet());
+            Collections.sort(sortedParentIds, (id1, id2) -> {
+                float[] s1 = parentStats.get(id1);
+                float[] s2 = parentStats.get(id2);
+                float v1 = (s1 != null ? s1[0] : 0f);
+                float v2 = (s2 != null ? s2[0] : 0f);
+                return Float.compare(v2, v1);
+            });
 
-            pie.add(new PieChartView.PieEntry(e.getKey(), e.getValue()[0], color, ""));
+            int colorIdx = 0;
+            for (String pid : sortedParentIds) {
+                float[] ps = parentStats.get(pid);
+                if (ps == null) ps = new float[2];
+                Category p = idToParent.get(pid);
+                String name = (p != null ? p.getName() : "其他");
+                String icon = (p != null ? p.getIconUri() : "");
+                int color = PieChartView.getPresetColor(colorIdx++);
+                float pct = ps[0] / fGrandTotal * 100f;
 
-            String iconUrl = "其他".equals(e.getKey())
-                    ? "android.resource://" + getApplication().getPackageName() + "/drawable/ic_cat"
-                    : iconMap.get(e.getKey());
+                CategoryStatItem parentItem = new CategoryStatItem(pid, name, icon, ps[0], pct, color, (int)ps[1], 1);
+                pieEntriesList.add(new PieChartView.PieEntry(name, ps[0], color, pid));
 
-            cat.add(new CategoryStatItem(
-                    e.getKey(),
-                    iconUrl,
-                    e.getValue()[0],
-                    pct,
-                    color,
-                    (int) e.getValue()[1]
-            ));
-        }
+                // 处理子分类
+                Map<String, float[]> cMap = childStatsMap.get(pid);
+                if (cMap != null) {
+                    List<String> sortedChildIds = new ArrayList<>(cMap.keySet());
+                    Collections.sort(sortedChildIds, (id1, id2) -> {
+                        float[] s1 = cMap.get(id1);
+                        float[] s2 = cMap.get(id2);
+                        float v1 = (s1 != null ? s1[0] : 0f);
+                        float v2 = (s2 != null ? s2[0] : 0f);
+                        return Float.compare(v2, v1);
+                    });
+                    
+                    for (String cid : sortedChildIds) {
+                        float[] cs = cMap.get(cid);
+                        if (cs == null) cs = new float[2];
+                        SubCategory sub = idToSub.get(cid);
+                        String cName = (sub != null ? sub.getName() : "未知子类");
+                        String cIcon = (sub != null ? sub.getIconUri() : "");
+                        float cPct = (ps[0] == 0 ? 0 : cs[0] / ps[0] * 100f);
+                        
+                        parentItem.subItems.add(new CategoryStatItem(cid, cName, cIcon, cs[0], cPct, color, (int)cs[1], 2));
+                    }
+                }
+                
+                resultList.add(parentItem);
+            }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            cat.sort((a, b) -> Float.compare(b.amount, a.amount));
-        }
-
-        executors.mainThread().execute(() -> {
-            pieEntries.setValue(pie);
-            categoryItems.setValue(cat);
+            // 4. 保存树形结构并更新列表
+            this.currentTree = resultList;
+            executors.mainThread().execute(() -> {
+                pieEntries.setValue(pieEntriesList);
+                updateFlatList();
+            });
         });
     }
 
