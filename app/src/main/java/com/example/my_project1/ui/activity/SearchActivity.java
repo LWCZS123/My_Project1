@@ -47,7 +47,6 @@ public class SearchActivity extends AppCompatActivity {
     private SearchViewModel viewModel;
     private HomeBillAdapter billAdapter;
     private SearchSummaryAdapter summaryAdapter;
-    private boolean isFirstSearch = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,7 +93,9 @@ public class SearchActivity extends AppCompatActivity {
         // 🚀 使用 Paging 加载状态监听来隐藏 Loading，防止闪烁
         billAdapter.addLoadStateListener(loadStates -> {
             if (loadStates.getRefresh() instanceof androidx.paging.LoadState.NotLoading) {
-                if (!isFirstSearch && binding.layoutLoading.getVisibility() == View.VISIBLE) {
+                // 如果搜索结果为空，已经在 searchState 观察者中处理了
+                // 如果有结果，在这里确保隐藏 Loading
+                if (binding.layoutLoading.getVisibility() == View.VISIBLE) {
                     hideLoading();
                 }
             }
@@ -169,7 +170,9 @@ public class SearchActivity extends AppCompatActivity {
                 binding.layoutResults.setVisibility(View.VISIBLE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
                 binding.layoutEmpty.setVisibility(View.GONE);
-                // hideLoading will be called by loadStateListener
+                
+                // 双重保证：在数据观察者中也尝试隐藏 Loading，应对分页加载监听器可能的遗漏
+                binding.getRoot().postDelayed(this::hideLoading, 100);
             }
         });
 
@@ -182,7 +185,6 @@ public class SearchActivity extends AppCompatActivity {
 
         viewModel.searchState.observe(this, state -> {
             if (state.isLoading()) {
-                isFirstSearch = false;
                 // 立即切换到加载布局，隐藏其他布局，确保 Lottie 能够第一时间显示
                 binding.layoutResults.setVisibility(View.GONE);
                 binding.layoutPreSearch.setVisibility(View.GONE);
