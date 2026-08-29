@@ -1,6 +1,10 @@
 package com.example.my_project1.data.repository.wish;
 
 import android.content.Context;
+import android.util.Log;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.example.my_project1.data.dao.WishDao;
 import com.example.my_project1.data.database.AppDatabase;
@@ -15,7 +19,9 @@ import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.work.WishSyncWorker;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 愿望模块的数据唯一入口。
@@ -25,16 +31,30 @@ import java.util.List;
  */
 public class WishRepository {
 
+    private static final String TAG = "WishRepository";
+    private static volatile WishRepository instance;
+
     private final Context context;
     private final AppDatabase database;
     private final WishDao wishDao;
     private final AppExecutors executors;
 
-    public WishRepository(Context context) {
+    private WishRepository(Context context) {
         this.context = context.getApplicationContext();
-        database = AppDatabase.getInstance(this.context);
-        wishDao = database.wishDao();
-        executors = AppExecutors.get();
+        this.database = AppDatabase.getInstance(this.context);
+        this.wishDao = database.wishDao();
+        this.executors = AppExecutors.get();
+    }
+
+    public static WishRepository getInstance(Context context) {
+        if (instance == null) {
+            synchronized (WishRepository.class) {
+                if (instance == null) {
+                    instance = new WishRepository(context);
+                }
+            }
+        }
+        return instance;
     }
 
     /**
@@ -44,7 +64,9 @@ public class WishRepository {
         return wishDao;
     }
 
-    public void insertWish(Wish wish, ApiResponse.Callback<Long> callback) {
+    // ==================== 愿望 CRUD API ====================
+
+    public void insertWish(@NonNull Wish wish, @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             Date now = new Date();
             wish.setId(0);
@@ -59,7 +81,7 @@ public class WishRepository {
         });
     }
 
-    public void updateWish(Wish wish, ApiResponse.Callback<Long> callback) {
+    public void updateWish(@NonNull Wish wish, @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             Wish stored = wishDao.getWishByIdSync(wish.getId());
             if (stored == null || stored.getSyncState() == SyncState.TO_DELETE) {
@@ -81,12 +103,11 @@ public class WishRepository {
         });
     }
 
-    public void deleteWish(long wishId, ApiResponse.Callback<Long> callback) {
+    public void deleteWish(long wishId, @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             Wish wish = wishDao.getWishByIdSync(wishId);
             if (wish == null) return ApiResponse.error("愿望不存在");
             Date now = new Date();
-            // 愿望与其记录必须一起进入待删除状态，避免只删父对象后留下云端孤儿记录。
             database.runInTransaction(() -> {
                 wishDao.markRecordsDeleted(wishId, now);
                 wish.setSyncState(SyncState.TO_DELETE);
@@ -98,7 +119,9 @@ public class WishRepository {
         });
     }
 
-    public void insertRecord(WishRecord record, ApiResponse.Callback<Long> callback) {
+    // ==================== 记录 CRUD API ====================
+
+    public void insertRecord(@NonNull WishRecord record, @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             Wish wish = wishDao.getWishByIdSync(record.getWishId());
             if (wish == null || wish.getSyncState() == SyncState.TO_DELETE) {
@@ -112,18 +135,17 @@ public class WishRepository {
             record.setCreatedAt(now);
             record.setUpdatedAt(now);
             final long[] id = new long[1];
-            // 写记录和重算累计金额属于同一个业务动作，必须在同一事务内提交。
             database.runInTransaction(() -> {
                 id[0] = wishDao.insertRecord(record);
                 record.setId(id[0]);
-                refreshProgress(wish, now);
+                refreshProgressInternal(wish, now);
             });
             enqueueSync();
             return ApiResponse.success(id[0], "记录已添加");
         });
     }
 
-    public void updateRecord(WishRecord record, ApiResponse.Callback<Long> callback) {
+    public void updateRecord(@NonNull WishRecord record, @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             WishRecord stored = wishDao.getRecordByIdSync(record.getId());
             if (stored == null || stored.getSyncState() == SyncState.TO_DELETE) {
@@ -141,14 +163,14 @@ public class WishRepository {
             record.setSyncState(nextWriteState(stored.getSyncState()));
             database.runInTransaction(() -> {
                 wishDao.updateRecord(record);
-                refreshProgress(wish, record.getUpdatedAt());
+                refreshProgressInternal(wish, record.getUpdatedAt());
             });
             enqueueSync();
             return ApiResponse.success(record.getId(), "记录已更新");
         });
     }
 
-    public void deleteRecord(long recordId, ApiResponse.Callback<Long> callback) {
+    public void deleteRecord(long recordId, @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             WishRecord record = wishDao.getRecordByIdSync(recordId);
             if (record == null) return ApiResponse.error("记录不存在");
@@ -158,12 +180,14 @@ public class WishRepository {
                 record.setSyncState(SyncState.TO_DELETE);
                 record.setUpdatedAt(now);
                 wishDao.updateRecord(record);
-                if (wish != null) refreshProgress(wish, now);
+                if (wish != null) refreshProgressInternal(wish, now);
             });
             enqueueSync();
             return ApiResponse.success(recordId, "记录已删除");
         });
     }
+
+    // ==================== 云端同步 API ====================
 
     public void syncNow() {
         enqueueSync();
@@ -171,9 +195,8 @@ public class WishRepository {
 
     /**
      * 从云端拉取并同步愿望及记录数据
-     * 逻辑参考账单模块，先执行一次全量拉取并合并，然后触发后台同步任务处理本地待上传变更
      */
-    public void syncFromCloud(String userId, ApiResponse.Callback<Boolean> callback) {
+    public void syncFromCloud(String userId, @Nullable ApiResponse.Callback<Boolean> callback) {
         if (userId == null || userId.isEmpty()) {
             if (callback != null) callback.onComplete(ApiResponse.error("用户未登录"));
             return;
@@ -181,82 +204,82 @@ public class WishRepository {
 
         executors.networkIO().execute(() -> {
             try {
-                // 1. 获取 Bmob API 实例
                 BmobWishApiImpl bmobApi = new BmobWishApiImpl(context);
-                
-                // 2. 拉取云端愿望
                 List<CloudWish> cloudWishes = bmobApi.fetchWishesSync();
-                // 3. 拉取云端记录
                 List<CloudWishRecord> cloudRecords = bmobApi.fetchRecordsSync();
 
-                // 4. 在磁盘 IO 线程执行本地数据库合并
                 executors.diskIO().execute(() -> {
                     try {
                         database.runInTransaction(() -> {
-                            // 处理愿望合并
+                            // 使用 Map 缓存本地愿望 objectId -> localId 映射，优化后续记录合并
+                            Map<String, Long> wishIdMap = new HashMap<>();
+
                             if (cloudWishes != null) {
                                 for (CloudWish cloud : cloudWishes) {
-                                    mergeWishInternal(cloud, userId);
+                                    long localId = mergeWishInternal(cloud, userId);
+                                    if (cloud.getObjectId() != null) {
+                                        wishIdMap.put(cloud.getObjectId(), localId);
+                                    }
                                 }
                             }
-                            // 处理记录合并
+
                             if (cloudRecords != null) {
                                 for (CloudWishRecord cloud : cloudRecords) {
-                                    mergeRecordInternal(cloud, userId);
+                                    mergeRecordInternal(cloud, userId, wishIdMap);
                                 }
                             }
                         });
 
-                        // 5. 合并完成后触发一次增量同步任务，处理本地尚未上传的修改
                         enqueueSync();
-
-                        // 6. 回调成功
                         if (callback != null) {
                             executors.mainThread().execute(() -> 
                                 callback.onComplete(ApiResponse.success(true, "云端同步完成")));
                         }
                     } catch (Exception e) {
-                        handleError(callback, e);
+                        Log.e(TAG, "Merge failed", e);
+                        postError(callback, e);
                     }
                 });
             } catch (Exception e) {
-                handleError(callback, e);
+                Log.e(TAG, "Fetch failed", e);
+                postError(callback, e);
             }
         });
     }
 
-    /**
-     * 合并单个云端愿望到本地（内部辅助方法）
-     */
-    private void mergeWishInternal(CloudWish cloud, String userId) {
+    // ==================== 内部辅助方法 ====================
+
+    private long mergeWishInternal(CloudWish cloud, String userId) {
         Wish incoming = cloud.toLocalEntity();
         incoming.setUserId(userId);
         incoming.setSyncState(SyncState.SYNCED);
 
         Wish local = wishDao.getWishByObjectId(incoming.getObjectId());
         if (local == null) {
-            wishDao.insertWish(incoming);
+            return wishDao.insertWish(incoming);
         } else {
-            // 时间对比逻辑由 Repository 层保证幂等和冲突控制
-            if (local.getSyncState() == SyncState.SYNCED && isCloudNewer(incoming, local)) {
+            if (local.getSyncState() == SyncState.SYNCED && isCloudNewer(incoming.getUpdatedAt(), local.getUpdatedAt())) {
                 incoming.setId(local.getId());
                 wishDao.updateWish(incoming);
             }
+            return local.getId();
         }
     }
 
-    /**
-     * 合并单个云端记录到本地（内部辅助方法）
-     */
-    private void mergeRecordInternal(CloudWishRecord cloud, String userId) {
+    private void mergeRecordInternal(CloudWishRecord cloud, String userId, Map<String, Long> wishIdMap) {
         WishRecord incoming = cloud.toLocalEntity();
         incoming.setUserId(userId);
         incoming.setSyncState(SyncState.SYNCED);
 
-        Wish parent = wishDao.getWishByObjectId(incoming.getWishObjectId());
-        if (parent == null) return;
-        
-        incoming.setWishId(parent.getId());
+        String wishObjectId = incoming.getWishObjectId();
+        Long wishLocalId = wishIdMap.get(wishObjectId);
+        if (wishLocalId == null) {
+            Wish parent = wishDao.getWishByObjectId(wishObjectId);
+            if (parent == null) return;
+            wishLocalId = parent.getId();
+        }
+
+        incoming.setWishId(wishLocalId);
         WishRecord local = wishDao.getRecordByObjectId(incoming.getObjectId());
         
         if (local == null) {
@@ -271,23 +294,12 @@ public class WishRepository {
         }
     }
 
-    private boolean isCloudNewer(Wish incoming, Wish local) {
-        return isCloudNewer(incoming.getUpdatedAt(), local.getUpdatedAt());
-    }
-
     private boolean isCloudNewer(Date cloudDate, Date localDate) {
         if (cloudDate == null) return false;
         return localDate == null || cloudDate.after(localDate);
     }
 
-    private void handleError(ApiResponse.Callback<Boolean> callback, Exception e) {
-        if (callback != null) {
-            executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e)));
-        }
-    }
-
-    private void refreshProgress(Wish wish, Date now) {
-        // 累计金额始终从记录表重新求和，编辑和删除记录时不会产生增量计算误差。
+    private void refreshProgressInternal(Wish wish, Date now) {
         double total = Math.max(0d, wishDao.getSavedAmount(wish.getId()));
         int status = wish.getStatus();
         if (status != Wish.STATUS_ABANDONED) {
@@ -298,20 +310,24 @@ public class WishRepository {
     }
 
     private SyncState nextWriteState(SyncState current) {
-        // 尚未创建到云端的数据继续保持 TO_CREATE，不能提前变成 UPDATE。
         return current == SyncState.TO_CREATE ? SyncState.TO_CREATE : SyncState.TO_UPDATE;
     }
 
     private void enqueueSync() {
-        WishSyncWorker.enqueue(context);
+        try {
+            WishSyncWorker.enqueue(context);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to enqueue sync", e);
+        }
     }
 
-    private <T> void execute(ApiResponse.Callback<T> callback, Task<T> task) {
+    private <T> void execute(@Nullable ApiResponse.Callback<T> callback, Task<T> task) {
         executors.diskIO().execute(() -> {
             ApiResponse<T> response;
             try {
                 response = task.run();
             } catch (Exception exception) {
+                Log.e(TAG, "Task execution failed", exception);
                 response = ApiResponse.error(exception);
             }
             if (callback != null) {
@@ -319,6 +335,12 @@ public class WishRepository {
                 executors.mainThread().execute(() -> callback.onComplete(result));
             }
         });
+    }
+
+    private void postError(ApiResponse.Callback<Boolean> callback, Exception e) {
+        if (callback != null) {
+            executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e)));
+        }
     }
 
     private interface Task<T> {

@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MediatorLiveData;
@@ -75,8 +76,9 @@ public class BillViewModel extends AndroidViewModel {
     // 🔴 性能优化相关
     private final Map<String, BillUiModel> billUiCache = new ConcurrentHashMap<>();
     private final Map<String, BillAdapter.DateHeader> headerCache = new HashMap<>();
+    private volatile Map<String, List<Bill>> dailyBillsCache = Collections.emptyMap();
+    private volatile boolean dailyBillsCacheReady = false;
     private String lastHomeFingerprint = "";
-    private String lastCalendarFingerprint = "";
 
     // 🔴 预分配格式化工具，避免循环中重复创建
     private static final SimpleDateFormat DATE_KEY_FMT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -302,36 +304,27 @@ public class BillViewModel extends AndroidViewModel {
         allBillsObserver = bills -> {
             if (bills == null || isCleared) return;
 
-            // 🚀 性能优化：日历数据指纹校验
-            // 🔴 修复：同样改进日历指纹，确保所有账单的变化都能反映在日历统计中
-            long billChecksum = 0;
-            for (Bill b : bills) {
-                billChecksum += b.getId();
-                if (b.getUpdatedAt() != null) {
-                    billChecksum += b.getUpdatedAt().getTime();
-                }
-            }
-
-            String fingerprint = bills.size() + "_" + billChecksum;
-            if (fingerprint.equals(lastCalendarFingerprint)) {
-                return;
-            }
-            lastCalendarFingerprint = fingerprint;
-
             if (bgExecutor.isShutdown()) return;
             bgExecutor.execute(() -> {
                 if (isCleared) return;
+
                 int count = computeBillCount(bills);
                 int days  = computeBillDays(bills);
 
-                // 计算日历所需的映射
                 Map<String, com.example.my_project1.data.model.calendar.DailyStat> statsMap = new HashMap<>();
+                Map<String, List<Bill>> billsByDate = new HashMap<>();
 
                 for (Bill b : bills) {
                     if (b.getBillTime() == null) continue;
                     String key = DATE_KEY_FMT.format(b.getBillTime());
 
-                    // 统计
+                    List<Bill> dailyBills = billsByDate.get(key);
+                    if (dailyBills == null) {
+                        dailyBills = new ArrayList<>();
+                        billsByDate.put(key, dailyBills);
+                    }
+                    dailyBills.add(b);
+
                     com.example.my_project1.data.model.calendar.DailyStat stat = statsMap.get(key);
                     if (stat == null) {
                         stat = new com.example.my_project1.data.model.calendar.DailyStat(0, 0, 0);
@@ -341,6 +334,14 @@ public class BillViewModel extends AndroidViewModel {
                     if (b.getType() == 1) stat.income += b.getAmount();
                     else if (b.getType() == 0) stat.expense += b.getAmount();
                 }
+
+                Map<String, List<Bill>> immutableCache = new HashMap<>(billsByDate.size());
+                for (Map.Entry<String, List<Bill>> entry : billsByDate.entrySet()) {
+                    immutableCache.put(entry.getKey(),
+                            Collections.unmodifiableList(new ArrayList<>(entry.getValue())));
+                }
+                dailyBillsCache = Collections.unmodifiableMap(immutableCache);
+                dailyBillsCacheReady = true;
 
                 mainHandler.post(() -> {
                     _billCount.setValue(count);
@@ -353,6 +354,31 @@ public class BillViewModel extends AndroidViewModel {
         if (allBills != null) {
             allBills.observeForever(allBillsObserver);
         }
+    }
+
+    /** Returns null until the initial Room snapshot has populated the cache. */
+    @Nullable
+    public List<Bill> getCachedBillsForDate(int year, int month, int day) {
+        if (!dailyBillsCacheReady) return null;
+        List<Bill> bills = dailyBillsCache.get(dateKey(year, month, day));
+        return bills == null ? Collections.emptyList() : bills;
+    }
+
+    public LiveData<List<Bill>> getBillsForDate(int year, int month, int day) {
+        if (currentUserId == null) {
+            return new MutableLiveData<>(Collections.emptyList());
+        }
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, month - 1, day, 0, 0, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        Date start = cal.getTime();
+        cal.add(Calendar.DAY_OF_MONTH, 1);
+        Date endExclusive = cal.getTime();
+        return repository.getBillsInTimeRangeExclusive(currentUserId, start, endExclusive);
+    }
+
+    private static String dateKey(int year, int month, int day) {
+        return String.format(Locale.US, "%04d-%02d-%02d", year, month, day);
     }
 
     public void setSelectedDate(int year, int month, int day) {
@@ -1155,6 +1181,8 @@ public class BillViewModel extends AndroidViewModel {
             isSyncing     = false;
             lastSyncTime  = 0;
             hasRoomBillsPublished = false;
+            dailyBillsCache = Collections.emptyMap();
+            dailyBillsCacheReady = false;
             reinitializeLiveData();
             if (currentUserId != null) Log.d(TAG, "✅ 新用户登录，将自动加载数据");
         }

@@ -3,6 +3,7 @@ package com.example.my_project1.data.model.bill;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.Ignore;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 import com.example.my_project1.data.model.SyncState;
@@ -11,7 +12,13 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
-@Entity(tableName = "bills")
+@Entity(
+        tableName = "bills",
+        indices = @Index(
+                value = {"user_id", "billTime"},
+                name = "index_bills_user_id_billTime"
+        )
+)
 public class Bill implements Serializable {
 
     @PrimaryKey(autoGenerate = true)

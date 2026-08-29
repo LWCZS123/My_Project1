@@ -791,6 +791,10 @@ public class BillRepository {
         return billDao.getBillsInTimeRange(userId, start, end);
     }
 
+    public LiveData<List<Bill>> getBillsInTimeRangeExclusive(String userId, Date start, Date endExclusive) {
+        return billDao.getBillsInTimeRangeExclusive(userId, start, endExclusive);
+    }
+
     /** Synchronous page query for PagingSource.load, which is never run on the UI thread. */
     public List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset) {
         return billDao.getBillsInTimeRangePaged(userId, start, end, limit, offset);

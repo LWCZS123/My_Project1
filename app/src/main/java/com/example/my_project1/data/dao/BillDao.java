@@ -68,6 +68,9 @@ public interface BillDao {
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsInTimeRange(String userId, Date start, Date end);
 
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime < :endExclusive AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
+    LiveData<List<Bill>> getBillsInTimeRangeExclusive(String userId, Date start, Date endExclusive);
+
     /** Homepage paging query with a stable tie-breaker for equal timestamps. */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC LIMIT :limit OFFSET :offset")
     List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset);

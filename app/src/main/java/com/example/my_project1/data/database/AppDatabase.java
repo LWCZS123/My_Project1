@@ -6,6 +6,10 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import androidx.room.TypeConverters;
+import androidx.room.migration.Migration;
+import androidx.sqlite.db.SupportSQLiteDatabase;
+
+import androidx.annotation.NonNull;
 
 import com.example.my_project1.data.converter.Converters;
 import com.example.my_project1.data.converter.SubCategoryListConverter;
@@ -35,7 +39,7 @@ import com.example.my_project1.data.model.wish.WishRecord;
                 SearchHistory.class, UserProfile.class, Budget.class,
                 Wish.class, WishRecord.class
         },
-        version = 27,
+        version = 28,
         exportSchema = true
 )
 
@@ -47,6 +51,13 @@ import com.example.my_project1.data.model.wish.WishRecord;
 public abstract class AppDatabase extends RoomDatabase {
 
     private static volatile AppDatabase INSTANCE;
+    static final Migration MIGRATION_27_28 = new Migration(27, 28) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_bills_user_id_billTime` "
+                    + "ON `bills` (`user_id`, `billTime`)");
+        }
+    };
 
     public abstract CategoryDao categoryDao();
     public abstract SubCategoryDao subCategoryDao();
@@ -67,6 +78,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "accounting_app_db"
                     )
+                            .addMigrations(MIGRATION_27_28)
                             .fallbackToDestructiveMigration() // 调试阶段允许重建数据库
                             .build();
                 }

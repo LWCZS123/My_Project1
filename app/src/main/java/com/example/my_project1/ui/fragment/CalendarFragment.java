@@ -11,40 +11,38 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.ConcatAdapter;
-import androidx.recyclerview.widget.LinearLayoutManager;
 
-import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.calendar.DailyStat;
 import com.example.my_project1.databinding.FragmentCalendarBinding;
 import com.example.my_project1.ui.activity.AddBillActivity;
-import com.example.my_project1.ui.activity.BillDetailActivity;
-import com.example.my_project1.ui.adapter.bill.BillListAdapter;
-import com.example.my_project1.ui.adapter.calendar.CalendarInfoAdapter;
-import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.HolidayUtil;
 import com.haibin.calendarview.Calendar;
 import com.haibin.calendarview.CalendarView;
+import com.nlf.calendar.Lunar;
+import com.nlf.calendar.Solar;
 
-import java.util.ArrayList;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 日历模块主界面
+ * 优化后：仅保留日历展示和打点逻辑，账单详情通过底部弹窗显示
+ */
 public class CalendarFragment extends Fragment implements
         CalendarView.OnCalendarSelectListener,
         CalendarView.OnMonthChangeListener {
 
     private FragmentCalendarBinding binding;
     private BillViewModel billViewModel;
-    private BillListAdapter billAdapter;
-    private CalendarInfoAdapter infoAdapter;
     private Calendar mCurrentSelectedDate;
     private int mVisibleYear, mVisibleMonth;
 
@@ -57,7 +55,6 @@ public class CalendarFragment extends Fragment implements
                 }
             };
     private final AtomicInteger mSchemeGeneration = new AtomicInteger();
-    private final AtomicInteger mBillRenderGeneration = new AtomicInteger();
     private int mStatsVersion = 0;
 
     @Nullable
@@ -83,10 +80,12 @@ public class CalendarFragment extends Fragment implements
         billViewModel = new ViewModelProvider(requireActivity()).get(BillViewModel.class);
 
         setupCalendar();
-        setupRecyclerView();
         setupListeners();
         observeData();
         selectToday(false);
+        if (mCurrentSelectedDate != null) {
+            updateHolidayInfo(mCurrentSelectedDate);
+        }
     }
 
     private void setupCalendar() {
@@ -99,26 +98,6 @@ public class CalendarFragment extends Fragment implements
         updateTodayButtonVisibility(mCurrentSelectedDate);
     }
 
-    private void setupRecyclerView() {
-        billAdapter = new BillListAdapter(requireContext());
-        billAdapter.setOnBillClickListener(bill -> {
-            if (bill == null || !isAdded()) return;
-            Intent intent = new Intent(requireContext(), BillDetailActivity.class);
-            intent.putExtra("bill_id", bill.objectId);
-            intent.putExtra("bill_local_id", bill.localId);
-            startActivity(intent);
-        });
-
-        infoAdapter = new CalendarInfoAdapter();
-        ConcatAdapter concatAdapter = new ConcatAdapter(infoAdapter, billAdapter);
-
-        binding.rvBills.setLayoutManager(new LinearLayoutManager(requireContext()));
-        binding.rvBills.setAdapter(concatAdapter);
-        binding.rvBills.setHasFixedSize(true);
-        binding.rvBills.setItemViewCacheSize(12);
-        binding.rvBills.setItemAnimator(null);
-    }
-
     private void setupListeners() {
         binding.btnToday.setOnClickListener(v -> binding.calendarView.scrollToCurrent(true));
         binding.ivAddBill.setOnClickListener(v -> {
@@ -128,7 +107,7 @@ public class CalendarFragment extends Fragment implements
     }
 
     private void observeData() {
-        // 核心优化：观察 ViewModel 预计算好的统计 Map
+        // 核心优化：观察 ViewModel 预计算好的统计 Map，用于绘制日历打点/Scheme
         billViewModel.dailyStatsMap.observe(getViewLifecycleOwner(), statsMap -> {
             mLatestStatsMap = statsMap == null ? new HashMap<>() : statsMap;
             mStatsVersion++;
@@ -136,11 +115,8 @@ public class CalendarFragment extends Fragment implements
                 mMonthSchemeCache.clear();
             }
             updateCalendarSchemes();
-            // 在日历数据加载并更新 Scheme 后初次隐藏 Loading（或者等待下方账单列表渲染）
+            hideLoading();
         });
-
-        // 🚀 核心优化：按需加载选中日期的账单
-        billViewModel.selectedDateBills.observe(getViewLifecycleOwner(), this::renderBillList);
     }
 
     private void updateCalendarSchemes() {
@@ -227,25 +203,6 @@ public class CalendarFragment extends Fragment implements
         return value < 10 ? "0" + value : String.valueOf(value);
     }
 
-    private void renderBillList(List<Bill> bills) {
-        if (mCurrentSelectedDate == null || binding == null) return;
-        final int generation = mBillRenderGeneration.incrementAndGet();
-        final List<Bill> snapshot = bills == null ? new ArrayList<>() : new ArrayList<>(bills);
-        AppExecutors.get().computation().execute(() -> {
-            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(snapshot);
-            List<BillListAdapter.ListItem> items = new ArrayList<>();
-            if (uiModels != null) {
-                for (BillUiModel model : uiModels) {
-                    items.add(new BillListAdapter.ListItem(model));
-                }
-            }
-            AppExecutors.get().mainThread().execute(() -> {
-                if (binding == null || generation != mBillRenderGeneration.get()) return;
-                billAdapter.submitList(items, this::hideLoading);
-            });
-        });
-    }
-
     private void updateDateTitle(Calendar calendar) {
         if (calendar == null || binding == null) return;
         binding.tvYearMonth.setText(String.format(Locale.getDefault(), "%d / %d", calendar.getYear(), calendar.getMonth()));
@@ -267,7 +224,6 @@ public class CalendarFragment extends Fragment implements
 
     /**
      * 根据当前选中的日期，控制“回到今天”按钮的显示/隐藏
-     * 只有当选中的不是今天时（移动到其他月份或点击其他日期），才显示该按钮。
      */
     private void updateTodayButtonVisibility(Calendar calendar) {
         if (calendar == null || binding == null) return;
@@ -278,7 +234,6 @@ public class CalendarFragment extends Fragment implements
                 && calendar.getDay() == today.get(java.util.Calendar.DAY_OF_MONTH);
         
         if (isToday) {
-            // 如果已经是今天，平滑隐藏按钮
             if (binding.btnToday.getVisibility() == View.VISIBLE) {
                 binding.btnToday.animate()
                         .alpha(0f)
@@ -287,7 +242,6 @@ public class CalendarFragment extends Fragment implements
                         .start();
             }
         } else {
-            // 如果不是今天，显示按钮
             if (binding.btnToday.getVisibility() != View.VISIBLE) {
                 binding.btnToday.setVisibility(View.VISIBLE);
                 binding.btnToday.setAlpha(0f);
@@ -304,12 +258,110 @@ public class CalendarFragment extends Fragment implements
         if (calendar == null) return;
         
         mCurrentSelectedDate = calendar;
-        infoAdapter.updateDate(calendar);
         updateDateTitle(calendar);
         updateTodayButtonVisibility(calendar);
-        
-        // 🚀 按需通知 ViewModel 切换日期，触发 selectedDateBills 观察者
-        billViewModel.setSelectedDate(calendar.getYear(), calendar.getMonth(), calendar.getDay());
+
+        if (isClick) {
+            // 检查当日是否有账单，若无则不弹出底部弹窗
+            String dateKey = calendar.getYear() + "-" + twoDigits(calendar.getMonth()) + "-" + twoDigits(calendar.getDay());
+            DailyStat stat = mLatestStatsMap.get(dateKey);
+            if (stat == null || stat.count == 0) {
+                // 如果没有账单统计信息，或者账单数量为0，则不显示弹窗，仅更新节日信息
+                updateHolidayInfo(calendar);
+                return;
+            }
+
+            FragmentManager fragmentManager = getChildFragmentManager();
+            if (fragmentManager.isStateSaved()
+                    || fragmentManager.findFragmentByTag("DailyBills") != null) {
+                return;
+            }
+            DailyBillsBottomSheetDialogFragment.newInstance(
+                    calendar.getYear(),
+                    calendar.getMonth(),
+                    calendar.getDay()
+            ).show(fragmentManager, "DailyBills");
+
+            binding.getRoot().post(() -> {
+                if (binding != null && isSameDate(mCurrentSelectedDate, calendar)) {
+                    updateHolidayInfo(calendar);
+                }
+            });
+        } else {
+            updateHolidayInfo(calendar);
+        }
+    }
+
+    private static boolean isSameDate(Calendar first, Calendar second) {
+        return first != null && second != null
+                && first.getYear() == second.getYear()
+                && first.getMonth() == second.getMonth()
+                && first.getDay() == second.getDay();
+    }
+
+    private void updateHolidayInfo(Calendar calendar) {
+        int year = calendar.getYear();
+        int month = calendar.getMonth();
+        int day = calendar.getDay();
+
+        // 1. 农历详情
+        Solar solar = Solar.fromYmd(year, month, day);
+        Lunar lunar = solar.getLunar();
+
+        binding.layoutCalendarInfo.tvLunarDate.setText(lunar.getDayInChinese());
+        String lunarDetail = String.format("%s%s年 %s月 %s日",
+                lunar.getYearInGanZhi(), lunar.getYearShengXiao(),
+                lunar.getMonthInGanZhi(), lunar.getDayInGanZhi());
+        binding.layoutCalendarInfo.tvLunarYear.setText(lunarDetail);
+
+        // 2. 节假日倒计时
+        java.util.Calendar selectedCal = java.util.Calendar.getInstance();
+        selectedCal.set(year, month - 1, day);
+        selectedCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        selectedCal.set(java.util.Calendar.MINUTE, 0);
+        selectedCal.set(java.util.Calendar.SECOND, 0);
+        selectedCal.set(java.util.Calendar.MILLISECOND, 0);
+
+        String[] nextHoliday = HolidayUtil.getNextHoliday(year, month, day);
+
+        if (nextHoliday != null) {
+            binding.layoutCalendarInfo.cardSolar.setVisibility(View.VISIBLE);
+            String hDateStr = nextHoliday[0];
+            String hName = nextHoliday[1];
+
+            binding.layoutCalendarInfo.tvSolarName.setText(hName);
+
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                Date hDate = sdf.parse(hDateStr);
+
+                java.util.Calendar holidayCal = java.util.Calendar.getInstance();
+                holidayCal.setTime(hDate);
+                holidayCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                holidayCal.set(java.util.Calendar.MINUTE, 0);
+                holidayCal.set(java.util.Calendar.SECOND, 0);
+                holidayCal.set(java.util.Calendar.MILLISECOND, 0);
+
+                long diffMs = holidayCal.getTimeInMillis() - selectedCal.getTimeInMillis();
+                long diffDays = diffMs / (24 * 60 * 60 * 1000);
+
+                binding.layoutCalendarInfo.tvSolarDayVal.setText(String.valueOf(Math.max(0, diffDays)));
+
+                if (diffDays == 0) {
+                    binding.layoutCalendarInfo.tvSolarDate.setText("就在今天");
+                    binding.layoutCalendarInfo.tvSolarName.setText(hName + " · 享受假期");
+                } else if (diffDays == 1) {
+                    binding.layoutCalendarInfo.tvSolarDate.setText("明天 (" + new SimpleDateFormat("M月d日", Locale.getDefault()).format(hDate) + ")");
+                } else {
+                    SimpleDateFormat displayFmt = new SimpleDateFormat("M月d日", Locale.getDefault());
+                    binding.layoutCalendarInfo.tvSolarDate.setText(displayFmt.format(hDate));
+                }
+            } catch (Exception e) {
+                binding.layoutCalendarInfo.tvSolarDayVal.setText("-");
+            }
+        } else {
+            binding.layoutCalendarInfo.cardSolar.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -321,7 +373,7 @@ public class CalendarFragment extends Fragment implements
     }
 
     private void selectToday(boolean scrollCalendar) {
-        if (binding == null || billViewModel == null) return;
+        if (binding == null) return;
         if (scrollCalendar) binding.calendarView.scrollToCurrent(false);
         java.util.Calendar today = java.util.Calendar.getInstance();
         Calendar selected = new Calendar();
@@ -329,12 +381,10 @@ public class CalendarFragment extends Fragment implements
         selected.setMonth(today.get(java.util.Calendar.MONTH) + 1);
         selected.setDay(today.get(java.util.Calendar.DAY_OF_MONTH));
         mCurrentSelectedDate = selected;
-        infoAdapter.updateDate(selected);
         mVisibleYear = selected.getYear();
         mVisibleMonth = selected.getMonth();
         updateDateTitle(selected);
         updateTodayButtonVisibility(selected);
-        billViewModel.setSelectedDate(selected.getYear(), selected.getMonth(), selected.getDay());
     }
 
     @Override
@@ -364,7 +414,6 @@ public class CalendarFragment extends Fragment implements
     public void onDestroyView() {
         super.onDestroyView();
         mSchemeGeneration.incrementAndGet();
-        mBillRenderGeneration.incrementAndGet();
         binding = null;
     }
 }

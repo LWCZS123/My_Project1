@@ -37,7 +37,7 @@ public class WishViewModel extends AndroidViewModel {
 
     public WishViewModel(Application application) {
         super(application);
-        repository = new WishRepository(application);
+        repository = WishRepository.getInstance(application);
         wishDao = repository.getWishDao();
         
         // 初始化当前用户

@@ -75,7 +75,7 @@
         android:layout_height="0dp"
         android:orientation="vertical"
         android:background="#F2F4F8"
-        app:calendar_content_view_id="@+id/rv_bills"
+        app:calendar_content_view_id="@+id/placeholder_view"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topBar">
 
@@ -106,16 +106,17 @@
                 android:background="@drawable/bg_calendar_handle" />
         </com.haibin.calendarview.CalendarView>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_bills"
+        <!-- 占位 View，代替原来的 RecyclerView，优化渲染性能 -->
+        <FrameLayout
+            android:id="@+id/placeholder_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#F2F4F8"
-            android:clipToPadding="false"
-            android:paddingHorizontal="6dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="200dp"
-            tools:listitem="@layout/item_transaction" />
+            android:background="#F2F4F8">
+
+            <include
+                android:id="@+id/layout_calendar_info"
+                layout="@layout/item_calendar_info" />
+        </FrameLayout>
 
     </com.haibin.calendarview.CalendarLayout>
 
