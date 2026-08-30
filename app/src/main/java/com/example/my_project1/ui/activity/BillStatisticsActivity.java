@@ -326,18 +326,10 @@ public class BillStatisticsActivity extends AppCompatActivity {
 
         viewModel.totalExpense.observe(this, v -> {
             binding.tvTotalExpense.setText("¥" + String.format("%.2f", v));
-            if(viewModel.pieType.getValue() == 0){
-                binding.tvPieCenterLabel.setText("总支出");
-                binding.tvPieCenterAmount.setText("¥" + String.format("%.2f", v));
-            }
         });
 
         viewModel.totalIncome.observe(this, v -> {
             binding.tvTotalIncome.setText("¥" + String.format("%.2f", v));
-            if(viewModel.pieType.getValue() == 1){
-                binding.tvPieCenterLabel.setText("总收入");
-                binding.tvPieCenterAmount.setText("¥" + String.format("%.2f", v));
-            }
         });
 
         viewModel.totalBalance.observe(this, v -> {
@@ -363,19 +355,11 @@ public class BillStatisticsActivity extends AppCompatActivity {
             boolean empty = (entries == null || entries.isEmpty());
             binding.pieChart.setVisibility(empty ? View.GONE : View.VISIBLE);
             binding.pieChartEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-            binding.tvPieCenterLabel.setVisibility(empty ? View.GONE : View.VISIBLE);
-            binding.tvPieCenterAmount.setVisibility(empty ? View.GONE : View.VISIBLE);
             if (!empty) binding.pieChart.setData(entries);
         });
 
         viewModel.pieType.observe(this, type -> {
-            if(type == 0){
-                binding.tvPieCenterLabel.setText("总支出");
-                binding.tvPieCenterAmount.setText("¥" + String.format("%.2f", viewModel.totalExpense.getValue()!=null?viewModel.totalExpense.getValue():0f));
-            }else{
-                binding.tvPieCenterLabel.setText("总收入");
-                binding.tvPieCenterAmount.setText("¥" + String.format("%.2f", viewModel.totalIncome.getValue()!=null?viewModel.totalIncome.getValue():0f));
-            }
+            // 中心文本已取消，仅保留对 pieType 的观察逻辑（如果需要处理其他 UI）
         });
 
         viewModel.categoryItems.observe(this, items -> {

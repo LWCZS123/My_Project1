@@ -330,20 +330,24 @@ public class BillStatisticsViewModel extends AndroidViewModel {
                 return Float.compare(v2, v1);
             });
 
+            float otherSum = 0f;
+            int otherCount = 0;
+
             int colorIdx = 0;
             for (String pid : sortedParentIds) {
                 float[] ps = parentStats.get(pid);
                 if (ps == null) ps = new float[2];
+                float pct = ps[0] / fGrandTotal * 100f;
+
                 Category p = idToParent.get(pid);
                 String name = (p != null ? p.getName() : "其他");
                 String icon = (p != null ? p.getIconUri() : "");
                 int color = PieChartView.getPresetColor(colorIdx++);
-                float pct = ps[0] / fGrandTotal * 100f;
 
+                // ── 列表数据：始终添加原始分类 ──
                 CategoryStatItem parentItem = new CategoryStatItem(pid, name, icon, ps[0], pct, color, (int)ps[1], 1);
-                pieEntriesList.add(new PieChartView.PieEntry(name, ps[0], color, pid));
-
-                // 处理子分类
+                
+                // 处理子分类并关联到父项
                 Map<String, float[]> cMap = childStatsMap.get(pid);
                 if (cMap != null) {
                     List<String> sortedChildIds = new ArrayList<>(cMap.keySet());
@@ -354,20 +358,31 @@ public class BillStatisticsViewModel extends AndroidViewModel {
                         float v2 = (s2 != null ? s2[0] : 0f);
                         return Float.compare(v2, v1);
                     });
-                    
                     for (String cid : sortedChildIds) {
                         float[] cs = cMap.get(cid);
                         if (cs == null) cs = new float[2];
                         SubCategory sub = idToSub.get(cid);
                         String cName = (sub != null ? sub.getName() : "未知子类");
                         String cIcon = (sub != null ? sub.getIconUri() : "");
-                        float cPct = (ps[0] == 0 ? 0 : cs[0] / ps[0] * 100f);
-                        
+                        float cPct = (ps[0] == 0 ? 0 : cs[0] / ps[0] * 100f); 
                         parentItem.subItems.add(new CategoryStatItem(cid, cName, cIcon, cs[0], cPct, color, (int)cs[1], 2));
                     }
                 }
-                
                 resultList.add(parentItem);
+
+                // ── 饼图数据：小于 5% 且不是前两个的进行合并展示 ──
+                if (pct < 5f && colorIdx > 2) {
+                    otherSum += ps[0];
+                    otherCount += (int)ps[1];
+                } else {
+                    pieEntriesList.add(new PieChartView.PieEntry(name, ps[0], color, pid));
+                }
+            }
+
+            // 如果有合并项，单独为饼图添加“其他”扇区
+            if (otherSum > 0) {
+                int otherColor = 0xFFCCCCCC; // 使用中性的灰色代表其他合并项
+                pieEntriesList.add(new PieChartView.PieEntry("其他", otherSum, otherColor, "merged_other"));
             }
 
             // 4. 保存树形结构并更新列表

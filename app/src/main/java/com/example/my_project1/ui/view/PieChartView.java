@@ -13,6 +13,7 @@ import android.view.ViewConfiguration;
 import android.view.animation.DecelerateInterpolator;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class PieChartView extends View {
@@ -33,6 +34,14 @@ public class PieChartView extends View {
             this.color      = color;
             this.categoryId = categoryId;
         }
+    }
+
+    private static class LabelPos {
+        PieEntry entry;
+        float percent;
+        float p1x, p1y;
+        float p2x, p2y;
+        boolean isRight;
     }
 
     // 示例图配色
@@ -80,8 +89,6 @@ public class PieChartView extends View {
     private float labelMargin;
     private float labelTextSize; // 缩小标签字号
     private float centerTextSize; // 不再使用
-    private float innerRatio   = 0.50f; // 进一步调小中心，增大扇形面积
-    private float sliceGapDeg  = 8.0f;   // 进一步增大间隙以突出独立色块感
 
     // ── Paints ────────────────────────────────────────────────────────
     private Paint slicePaint;
@@ -110,15 +117,13 @@ public class PieChartView extends View {
         float d = getResources().getDisplayMetrics().density;
 
         expandPx      = 10 * d;
-        leaderRadial  = 12 * d;
-        labelMargin   = 2  * d;
-        labelTextSize = 8 * d; // 将标签字号从 14d 改为 12d
+        leaderRadial  = 15 * d; // 第一段斜线长度
+        labelMargin   = 10 * d; // 第二段横线长度
+        labelTextSize = 9 * d;  // 缩小标签字号到 9dp
         centerTextSize = 24 * d; // 不再使用
 
         slicePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        slicePaint.setStyle(Paint.Style.FILL_AND_STROKE);
-        slicePaint.setStrokeJoin(Paint.Join.ROUND);
-        slicePaint.setStrokeWidth(6 * d); // 通过描边圆角实现 3dp 的圆角效果
+        slicePaint.setStyle(Paint.Style.FILL); // 改回纯填充，手动处理圆角
 
         holePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         holePaint.setColor(Color.WHITE);
@@ -207,51 +212,52 @@ public class PieChartView extends View {
         float cy = getHeight() / 2f;
         float d = getResources().getDisplayMetrics().density;
 
-        float avail = Math.min(cx, cy) - expandPx - 5 * d; // 进一步压缩 padding
-        float radius = Math.max(avail, 70 * d); // 增大最小半径到 70d
-        float innerR = radius * innerRatio;
+        // 增大内边距，为外推的扇形和标签留出空间
+        float avail = Math.min(cx, cy) - expandPx - 40 * d; 
+        float radius = Math.max(avail, 70 * d); 
 
         float startAngle = -90 + rotationOffset;
         float sweepTotal = 360 * animProgress;
+
+        // 设置画笔，增大描边宽度实现更圆润的视觉效果
+        slicePaint.setAntiAlias(true);
+        slicePaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        slicePaint.setStrokeJoin(Paint.Join.ROUND);
+        slicePaint.setStrokeWidth(8 * d); // 增大圆角半径 (描边的一半为圆角)
+
+        RectF oval = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
 
         // 绘制所有扇形
         for (int i = 0; i < entries.size(); i++) {
             PieEntry e = entries.get(i);
             float sweep = (e.value / total) * sweepTotal;
-            float actualSw = Math.max(sweep - sliceGapDeg, 0.1f);
+            // 夹角间隙
+            float actualSw = Math.max(sweep - 1.5f, 0.5f);
             float actualSt = startAngle + (sweep - actualSw) / 2f;
 
-            float offsetPx = 0f;
+            // 动画/选中位移
+            float moveOffset = 0f;
             if (i == selectedIndex) {
-                offsetPx = expandPx * highlightAnim;
+                moveOffset = expandPx * highlightAnim;
             } else if (i == previousSelected) {
-                offsetPx = expandPx * (1f - highlightAnim);
+                moveOffset = expandPx * (1f - highlightAnim);
             }
 
-            // 关键：为了圆角平滑，收缩绘图半径，由 StrokeJoin.ROUND 补偿回来
-            float strokeW = slicePaint.getStrokeWidth();
-            float outerR = radius + offsetPx - strokeW / 2f;
-            float innerRCurrent = innerR + offsetPx + strokeW / 2f;
+            // 物理分离距离：配合圆角增大分离位移，防止中心挤压
+            float baseSep = 10 * d;
+            float midRad = (float) Math.toRadians(actualSt + actualSw / 2f);
+            float dx = (baseSep + moveOffset) * (float) Math.cos(midRad);
+            float dy = (baseSep + moveOffset) * (float) Math.sin(midRad);
 
             Path path = new Path();
-
-            float startRad = (float) Math.toRadians(actualSt);
-            float endRad = (float) Math.toRadians(actualSt + actualSw);
-
-            float outStartX = cx + outerR * (float) Math.cos(startRad);
-            float outStartY = cy + outerR * (float) Math.sin(startRad);
-            float outEndX = cx + outerR * (float) Math.cos(endRad);
-            float outEndY = cy + outerR * (float) Math.sin(endRad);
-            float inStartX = cx + innerRCurrent * (float) Math.cos(endRad);
-            float inStartY = cy + innerRCurrent * (float) Math.sin(endRad);
-            float inEndX = cx + innerRCurrent * (float) Math.cos(startRad);
-            float inEndY = cy + innerRCurrent * (float) Math.sin(startRad);
-
-            // 使用 lineTo 连接，配合 FILL_AND_STROKE + Join.ROUND 实现完美 4 角圆角
-            path.moveTo(outStartX, outStartY);
-            path.arcTo(new RectF(cx - outerR, cy - outerR, cx + outerR, cy + outerR), actualSt, actualSw, false);
-            path.lineTo(inStartX, inStartY);
-            path.arcTo(new RectF(cx - innerRCurrent, cy - innerRCurrent, cx + innerRCurrent, cy + innerRCurrent), actualSt + actualSw, -actualSw, false);
+            path.moveTo(cx + dx, cy + dy);
+            
+            // 核心修复：通过对 RectF 的同心平移，确保所有扇区仍属于同一个“虚拟圆”
+            RectF sliceOval = new RectF(oval);
+            sliceOval.offset(dx, dy);
+            path.arcTo(sliceOval, actualSt, actualSw, false);
+            
+            path.lineTo(cx + dx, cy + dy);
             path.close();
 
             slicePaint.setColor(e.color);
@@ -260,50 +266,102 @@ public class PieChartView extends View {
             startAngle += sweep;
         }
 
-        // 绘制中心空心圆
-        canvas.drawCircle(cx, cy, innerR, holePaint);
-
-        // 不再绘制中心文本
-        // Paint.FontMetricsInt fm = centerTextPaint.getFontMetricsInt();
-        // float baseline = cy - (fm.top + fm.bottom) / 2f;
-        // canvas.drawText(centerText, cx, baseline, centerTextPaint);
-
-        // 绘制标签
+        // 绘制标签（直线模式）
         if (animProgress > 0.9f) drawLabels(canvas, cx, cy, radius);
-
-        // 不再绘制图例
-        // drawLegend(canvas, cx, cy, radius);
     }
 
     private void drawLabels(Canvas canvas, float cx, float cy, float radius) {
         float startAngle = -90 + rotationOffset;
+        float d = getResources().getDisplayMetrics().density;
+        
+        List<LabelPos> leftLabels = new ArrayList<>();
+        List<LabelPos> rightLabels = new ArrayList<>();
+
+        // 1. 第一阶段：预计算所有标签的基础位置，并按左右分组
         for (int i = 0; i < entries.size(); i++) {
             PieEntry e = entries.get(i);
             float sweep = (e.value / total) * 360;
             float percent = e.value / total * 100;
-            if (percent < 2) { startAngle += sweep; continue; }
+            
+            // 降低阈值，显示更多小比例标签
+            if (percent >= 0.1f) { 
+                float mid = startAngle + sweep / 2;
+                float rad = (float) Math.toRadians(mid);
+                float cos = (float) Math.cos(rad);
+                float sin = (float) Math.sin(rad);
+                boolean isRight = cos >= 0;
 
-            float mid = startAngle + sweep / 2;
-            float rad = (float) Math.toRadians(mid);
-            float cos = (float) Math.cos(rad);
-            float sin = (float) Math.sin(rad);
-            boolean right = cos >= 0;
+                LabelPos pos = new LabelPos();
+                pos.entry = e;
+                pos.percent = percent;
+                
+                // 起点在圆周边缘
+                pos.p1x = cx + radius * cos;
+                pos.p1y = cy + radius * sin;
+                
+                // 终点在引线末端（基础位置）
+                float radialLen = leaderRadial + 10 * d; // 增加引线长度
+                pos.p2x = cx + (radius + radialLen) * cos;
+                pos.p2y = cy + (radius + radialLen) * sin;
+                pos.isRight = isRight;
 
-            float p1x = cx + (radius + labelMargin) * cos;
-            float p1y = cy + (radius + labelMargin) * sin;
-            float p2x = cx + (radius + leaderRadial) * cos;
-            float p2y = cy + (radius + leaderRadial) * sin;
-
-            linePaint.setColor(e.color);
-            canvas.drawLine(p1x, p1y, p2x, p2y, linePaint);
-
-            // 关键修改：在标签中显示百分比
-            labelPaint.setTextAlign(right ? Paint.Align.LEFT : Paint.Align.RIGHT);
-            // 格式化为两位小数的百分比字符串
-            String labelWithPercent = e.label + " " + String.format("%.2f%%", percent);
-            canvas.drawText(labelWithPercent, right ? p2x + 6 : p2x - 6, p2y + labelTextSize / 3, labelPaint);
-
+                if (isRight) rightLabels.add(pos);
+                else leftLabels.add(pos);
+            }
             startAngle += sweep;
+        }
+
+        // 2. 第二阶段：排序并强制执行垂直间距，防止重叠和交叉
+        float minGap = labelTextSize * 1.5f;
+        
+        // 按 Y 坐标排序，确保调整后顺序不变（防止引导线交叉的核心）
+        Collections.sort(leftLabels, (a, b) -> Float.compare(a.p2y, b.p2y));
+        Collections.sort(rightLabels, (a, b) -> Float.compare(a.p2y, b.p2y));
+
+        adjustYPositions(leftLabels, minGap);
+        adjustYPositions(rightLabels, minGap);
+
+        // 3. 第三阶段：绘制
+        drawLabelPosList(canvas, leftLabels, d);
+        drawLabelPosList(canvas, rightLabels, d);
+    }
+
+    private void adjustYPositions(List<LabelPos> list, float minGap) {
+        if (list.size() < 2) return;
+        
+        // 正向调整：从上往下推
+        for (int i = 1; i < list.size(); i++) {
+            LabelPos prev = list.get(i - 1);
+            LabelPos curr = list.get(i);
+            if (curr.p2y - prev.p2y < minGap) {
+                curr.p2y = prev.p2y + minGap;
+            }
+        }
+        
+        // 反向调整：防止最后几个被推得太靠下，向上拉回
+        for (int i = list.size() - 2; i >= 0; i--) {
+            LabelPos next = list.get(i + 1);
+            LabelPos curr = list.get(i);
+            if (next.p2y - curr.p2y < minGap) {
+                curr.p2y = next.p2y - minGap;
+            }
+        }
+    }
+
+    private void drawLabelPosList(Canvas canvas, List<LabelPos> list, float d) {
+        for (LabelPos pos : list) {
+            linePaint.setColor(pos.entry.color);
+            linePaint.setAlpha(160);
+            
+            // 绘制直线引导线
+            canvas.drawLine(pos.p1x, pos.p1y, pos.p2x, pos.p2y, linePaint);
+
+            // 绘制文字
+            labelPaint.setTextAlign(pos.isRight ? Paint.Align.LEFT : Paint.Align.RIGHT);
+            String labelStr = pos.entry.label + " " + String.format("%.2f%%", pos.percent);
+            
+            float textX = pos.p2x + (pos.isRight ? 4 * d : -4 * d);
+            canvas.drawText(labelStr, textX, pos.p2y + labelTextSize / 3, labelPaint);
         }
     }
 
@@ -363,11 +421,13 @@ public class PieChartView extends View {
 
     private int sliceAtAngle(float touchAngle, float cx, float cy, float tx, float ty) {
         float d = getResources().getDisplayMetrics().density;
-        float avail = Math.min(cx, cy) - expandPx - 5 * d; // 进一步压缩 padding
-        float radius = Math.max(avail, 70 * d); // 增大最小半径到 70d
+        float avail = Math.min(cx, cy) - expandPx - 5 * d;
+        float radius = Math.max(avail, 70 * d);
         float distSq = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
-        float innerR = radius * innerRatio;
-        if (distSq < innerR * innerR || distSq > (radius + expandPx) * (radius + expandPx))
+        
+        // 如果是实心尖角，允许点击距离中心很近的地方（如 5dp）
+        float minClickDistSq = (5 * d) * (5 * d);
+        if (distSq < minClickDistSq || distSq > (radius + expandPx + 20 * d) * (radius + expandPx + 20 * d))
             return -1;
 
         float start = -90 + rotationOffset;
