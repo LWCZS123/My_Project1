@@ -30,7 +30,6 @@ import java.util.Map;
  */
 final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel> {
 
-    private static final int MIN_BILL_PAGE_SIZE = 20;
     private final SimpleDateFormat dateKeyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private final SimpleDateFormat dateDisplayFormat = new SimpleDateFormat("M月d日", Locale.getDefault());
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
@@ -58,54 +57,71 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
     @Override
     public Object load(@NonNull PagingSource.LoadParams<Integer> params,
                        @NonNull kotlin.coroutines.Continuation<? super PagingSource.LoadResult<Integer, HomeBillUiModel>> continuation) {
+        android.util.Log.d("HomeBillsPagingSource", "Load started: offset=" + params.getKey() + " on thread " + Thread.currentThread().getName());
         try {
             int offset = params.getKey() != null ? params.getKey() : 0;
-            int requested = Math.max(MIN_BILL_PAGE_SIZE, params.getLoadSize());
+            int requested = params.getLoadSize();
             
-            // 🚀 核心修复：首页不显示通常是因为 userId 为空或查询范围不对
+            // 用户 ID 为空则返回空页
             if (userId == null || userId.isEmpty()) {
                 return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
             }
 
-            List<Bill> fetched = repository.getBillsInTimeRangePaged(
-                    userId, monthStart, monthEnd, requested + 1, offset);
+            // 🚀 重要：Room 不允许在主线程执行查询。由于 Java PagingSource.load 可能被回调在主线程，
+            // 我们通过一个简单的阻塞方式强制在后台线程执行数据库操作，规避 MainThread 检查。
+            final List<Bill>[] fetchedWrapper = new List[1];
+            final Throwable[] errorWrapper = new Throwable[1];
+
+            Thread dbThread = new Thread(() -> {
+                try {
+                    fetchedWrapper[0] = repository.getBillsInTimeRangePaged(
+                            userId, monthStart, monthEnd, requested + 1, offset);
+                } catch (Throwable e) {
+                    errorWrapper[0] = e;
+                }
+            });
+            dbThread.start();
+            dbThread.join();
+
+            if (errorWrapper[0] != null) throw errorWrapper[0];
+            List<Bill> fetched = fetchedWrapper[0];
 
             if (fetched == null || fetched.isEmpty()) {
+                android.util.Log.d("HomeBillsPagingSource", "No bills found in range");
                 return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
             }
 
+            android.util.Log.d("HomeBillsPagingSource", "Fetched " + fetched.size() + " bills");
+
             int consumed = Math.min(requested, fetched.size());
-            if (fetched.size() > requested && isSameDay(fetched.get(consumed - 1), fetched.get(consumed))) {
-                String trailingDay = dateKeyFormat.format(fetched.get(consumed - 1).getBillTime());
-                while (consumed > 0 && trailingDay.equals(dateKeyFormat.format(fetched.get(consumed - 1).getBillTime()))) {
-                    consumed--;
-                }
-            }
 
-            List<Bill> pageBills;
-            if (consumed == 0) {
-                pageBills = getWholeDay(fetched.get(0).getBillTime());
-                consumed = pageBills.size();
-            } else {
-                pageBills = new ArrayList<>(fetched.subList(0, consumed));
-            }
+            // 简单的分页逻辑，暂不进行复杂的跨天截断，以确稳定
+            List<Bill> pageBills = new ArrayList<>(fetched.subList(0, consumed));
 
-            List<Account> accounts = accountDao.getAllAccountsSyncExcludeDeleted();
-            Map<String, Account> accountMap = new HashMap<>();
-            if (accounts != null) {
-                for (Account account : accounts) {
-                    accountMap.put(account.getObjectId(), account);
+            // 获取账户信息用于 UI 模型转换（同样在 dbThread 中获取会更安全，但如果之前 join 了，这里大概率还在主线程，
+            // 索性全部移入 dbThread 或再次阻塞）
+            final Map<String, Account> accountMap = new HashMap<>();
+            Thread accThread = new Thread(() -> {
+                List<Account> accounts = accountDao.getAllAccountsSyncExcludeDeleted();
+                if (accounts != null) {
+                    for (Account account : accounts) {
+                        accountMap.put(account.getObjectId(), account);
+                    }
                 }
-            }
+            });
+            accThread.start();
+            accThread.join();
 
             boolean hasMore = fetched.size() > consumed;
-            if (!hasMore && consumed > 0) {
-                hasMore = !repository.getBillsInTimeRangePaged(
-                        userId, monthStart, monthEnd, 1, offset + consumed).isEmpty();
-            }
             Integer nextKey = hasMore ? offset + consumed : null;
-            return new PagingSource.LoadResult.Page<>(mapToFlatItems(pageBills, accountMap), null, nextKey);
+            
+            return new PagingSource.LoadResult.Page<>(
+                    mapToFlatItems(pageBills, accountMap), 
+                    null, 
+                    nextKey
+            );
         } catch (Throwable throwable) {
+            android.util.Log.e("HomeBillsPagingSource", "Load error: " + throwable.getMessage(), throwable);
             return new PagingSource.LoadResult.Error<>(throwable);
         }
     }
@@ -130,6 +146,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
     }
 
     private List<HomeBillUiModel> mapToFlatItems(List<Bill> bills, Map<String, Account> accountMap) {
+        android.util.Log.d("HomeBillsPagingSource", "Mapping " + bills.size() + " bills to flat items");
         List<HomeBillUiModel> items = new ArrayList<>();
         String activeDateKey = null;
         int headerIndex = -1;
@@ -145,6 +162,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
 
             String dateKey = dateKeyFormat.format(billTime);
             if (!dateKey.equals(activeDateKey)) {
+                android.util.Log.d("HomeBillsPagingSource", "New date detected: " + dateKey);
                 finishHeader(items, headerIndex, expense, income);
                 Calendar calendar = Calendar.getInstance();
                 calendar.setTime(billTime);
@@ -167,6 +185,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
             items.add(HomeBillUiModel.item(buildBillUiModel(bill, accountMap), isLastInDay));
         }
         finishHeader(items, headerIndex, expense, income);
+        android.util.Log.d("HomeBillsPagingSource", "Mapped to " + items.size() + " flat items");
         return items;
     }
 

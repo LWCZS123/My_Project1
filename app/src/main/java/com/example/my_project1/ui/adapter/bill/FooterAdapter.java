@@ -4,7 +4,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -12,13 +11,14 @@ import androidx.paging.LoadState;
 import androidx.paging.LoadStateAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.airbnb.lottie.LottieAnimationView;
 import com.example.my_project1.R;
 
 /**
  * FooterAdapter - 分页加载状态 Footer
  * -------------------------------------------------------
  * Renders Paging 3 append state:
- *   LOADING  → ProgressBar 旋转动画
+ *   LOADING  → Lottie 动画
  *   NO_MORE  → "— 没有更多了 —" 文字
  *   ERROR    → "加载失败，点击重试" 按钮
  *   IDLE     → 隐藏（itemCount=0）
@@ -57,13 +57,13 @@ public class FooterAdapter extends LoadStateAdapter<FooterAdapter.FooterVH> {
     }
 
     class FooterVH extends RecyclerView.ViewHolder {
-        private final ProgressBar progressBar;
+        private final LottieAnimationView lottieLoading;
         private final TextView    tvMessage;
         private final Button      btnRetry;
 
         FooterVH(View itemView) {
             super(itemView);
-            progressBar = itemView.findViewById(R.id.footerProgressBar);
+            lottieLoading = itemView.findViewById(R.id.footerLottieLoading);
             tvMessage   = itemView.findViewById(R.id.footerTvMessage);
             btnRetry    = itemView.findViewById(R.id.footerBtnRetry);
 
@@ -78,7 +78,14 @@ public class FooterAdapter extends LoadStateAdapter<FooterAdapter.FooterVH> {
             boolean isComplete = state instanceof LoadState.NotLoading
                     && ((LoadState.NotLoading) state).getEndOfPaginationReached();
 
-            progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            if (isLoading) {
+                lottieLoading.setVisibility(View.VISIBLE);
+                lottieLoading.playAnimation();
+            } else {
+                lottieLoading.pauseAnimation();
+                lottieLoading.setVisibility(View.GONE);
+            }
+
             tvMessage.setVisibility(isComplete ? View.VISIBLE : View.GONE);
             btnRetry.setVisibility(isError ? View.VISIBLE : View.GONE);
 

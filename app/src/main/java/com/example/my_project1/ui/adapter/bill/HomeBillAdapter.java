@@ -87,6 +87,7 @@ public class HomeBillAdapter extends PagingDataAdapter<HomeBillUiModel, Recycler
             return;
         }
         if (holder instanceof HeaderVH) {
+            android.util.Log.d("HomeBillAdapter", "Binding header at pos " + position + ": " + item.dateText);
             ((HeaderVH) holder).bind(item);
         } else if (holder instanceof BillVH) {
             ((BillVH) holder).bind(item.billItem, item.isLastInDay);

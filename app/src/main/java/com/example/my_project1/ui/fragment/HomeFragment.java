@@ -13,11 +13,9 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.paging.CombinedLoadStates;
 import androidx.paging.LoadState;
 import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.bill.Bill;
@@ -188,11 +186,25 @@ public class HomeFragment extends Fragment {
 
         // 🚀 使用 Paging 的加载状态监听来控制 Loading 动画，防止数据未渲染时的闪烁
         billAdapter.addLoadStateListener(loadStates -> {
-            if (loadStates.getRefresh() instanceof LoadState.NotLoading) {
+            LoadState refreshState = loadStates.getRefresh();
+            
+            if (refreshState instanceof LoadState.NotLoading) {
                 if (isFirstLoad) {
                     hideLoading();
                     isFirstLoad = false;
                 }
+                if (binding != null && binding.swipeRefreshLayout.isRefreshing()) {
+                    binding.swipeRefreshLayout.setRefreshing(false);
+                }
+            } else if (refreshState instanceof LoadState.Error) {
+                hideLoading();
+                isFirstLoad = false;
+                if (binding != null && binding.swipeRefreshLayout.isRefreshing()) {
+                    binding.swipeRefreshLayout.setRefreshing(false);
+                }
+                Throwable error = ((LoadState.Error) refreshState).getError();
+                Log.e(TAG, "Paging Error: " + error.getMessage(), error);
+                showSnackbar("加载失败: " + error.getMessage());
             }
             return null;
         });
@@ -259,8 +271,13 @@ public class HomeFragment extends Fragment {
     private void observeData() {
         // ── 1. 首页账单（Paging 3 根据滚动位置自动追加）──
         billViewModel.homeBillPagingData.observe(getViewLifecycleOwner(), pagingData -> {
+            Log.d(TAG, "PagingData updated");
             if (pagingData != null) {
                 billAdapter.submitData(getViewLifecycleOwner().getLifecycle(), pagingData);
+                // 兜底方案：如果 adapter 中已经有数据，尝试隐藏加载框
+                if (billAdapter.getItemCount() > 0) {
+                    hideLoading();
+                }
             }
             binding.swipeRefreshLayout.setRefreshing(false);
         });
