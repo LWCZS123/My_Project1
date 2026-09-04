@@ -104,6 +104,9 @@ public interface WishDao {
     int markRecordsDeleted(long wishId, Date updatedAt);
 
     /** 进度以有效记录求和为准，不信任 UI 传入的累计金额。 */
+    @Query("SELECT * FROM wish_records WHERE linked_bill_id = :billId LIMIT 1")
+    WishRecord getRecordByBillId(long billId);
+
     @Query("SELECT COALESCE(SUM(amount), 0) FROM wish_records WHERE wish_id = :wishId AND sync_state != 'TO_DELETE'")
     double getSavedAmount(long wishId);
 }

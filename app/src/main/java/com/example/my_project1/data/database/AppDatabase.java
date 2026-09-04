@@ -18,6 +18,7 @@ import com.example.my_project1.data.dao.AccountDao;
 import com.example.my_project1.data.dao.BillDao;
 import com.example.my_project1.data.dao.BudgetDao;
 import com.example.my_project1.data.dao.CategoryDao;
+import com.example.my_project1.data.dao.SavingPlanDao;
 import com.example.my_project1.data.dao.SearchHistoryDao;
 import com.example.my_project1.data.dao.SubCategoryDao;
 import com.example.my_project1.data.dao.UserProfileDao;
@@ -29,6 +30,8 @@ import com.example.my_project1.data.model.account.AccountGroup;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.bill.SearchHistory;
 import com.example.my_project1.data.model.budget.Budget;
+import com.example.my_project1.data.model.saving.SavingPlan;
+import com.example.my_project1.data.model.saving.SavingRecord;
 import com.example.my_project1.data.model.user.UserProfile;
 import com.example.my_project1.data.model.wish.Wish;
 import com.example.my_project1.data.model.wish.WishRecord;
@@ -37,9 +40,10 @@ import com.example.my_project1.data.model.wish.WishRecord;
         entities = {Category.class, SubCategory.class,
                 AccountGroup.class, Account.class, Bill.class,
                 SearchHistory.class, UserProfile.class, Budget.class,
-                Wish.class, WishRecord.class
+                Wish.class, WishRecord.class,
+                SavingPlan.class, SavingRecord.class
         },
-        version = 29,
+        version = 36,
         exportSchema = true
 )
 
@@ -78,6 +82,7 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract UserProfileDao userProfileDao();
     public abstract BudgetDao budgetDao();
     public abstract WishDao wishDao();
+    public abstract SavingPlanDao savingPlanDao();
 
 
     public static AppDatabase getInstance(Context context) {

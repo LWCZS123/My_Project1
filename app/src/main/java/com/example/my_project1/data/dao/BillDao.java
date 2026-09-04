@@ -239,6 +239,18 @@ public interface BillDao {
     @Query("DELETE FROM bills WHERE user_id = :userId AND category_id = :categoryId")
     int deleteBillsByCategory(String userId, String categoryId);
 
+    /** 🔥 批量标记删除账单 */
+    @Query("UPDATE bills SET sync_state = 'TO_DELETE', updatedAt = :now WHERE id IN (:billIds)")
+    void markBillsDeletedByIds(List<Long> billIds, long now);
+
+    /** 🔥 批量物理删除账单 */
+    @Query("DELETE FROM bills WHERE id IN (:billIds)")
+    void deleteBillsByIds(List<Long> billIds);
+
+    /** 🔥 批量根据ID查询账单 */
+    @Query("SELECT * FROM bills WHERE id IN (:billIds)")
+    List<Bill> getBillsByIds(List<Long> billIds);
+
     @Query("SELECT COUNT(*) FROM bills WHERE category_id = :categoryId AND user_id = :userId AND sync_state != 'TO_DELETE'")
     int countBillsByCategory(String userId, String categoryId);
 

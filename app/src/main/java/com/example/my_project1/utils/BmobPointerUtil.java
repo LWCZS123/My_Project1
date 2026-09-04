@@ -2,6 +2,7 @@ package com.example.my_project1.utils;
 
 import com.example.my_project1.data.remote.model.cloudaccount.Account;
 import com.example.my_project1.data.remote.model.cloudaccount.AccountGroup;
+import com.example.my_project1.data.remote.model.cloudsaving.CloudSavingPlan;
 import com.example.my_project1.data.remote.model.clouduser.CloudUser;
 import com.example.my_project1.data.remote.model.cloudwish.CloudWish;
 
@@ -28,8 +29,13 @@ public class BmobPointerUtil {
         return new BmobPointer(account);
     }
 
-    /** ✅ 愿望关联（修复点） */
+    /** 愿望关联 */
     public static BmobPointer wish(String wishId) {
         return new BmobPointer(new CloudWish(wishId));
+    }
+
+    /** 存钱计划关联 */
+    public static BmobPointer savingPlan(String planId) {
+        return new BmobPointer(new CloudSavingPlan(planId));
     }
 }

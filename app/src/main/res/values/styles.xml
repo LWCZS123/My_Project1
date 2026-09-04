@@ -12,8 +12,8 @@
         <item name="android:thumb">@drawable/ios_switch_thumb</item>
         <item name="track">@drawable/ios_switch_track</item>
         <item name="switchStyle">@style/AppCompat.Switch.IOS</item>
-        <item name="android:minWidth">36dp</item>
-        <item name="android:minHeight">20dp</item>
+        <item name="android:minWidth">50dp</item>
+        <item name="android:minHeight">26dp</item>
     </style>
 
     <style name="AppCompat.Switch.IOS" parent="Widget.AppCompat.CompoundButton.Switch">

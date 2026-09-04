@@ -56,7 +56,7 @@ public class ImageLoaderUtils {
                 .dontAnimate(); // 🔑 统一关闭动画，防止UI图标闪烁
 
         Glide.with(context)
-                .load(url)
+                .load(getGlideSource(context, url))
                 .apply(options)
                 .into(imageView);
     }
@@ -78,7 +78,7 @@ public class ImageLoaderUtils {
                 .centerCrop();
 
         Glide.with(context)
-                .load(url)
+                .load(getGlideSource(context, url))
                 .apply(options)
                 .into(imageView);
     }
@@ -212,7 +212,7 @@ public class ImageLoaderUtils {
                 .centerCrop();
 
         Glide.with(context.getApplicationContext())
-                .load(url)
+                .load(getGlideSource(context, url))
                 .apply(options)
                 .thumbnail(0.1f)
                 .into(imageView);
@@ -233,7 +233,7 @@ public class ImageLoaderUtils {
                 .fitCenter();
 
         Glide.with(context.getApplicationContext())
-                .load(url)
+                .load(getGlideSource(context, url))
                 .apply(options)
                 .into(imageView);
     }
@@ -347,7 +347,7 @@ public class ImageLoaderUtils {
      * - 其他：返回默认图标
      */
     public static Object getGlideSource(Context context, String uri) {
-        if (uri == null) {
+        if (uri == null || uri.isEmpty()) {
             return R.drawable.ic_default_category;
         }
 
@@ -357,6 +357,11 @@ public class ImageLoaderUtils {
         } else if (uri.startsWith("android.resource://")) {
             // ✅ 系统资源 URI —— 一定要返回 Uri 对象！
             return Uri.parse(uri);
+        } else if (uri.startsWith("ic_")) {
+            // ✅ 识别简单的本地资源名称 (如 ic_transference)
+            int resId = context.getResources().getIdentifier(uri, "drawable", context.getPackageName());
+            if (resId != 0) return resId;
+            return R.drawable.ic_default_category;
         } else {
             // ✅ 默认占位图
             return R.drawable.ic_default_category;
@@ -400,7 +405,7 @@ public class ImageLoaderUtils {
                 .override(avatarSize, avatarSize);
 
         Glide.with(context.getApplicationContext())
-                .load(url)
+                .load(getGlideSource(context, url))
                 .apply(options)
                 .into(imageView);
     }
@@ -451,7 +456,7 @@ public class ImageLoaderUtils {
                 .centerCrop();
 
         Glide.with(context)
-                .load(url)
+                .load(getGlideSource(context, url))
                 .apply(options)
                 .into(imageView);
     }

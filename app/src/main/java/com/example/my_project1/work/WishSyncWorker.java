@@ -220,13 +220,27 @@ public class WishSyncWorker extends Worker {
 
         WishRecord local = dao.getRecordByObjectId(incoming.getObjectId());
         if (local == null) {
+            // 尝试恢复关联账单的本地 ID
+            if (incoming.getLinkedBillObjectId() != null) {
+                com.example.my_project1.data.model.bill.Bill bill = database.billDao().getBillByObjectIdSync(incoming.getLinkedBillObjectId());
+                if (bill != null) {
+                    incoming.setLinkedBillId(bill.getId());
+                }
+            }
             dao.insertRecord(incoming);
             Log.d(TAG, "合并云端记录 - 新增本地: " + incoming.getObjectId());
         } else {
             if (local.getSyncState() == SyncState.SYNCED && isCloudNewer(incoming.getUpdatedAt(), local.getUpdatedAt())) {
                 incoming.setId(local.getId());
-                // 保留关联账单 ID
-                incoming.setLinkedBillId(local.getLinkedBillId());
+                // 如果云端有关联账单且本地还没有，尝试恢复
+                if (incoming.getLinkedBillObjectId() != null && local.getLinkedBillId() <= 0) {
+                    com.example.my_project1.data.model.bill.Bill bill = database.billDao().getBillByObjectIdSync(incoming.getLinkedBillObjectId());
+                    if (bill != null) {
+                        incoming.setLinkedBillId(bill.getId());
+                    }
+                } else {
+                    incoming.setLinkedBillId(local.getLinkedBillId());
+                }
                 dao.updateRecord(incoming);
                 Log.d(TAG, "合并云端记录 - 更新本地: " + incoming.getObjectId());
             }

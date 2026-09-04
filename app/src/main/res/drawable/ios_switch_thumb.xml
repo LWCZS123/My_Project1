@@ -1,13 +1,18 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 滑块尺寸小于滑道，确保不超出 -->
+    <!-- 滑块尺寸缩小 -->
     <item>
-        <shape android:shape="oval">
-            <!-- 滑块直径比滑道高度小4dp（上下各留2dp边距） -->
-            <size android:width="28dp" android:height="28dp" />
-            <solid android:color="#FFFFFF" /> <!-- 白色滑块 -->
-            <stroke
-                android:width="0.5dp"
-                android:color="#DDDDDD" /> <!-- 轻微边框 -->
-        </shape>
+        <layer-list>
+            <!-- 视觉上的内边距设为 3dp，使滑块明显小于 26dp 的滑道 -->
+            <item android:top="3dp" android:bottom="3dp" android:left="3dp" android:right="3dp">
+                <shape android:shape="oval">
+                    <!-- 视觉上的滑块尺寸 20dp -->
+                    <size android:width="20dp" android:height="20dp" />
+                    <solid android:color="#FFFFFF" />
+                    <stroke
+                        android:width="0.5dp"
+                        android:color="#DDDDDD" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </selector>

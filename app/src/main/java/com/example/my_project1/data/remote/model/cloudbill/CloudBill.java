@@ -29,7 +29,8 @@ public class CloudBill extends BmobObject {
 
     private BmobPointer user;          // 关联用户
     private BmobPointer book;          // 关联账本
-    private BmobPointer account;       // 关联账户
+    private BmobPointer account;       // 关联账户 (转出)
+    private BmobPointer toAccount;     // 转入账户 (用于转账)
     private String categoryId;         // 分类ID
     private String categoryName;       // 分类名称（冗余字段）
     private String categoryIconUrl;    // 分类图标URL
@@ -52,6 +53,9 @@ public class CloudBill extends BmobObject {
 
     public BmobPointer getAccount() { return account; }
     public void setAccount(BmobPointer account) { this.account = account; }
+
+    public BmobPointer getToAccount() { return toAccount; }
+    public void setToAccount(BmobPointer toAccount) { this.toAccount = toAccount; }
 
     public String getCategoryId() { return categoryId; }
     public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
@@ -113,6 +117,11 @@ public class CloudBill extends BmobObject {
         return account != null ? account.getObjectId() : null;
     }
 
+    /** 获取本地转入账户ID */
+    public String getToAccountId() {
+        return toAccount != null ? toAccount.getObjectId() : null;
+    }
+
     // ======================== 转换方法 ========================
 
     /**
@@ -166,6 +175,7 @@ public class CloudBill extends BmobObject {
         local.setUserId(getUserId());
         local.setBookId(getBookId());
         local.setAccountId(getAccountId());
+        local.setToAccountId(getToAccountId());
         local.setCategoryId(categoryId);
         local.setCategoryName(categoryName);
         local.setCategoryIconUrl(categoryIconUrl);
@@ -249,6 +259,10 @@ public class CloudBill extends BmobObject {
 
         if (local.getAccountId() != null) {
             cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));
+        }
+
+        if (local.getToAccountId() != null) {
+            cloud.setToAccount(BmobPointerUtil.account(local.getToAccountId()));
         }
 
         return cloud;

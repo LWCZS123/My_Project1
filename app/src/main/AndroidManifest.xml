@@ -30,6 +30,18 @@
         android:theme="@style/Theme.My_Project1"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".ui.activity.SavingPlanActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
+            android:name=".ui.activity.SavingPlanDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
+            android:name=".ui.activity.ArchivedSavingPlansActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
             android:name=".ui.activity.IconSelectionActivity"
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar" />

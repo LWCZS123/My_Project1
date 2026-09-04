@@ -69,6 +69,12 @@ public class WishRecord {
     @ColumnInfo(name = "linked_bill_id", defaultValue = "-1")
     private long linkedBillId = -1;
 
+    /**
+     * 关联账单云端 ID
+     */
+    @ColumnInfo(name = "linked_bill_object_id")
+    private String linkedBillObjectId;
+
     // ================== 构造 ==================
 
     public WishRecord() {}
@@ -121,4 +127,7 @@ public class WishRecord {
 
     public long getLinkedBillId() { return linkedBillId; }
     public void setLinkedBillId(long linkedBillId) { this.linkedBillId = linkedBillId; }
+
+    public String getLinkedBillObjectId() { return linkedBillObjectId; }
+    public void setLinkedBillObjectId(String linkedBillObjectId) { this.linkedBillObjectId = linkedBillObjectId; }
 }

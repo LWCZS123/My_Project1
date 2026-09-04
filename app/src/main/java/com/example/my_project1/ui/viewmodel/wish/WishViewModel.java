@@ -106,6 +106,10 @@ public class WishViewModel extends AndroidViewModel {
     }
 
     public void saveRecord(WishRecord record) {
+        saveRecord(record, -1, -1);
+    }
+
+    public void saveRecord(WishRecord record, long fromAccountId, long toAccountId) {
         if (record == null || record.getWishId() <= 0) {
             operationState.setValue(ApiResponse.error("记录数据无效"));
             return;
@@ -116,7 +120,7 @@ public class WishViewModel extends AndroidViewModel {
         }
         operationState.setValue(ApiResponse.loading("正在保存记录"));
         if (record.getId() == 0) {
-            repository.insertRecord(record, operationState::setValue);
+            repository.insertRecord(record, fromAccountId, toAccountId, operationState::setValue);
         } else {
             repository.updateRecord(record, operationState::setValue);
         }

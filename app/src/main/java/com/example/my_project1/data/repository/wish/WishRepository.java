@@ -6,9 +6,12 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.example.my_project1.R;
 import com.example.my_project1.data.dao.WishDao;
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.SyncState;
+import com.example.my_project1.data.model.account.Account;
+import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.model.wish.Wish;
 import com.example.my_project1.data.model.wish.WishRecord;
@@ -122,6 +125,11 @@ public class WishRepository {
     // ==================== 记录 CRUD API ====================
 
     public void insertRecord(@NonNull WishRecord record, @Nullable ApiResponse.Callback<Long> callback) {
+        insertRecord(record, -1, -1, callback);
+    }
+
+    public void insertRecord(@NonNull WishRecord record, long fromAccountId, long toAccountId,
+                             @Nullable ApiResponse.Callback<Long> callback) {
         execute(callback, () -> {
             Wish wish = wishDao.getWishByIdSync(record.getWishId());
             if (wish == null || wish.getSyncState() == SyncState.TO_DELETE) {
@@ -136,6 +144,11 @@ public class WishRepository {
             record.setUpdatedAt(now);
             final long[] id = new long[1];
             database.runInTransaction(() -> {
+                // 处理账户余额和账单
+                if (fromAccountId > 0 && toAccountId > 0) {
+                    processSavingTransaction(record, fromAccountId, toAccountId, wish.getWishName());
+                }
+
                 id[0] = wishDao.insertRecord(record);
                 record.setId(id[0]);
                 refreshProgressInternal(wish, now);
@@ -143,6 +156,45 @@ public class WishRepository {
             enqueueSync();
             return ApiResponse.success(id[0], "记录已添加");
         });
+    }
+
+    private void processSavingTransaction(WishRecord record, long fromId, long toId, String wishName) {
+        Account fromAcc = database.accountDao().getAccountByLocalId(fromId);
+        Account toAcc = database.accountDao().getAccountByLocalId(toId);
+        
+        if (fromAcc != null && toAcc != null) {
+            fromAcc.setBalance(fromAcc.getBalance() - record.getAmount());
+            fromAcc.setSyncState(SyncState.TO_UPDATE);
+            fromAcc.setUpdatedAt(new Date());
+            database.accountDao().update(fromAcc);
+
+            toAcc.setBalance(toAcc.getBalance() + record.getAmount());
+            toAcc.setSyncState(SyncState.TO_UPDATE);
+            toAcc.setUpdatedAt(new Date());
+            database.accountDao().update(toAcc);
+
+            Bill bill = new Bill();
+            bill.setUserId(record.getUserId());
+            bill.setAmount(record.getAmount());
+            bill.setType(2); // 转账
+            bill.setLocalAccountId(fromId);
+            bill.setToLocalAccountId(toId);
+            bill.setAccountId(fromAcc.getObjectId());
+            bill.setToAccountId(toAcc.getObjectId());
+            bill.setBillTime(record.getRecordDate());
+            bill.setCategoryIconUrl("android.resource://" + context.getPackageName() + "/" + R.drawable.ic_transference);
+            bill.setCategoryName("愿望存钱");
+            bill.setRemark(fromAcc.getName() + "转" + record.getAmount() + "元到" + toAcc.getName() + " (愿望:" + wishName + ")");
+            bill.setSyncState(SyncState.TO_CREATE);
+            bill.setCreatedAt(new Date());
+            bill.setUpdatedAt(new Date());
+            
+            long billId = database.billDao().insert(bill);
+            record.setLinkedBillId(billId);
+            // 立即查出刚插入的账单，获取其 objectId（如果已有或者之后同步分配）
+            // 注意：刚插入时 objectId 可能是 null，直到 BillSyncWorker 运行。
+            // 但如果从云端拉取，我们会合并。
+        }
     }
 
     public void updateRecord(@NonNull WishRecord record, @Nullable ApiResponse.Callback<Long> callback) {
@@ -177,6 +229,9 @@ public class WishRepository {
             Wish wish = wishDao.getWishByIdSync(record.getWishId());
             Date now = new Date();
             database.runInTransaction(() -> {
+                if (record.getLinkedBillId() > 0) {
+                    revertSavingTransaction(record);
+                }
                 record.setSyncState(SyncState.TO_DELETE);
                 record.setUpdatedAt(now);
                 wishDao.updateRecord(record);
@@ -185,6 +240,29 @@ public class WishRepository {
             enqueueSync();
             return ApiResponse.success(recordId, "记录已删除");
         });
+    }
+
+    private void revertSavingTransaction(WishRecord record) {
+        Bill bill = database.billDao().getBillByIdSync(record.getLinkedBillId());
+        if (bill != null) {
+            Account fromAcc = database.accountDao().getAccountByLocalId(bill.getLocalAccountId());
+            Account toAcc = database.accountDao().getAccountByLocalId(bill.getToLocalAccountId());
+            
+            if (fromAcc != null) {
+                fromAcc.setBalance(fromAcc.getBalance() + record.getAmount());
+                fromAcc.setSyncState(SyncState.TO_UPDATE);
+                database.accountDao().update(fromAcc);
+            }
+            if (toAcc != null) {
+                toAcc.setBalance(toAcc.getBalance() - record.getAmount());
+                toAcc.setSyncState(SyncState.TO_UPDATE);
+                database.accountDao().update(toAcc);
+            }
+            
+            bill.setSyncState(SyncState.TO_DELETE);
+            bill.setUpdatedAt(new Date());
+            database.billDao().update(bill);
+        }
     }
 
     // ==================== 云端同步 API ====================

@@ -347,6 +347,21 @@ public class BmobBillApiImpl {
             if (db != null) {
                 AppExecutors.get().diskIO().execute(() -> {
                     db.billDao().update(local);
+                    
+                    // 同步更新关联的愿望记录
+                    com.example.my_project1.data.model.wish.WishRecord wishRecord = db.wishDao().getRecordByBillId(local.getId());
+                    if (wishRecord != null) {
+                        wishRecord.setLinkedBillObjectId(local.getObjectId());
+                        db.wishDao().updateRecord(wishRecord);
+                    }
+                    
+                    // 同步更新关联的存钱计划记录
+                    com.example.my_project1.data.model.saving.SavingRecord savingRecord = db.savingPlanDao().getRecordByBillId(local.getId());
+                    if (savingRecord != null) {
+                        savingRecord.setLinkedBillObjectId(local.getObjectId());
+                        db.savingPlanDao().updateRecord(savingRecord);
+                    }
+
                     Log.d(TAG, "✅ 本地数据库已更新: ID=" + local.getId());
                 });
             }

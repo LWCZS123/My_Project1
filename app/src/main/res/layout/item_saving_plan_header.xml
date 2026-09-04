@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tv_title"
+    android:layout_width="wrap_content"
+    android:layout_height="56dp"
+    android:gravity="center_vertical"
+    android:text="存钱"
+    android:textColor="#17151A"
+    android:textSize="28sp"
+    android:textStyle="bold" />

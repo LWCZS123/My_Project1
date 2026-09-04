@@ -25,6 +25,7 @@ import com.example.my_project1.ui.activity.ChangePasswordActivity;
 import com.example.my_project1.ui.activity.EditProfileActivity;
 import com.example.my_project1.ui.activity.IconMarketActivity;
 import com.example.my_project1.ui.activity.IconSelectionActivity;
+import com.example.my_project1.ui.activity.SavingPlanActivity;
 import com.example.my_project1.ui.activity.SavingsOverviewActivity;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
@@ -177,7 +178,7 @@ public class ProfileFragment extends Fragment {
         binding.llBudget.setOnClickListener(v -> budgetActivity());
         binding.llCategoryManage.setOnClickListener(v -> iconMarketActivity());
         binding.llMyWish.setOnClickListener(v -> savingsOverviewActivity());
-        binding.llFinancialTips.setOnClickListener(v-> iconCheckAcitvity());
+        binding.llFinancialTips.setOnClickListener(v-> savingPlanActivity());
         
         // 定时记账
         binding.llScheduledRecord.setOnClickListener(v -> {
@@ -195,6 +196,13 @@ public class ProfileFragment extends Fragment {
         // 其他点击项 (根据需要添加)
         binding.llCloudBackup.setOnClickListener(v -> Toast.makeText(getContext(), "云端备份功能即将上线", Toast.LENGTH_SHORT).show());
         binding.llDailyReceipt.setOnClickListener(v -> Toast.makeText(getContext(), "每日小票功能即将上线", Toast.LENGTH_SHORT).show());
+    }
+
+    private void savingPlanActivity() {
+        startActivity(new Intent(getActivity(), SavingPlanActivity.class));
+        if (getActivity() != null) {
+            getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+        }
     }
 
     private void iconCheckAcitvity() {

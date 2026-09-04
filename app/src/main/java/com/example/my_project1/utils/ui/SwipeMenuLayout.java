@@ -141,6 +141,7 @@ public class SwipeMenuLayout extends ViewGroup {
 
                 if (newScrollX != 0) {
                     mViewCache = new java.lang.ref.WeakReference<>(this);
+                    getParent().requestDisallowInterceptTouchEvent(true);
                 }
 
                 scrollTo(newScrollX, 0);
@@ -172,6 +173,12 @@ public class SwipeMenuLayout extends ViewGroup {
                     mVelocityTracker.recycle();
                     mVelocityTracker = null;
                 }
+
+                // 如果没有滑动且点击了内容区域，触发点击事件
+                if (!isSwipe && finalScrollX == 0 && ev.getAction() == MotionEvent.ACTION_UP) {
+                    mContentView.performClick();
+                }
+
                 isSwipe = false;
                 break;
         }
