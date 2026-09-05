@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingTop="16dp"
+    android:paddingTop="24dp"
     android:paddingHorizontal="16dp">
 
     <!-- Account Info Card -->
@@ -171,7 +172,7 @@
         android:id="@+id/card_credit_bill"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="24dp"
         android:visibility="gone"
         app:cardBackgroundColor="@android:color/white"
         app:cardCornerRadius="16dp"
@@ -239,7 +240,7 @@
         android:id="@+id/card_overview"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="24dp"
         app:cardBackgroundColor="@android:color/white"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp">
@@ -284,15 +285,18 @@
                 <com.github.mikephil.charting.charts.PieChart
                     android:id="@+id/pieChart"
                     android:layout_width="0dp"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_weight="1" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/legend_recycler_view"
                     android:layout_width="0dp"
-                    android:layout_height="180dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp" />
+                    android:layout_height="200dp"
+                    android:layout_weight="1.2"
+                    android:layout_marginStart="12dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    tools:listitem="@layout/item_chart_legend" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

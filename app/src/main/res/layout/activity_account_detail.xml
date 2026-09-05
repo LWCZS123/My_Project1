@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8F9FA"
+    android:background="#F3F3F3"
     android:fitsSystemWindows="true">
 
     <!-- Top Toolbar -->

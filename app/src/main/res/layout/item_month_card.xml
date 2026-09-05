@@ -84,7 +84,7 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- Bills List -->
+
         <LinearLayout
             android:id="@+id/layout_bills_container"
             android:layout_width="match_parent"

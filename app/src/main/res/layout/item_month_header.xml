@@ -1,101 +1,119 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingHorizontal="16dp"
-    android:paddingTop="16dp"
-    android:paddingBottom="0dp">
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginTop="24dp"
+    android:layout_marginBottom="0dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:cardElevation="0dp"
+    app:cardPreventCornerOverlap="false"
+    app:shapeAppearance="@style/TopRoundedAppearance">
 
-    <TextView
-        android:id="@+id/tv_month_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="2026年07月"
-        android:textColor="#333333"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <TextView
-        android:id="@+id/tv_month_range"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:background="@drawable/bg_month_range"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="2dp"
-        android:text="07月01日 - 07月31日"
-        android:textColor="#999999"
-        android:textSize="11sp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_month_title" />
-
-    <TextView
-        android:id="@+id/tv_bill_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:background="#F5F5F5"
-        android:paddingHorizontal="6dp"
-        android:paddingVertical="2dp"
-        android:text="账单金额: 未出账"
-        android:textColor="#999999"
-        android:textSize="10sp"
-        android:visibility="gone"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_month_range" />
-
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="end"
-        android:orientation="vertical"
-        android:layout_marginEnd="8dp"
-        app:layout_constraintEnd_toStartOf="@+id/iv_arrow"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="@+id/tv_month_range">
-
-        <TextView
-            android:id="@+id/tv_outflow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="流出: ¥110.00"
-            android:textColor="#FF6B6B"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/tv_inflow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="流入: ¥8,656.00"
-            android:textColor="#00C48C"
-            android:textSize="11sp" />
-    </LinearLayout>
-
-    <ImageView
-        android:id="@+id/iv_arrow"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:src="@drawable/ic_down_arrow"
-        android:padding="2dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="@+id/tv_month_range"
-        app:tint="#CCCCCC" />
-
-    <!-- 关键修改：使用 GuideLine 或直接约束到内容底部，保证分割线在内容下方固定距离 -->
-    <View
-        android:id="@+id/divider"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layout_month_header"
         android:layout_width="match_parent"
-        android:layout_height="1.5dp"
-        android:layout_marginHorizontal="0dp"
-        android:background="#E8E8E8"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_month_range"
-        android:layout_marginTop="24dp" />
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:background="?attr/selectableItemBackground">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- 月份标题 -->
+        <TextView
+            android:id="@+id/tv_month_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2026年07月"
+            android:textColor="#2D3436"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 日期范围 -->
+        <TextView
+            android:id="@+id/tv_month_range"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_gray_rounded"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:text="07月01日 - 07月31日"
+            android:textColor="#636E72"
+            android:textSize="10sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_month_title" />
+
+        <!-- 账单金额 -->
+        <TextView
+            android:id="@+id/tv_bill_amount_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_gray_rounded"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:text="账单金额：未出账"
+            android:textColor="#636E72"
+            android:textSize="10sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_month_range" />
+
+        <!-- 收支统计 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:gravity="end"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/iv_arrow"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/tv_outflow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="流出: ¥0.00"
+                android:textColor="#FF6B6B"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_inflow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="流入: ¥0.00"
+                android:textColor="#00C48C"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+
+        <!-- 展开箭头 -->
+        <ImageView
+            android:id="@+id/iv_arrow"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_down_arrow"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="#B2BEC3" />
+
+        <!-- 分割线 -->
+        <View
+            android:id="@+id/divider"
+            android:layout_width="match_parent"
+            android:layout_height="0.8dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="10dp"
+            android:background="#ECECEC"
+            app:layout_constraintTop_toBottomOf="@id/tv_bill_amount_label" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

@@ -1,57 +1,55 @@
 package com.example.my_project1.ui.viewmodel.accountvm;
 
 import com.example.my_project1.data.model.bill.Bill;
+
 import java.util.Objects;
 
 public class AccountBillUiModel {
+
     public static final int TYPE_MONTH_HEADER = 0;
     public static final int TYPE_DAY_HEADER = 1;
     public static final int TYPE_BILL_ITEM = 2;
 
-    public final int type;
+    public int type;
     
-    // For Headers
-    public final String title;
-    public final String subtitle;
-    public final String inflowText;
-    public final String outflowText;
-    public final boolean isCollapsed;
-    public final String key; // monthKey or dayKey
+    // Header fields
+    public String title;
+    public String subtitle;
+    public String billAmountText;
+    public String inflowText;
+    public String outflowText;
+    public boolean isCollapsed;
+    public String key;
 
-    // For Bill Item
-    public final long id;
-    public final String objectId;
-    public final String categoryName;
-    public final String categoryIconUrl;
-    public final String timeNote;
-    public final String amountText;
-    public final int amountColor;
-    public final String balanceText;
-    public final Bill originalBill;
+    // Bill fields
+    public long id;
+    public String objectId;
+    public String categoryName;
+    public String categoryIconUrl;
+    public String timeNote;
+    public String amountText;
+    public int amountColor;
+    public String balanceText;
+    public Bill originalBill;
+    public boolean isLastInSection;
 
     // Header Constructor
-    public AccountBillUiModel(int type, String title, String subtitle, String inflowText, String outflowText, boolean isCollapsed, String key) {
+    public AccountBillUiModel(int type, String title, String subtitle, String billAmountText, 
+                             String inflowText, String outflowText, boolean isCollapsed, String key) {
         this.type = type;
         this.title = title;
         this.subtitle = subtitle;
+        this.billAmountText = billAmountText;
         this.inflowText = inflowText;
         this.outflowText = outflowText;
         this.isCollapsed = isCollapsed;
         this.key = key;
-        
-        this.id = -1;
-        this.objectId = null;
-        this.categoryName = null;
-        this.categoryIconUrl = null;
-        this.timeNote = null;
-        this.amountText = null;
-        this.amountColor = 0;
-        this.balanceText = null;
-        this.originalBill = null;
     }
 
     // Bill Item Constructor
-    public AccountBillUiModel(long id, String objectId, String categoryName, String categoryIconUrl, String timeNote, String amountText, int amountColor, String balanceText, Bill originalBill) {
+    public AccountBillUiModel(long id, String objectId, String categoryName, String categoryIconUrl, 
+                             String timeNote, String amountText, int amountColor, String balanceText, 
+                             Bill originalBill) {
         this.type = TYPE_BILL_ITEM;
         this.id = id;
         this.objectId = objectId;
@@ -62,13 +60,6 @@ public class AccountBillUiModel {
         this.amountColor = amountColor;
         this.balanceText = balanceText;
         this.originalBill = originalBill;
-        
-        this.title = null;
-        this.subtitle = null;
-        this.inflowText = null;
-        this.outflowText = null;
-        this.isCollapsed = false;
-        this.key = null;
     }
 
     @Override
@@ -80,8 +71,10 @@ public class AccountBillUiModel {
                 isCollapsed == that.isCollapsed &&
                 id == that.id &&
                 amountColor == that.amountColor &&
+                isLastInSection == that.isLastInSection &&
                 Objects.equals(title, that.title) &&
                 Objects.equals(subtitle, that.subtitle) &&
+                Objects.equals(billAmountText, that.billAmountText) &&
                 Objects.equals(inflowText, that.inflowText) &&
                 Objects.equals(outflowText, that.outflowText) &&
                 Objects.equals(key, that.key) &&
@@ -90,11 +83,14 @@ public class AccountBillUiModel {
                 Objects.equals(categoryIconUrl, that.categoryIconUrl) &&
                 Objects.equals(timeNote, that.timeNote) &&
                 Objects.equals(amountText, that.amountText) &&
-                Objects.equals(balanceText, that.balanceText);
+                Objects.equals(balanceText, that.balanceText) &&
+                Objects.equals(originalBill, that.originalBill);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, title, subtitle, inflowText, outflowText, isCollapsed, key, id, objectId, categoryName, categoryIconUrl, timeNote, amountText, amountColor, balanceText);
+        return Objects.hash(type, title, subtitle, billAmountText, inflowText, outflowText, isCollapsed, 
+                            key, id, objectId, categoryName, categoryIconUrl, timeNote, amountText, 
+                            amountColor, balanceText, originalBill, isLastInSection);
     }
 }

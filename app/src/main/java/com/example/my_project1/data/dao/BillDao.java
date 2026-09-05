@@ -1,6 +1,7 @@
 package com.example.my_project1.data.dao;
 
 import androidx.lifecycle.LiveData;
+import androidx.room.ColumnInfo;
 import androidx.room.Dao;
 import androidx.room.Delete;
 import androidx.room.Insert;
@@ -10,6 +11,7 @@ import androidx.room.Update;
 
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.bill.BillWithBalance;
 import com.example.my_project1.data.model.budget.CategoryAmount;
 import com.example.my_project1.data.model.bill.SearchSummary;
 
@@ -82,6 +84,107 @@ public interface BillDao {
     /** 🔥 按账本和用户查询账单 - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND book_id = :bookId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsByBook(String userId, String bookId);
+
+    @Query("SELECT * FROM bills WHERE user_id = :userId " +
+            "AND (account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
+            "AND sync_state != 'TO_DELETE' " +
+            "AND (:startTime IS NULL OR billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR billTime <= :endTime) " +
+            "ORDER BY billTime DESC, id DESC LIMIT :limit OFFSET :offset")
+    List<Bill> getAccountBillsPaged(String userId, String accountId, long localAccountId, java.util.Date startTime, java.util.Date endTime, int limit, int offset);
+
+    /**
+     * 获取账户账单（带余额计算）
+     * 采用关联子查询替代 Window Function (OVER) 以兼容旧版 Room 解析器
+     */
+    @Query("SELECT *, (:currentBalance - (SELECT COALESCE(SUM(CASE " +
+            "WHEN b2.type = 1 THEN b2.amount " +
+            "WHEN b2.type = 0 THEN -b2.amount " +
+            "WHEN (b2.type = 2 OR b2.type = 3) AND (b2.account_id = :accountId OR b2.local_account_id = :localAccountId) THEN -b2.amount " +
+            "WHEN (b2.type = 2 OR b2.type = 3) AND (b2.to_account_id = :accountId OR b2.to_local_account_id = :localAccountId) THEN b2.amount " +
+            "ELSE 0 END), 0) FROM bills AS b2 WHERE b2.user_id = :userId " +
+            "AND (b2.account_id = :accountId OR b2.local_account_id = :localAccountId OR b2.to_account_id = :accountId OR b2.to_local_account_id = :localAccountId) " +
+            "AND b2.sync_state != 'TO_DELETE' " +
+            "AND (b2.billTime > b.billTime OR (b2.billTime = b.billTime AND b2.id > b.id)))) AS balanceAfter " +
+            "FROM bills AS b WHERE b.user_id = :userId " +
+            "AND (b.account_id = :accountId OR b.local_account_id = :localAccountId " +
+            "OR b.to_account_id = :accountId OR b.to_local_account_id = :localAccountId) " +
+            "AND b.sync_state != 'TO_DELETE' " +
+            "AND (:startTime IS NULL OR b.billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR b.billTime <= :endTime) " +
+            "ORDER BY b.billTime DESC, b.id DESC LIMIT :limit OFFSET :offset")
+    List<BillWithBalance> getAccountBillsWithBalancePaged(String userId, String accountId, long localAccountId, double currentBalance, java.util.Date startTime, java.util.Date endTime, int limit, int offset);
+
+    @Query("SELECT " +
+            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal, " +
+            "COUNT(*) as billCount, " +
+            "COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
+            "FROM bills WHERE user_id = :userId " +
+            "AND (account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
+            "AND sync_state != 'TO_DELETE' " +
+            "AND (:startTime IS NULL OR billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR billTime <= :endTime)")
+    androidx.lifecycle.LiveData<SearchSummary> getAccountStatsLive(String userId, String accountId, long localAccountId, java.util.Date startTime, java.util.Date endTime);
+
+    @Query("SELECT category_id, category_name, SUM(amount) as total_amount " +
+            "FROM bills WHERE user_id = :userId " +
+            "AND (account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
+            "AND sync_state != 'TO_DELETE' " +
+            "AND type = :type " +
+            "AND (:startTime IS NULL OR billTime >= :startTime) " +
+            "AND (:endTime IS NULL OR billTime <= :endTime) " +
+            "GROUP BY category_name " +
+            "ORDER BY total_amount DESC")
+    androidx.lifecycle.LiveData<List<CategorySummary>> getAccountCategorySummaryLive(String userId, String accountId, long localAccountId, int type, java.util.Date startTime, java.util.Date endTime);
+
+    @Query("SELECT strftime('%Y-%m-%d', billTime/1000, 'unixepoch', 'localtime') as day, " +
+            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal " +
+            "FROM bills WHERE user_id = :userId " +
+            "AND (account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
+            "AND sync_state != 'TO_DELETE' " +
+            "GROUP BY day")
+    androidx.lifecycle.LiveData<List<DailyStat>> getAccountDailyStatsLive(String userId, String accountId, long localAccountId);
+
+    class DailyStat {
+        public String day; // yyyy-MM-dd
+        public double incomeTotal;
+        public double expenseTotal;
+    }
+
+    @Query("SELECT strftime('%Y-%m', billTime/1000, 'unixepoch', 'localtime') as month, " +
+            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal, " +
+            "SUM(CASE WHEN (type = 2 OR type = 3) AND (to_account_id = :accountId OR to_local_account_id = :localAccountId) THEN amount ELSE 0 END) as transferInTotal, " +
+            "SUM(CASE WHEN (type = 2 OR type = 3) AND (account_id = :accountId OR local_account_id = :localAccountId) THEN amount ELSE 0 END) as transferOutTotal " +
+            "FROM bills WHERE user_id = :userId " +
+            "AND (account_id = :accountId OR local_account_id = :localAccountId " +
+            "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
+            "AND sync_state != 'TO_DELETE' " +
+            "GROUP BY month")
+    androidx.lifecycle.LiveData<List<MonthlyStat>> getAccountMonthlyStatsLive(String userId, String accountId, long localAccountId);
+
+    class MonthlyStat {
+        public String month; // yyyy-MM
+        public double incomeTotal;
+        public double expenseTotal;
+        public double transferInTotal;
+        public double transferOutTotal;
+    }
+
+    public static class CategorySummary {
+        @ColumnInfo(name = "category_id")
+        public String categoryId;
+        @ColumnInfo(name = "category_name")
+        public String categoryName;
+        @ColumnInfo(name = "total_amount")
+        public double totalAmount;
+    }
 
     /** 🔥 按账户和用户查询账单 - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId " +

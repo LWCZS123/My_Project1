@@ -686,6 +686,7 @@ public class AccountViewModel extends AndroidViewModel {
                         AccountBillUiModel.TYPE_MONTH_HEADER,
                         TITLE_FMT.format(mGroup.date),
                         startStr + " - " + endStr,
+                        "账单金额: ¥" + MONEY_FMT.format(mGroup.totalOutflow - mGroup.totalInflow),
                         "流入: ¥" + MONEY_FMT.format(mGroup.totalInflow),
                         "流出: ¥" + MONEY_FMT.format(mGroup.totalOutflow),
                         isCollapsed,
@@ -705,7 +706,7 @@ public class AccountViewModel extends AndroidViewModel {
                                 AccountBillUiModel.TYPE_DAY_HEADER,
                                 DAY_TITLE_FMT.format(dGroup.date),
                                 "流出: ¥" + MONEY_FMT.format(dGroup.totalOutflow) + " 流入: ¥" + MONEY_FMT.format(dGroup.totalInflow),
-                                null, null, false, dGroup.key
+                                null, null, null, false, dGroup.key
                         );
                         billUiModelCache.put(dayHeaderKey, dayModel);
                     }

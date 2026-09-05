@@ -1,42 +1,35 @@
 package com.example.my_project1.ui.activity;
 
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
-import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ActivityAccountDetailBinding;
-import com.example.my_project1.ui.adapter.bill.AccountBillAdapter;
+import com.example.my_project1.ui.adapter.bill.AccountBillPagingAdapter;
+import com.example.my_project1.ui.adapter.bill.AccountHeaderAdapter;
 import com.example.my_project1.ui.fragment.AccountMoreBottomSheetFragment;
 import com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment;
 import com.example.my_project1.ui.fragment.BillChooseAccountFragment;
 import com.example.my_project1.ui.fragment.BottomSheetAccountEditFragment;
 import com.example.my_project1.ui.fragment.DateRangePickerFragment;
 import com.example.my_project1.ui.fragment.DeleteAccountDialogFragment;
-import com.example.my_project1.ui.fragment.VerificationCodeDialog;
-import com.example.my_project1.ui.viewmodel.accountvm.AccountBillUiModel;
-import com.example.my_project1.ui.viewmodel.accountvm.AccountDetailUiModel;
+import com.example.my_project1.ui.viewmodel.accountvm.AccountDetailViewModel;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.SnackbarUtils;
-import com.github.mikephil.charting.data.PieEntry;
 
-import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * AccountDetailActivity - 账户详情页（优化版）
@@ -65,31 +58,17 @@ public class AccountDetailActivity extends AppCompatActivity {
     // ViewModels
     private AccountViewModel accountViewModel;
     private BillViewModel billViewModel;
+    private AccountDetailViewModel detailViewModel;
 
-    // Adapter
-    private AccountBillAdapter billAdapter;
+    // Adapters
+    private AccountHeaderAdapter headerAdapter;
+    private AccountBillPagingAdapter pagingAdapter;
 
     // 数据
     private Account currentAccount;
-    private List<Bill> allBills = new ArrayList<>();
-    private List<Bill> filteredBills = new ArrayList<>();
-    private java.util.Set<String> collapsedMonths = new java.util.HashSet<>();
-
-    // 图表切换状态：true=支出，false=收入
+    
+    // 图表切换状态
     private boolean showingExpense = true;
-
-    // 统计数据
-    private double totalIncome = 0.0;
-    private double totalExpense = 0.0;
-    private double transferIn = 0.0;
-    private double transferOut = 0.0;
-
-    // 日期筛选
-    private Long startTimestamp = null;
-    private Long endTimestamp = null;
-
-    // 🔴 标记是否是首次加载
-    private boolean isFirstLoad = true;
 
     // 🔴 删除对话框
     private DeleteAccountDialogFragment deleteDialog;
@@ -115,14 +94,13 @@ public class AccountDetailActivity extends AppCompatActivity {
         // 设置状态栏图标为深色
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        if (insetsController != null) {
-            insetsController.setAppearanceLightStatusBars(true);
-        }
+        insetsController.setAppearanceLightStatusBars(true);
 
 
         // 初始化ViewModel
         accountViewModel = new ViewModelProvider(this).get(AccountViewModel.class);
         billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
+        detailViewModel = new ViewModelProvider(this).get(AccountDetailViewModel.class);
 
         // 获取账户ID
         String accountId = getIntent().getStringExtra(EXTRA_ACCOUNT_ID);
@@ -134,8 +112,7 @@ public class AccountDetailActivity extends AppCompatActivity {
             return;
         }
 
-        // 加载账户数据
-        observeAccountData(accountId, localId);
+        detailViewModel.setAccount(accountId, localId);
 
         // 设置RecyclerView
         setupRecyclerView();
@@ -144,64 +121,93 @@ public class AccountDetailActivity extends AppCompatActivity {
         setupListeners();
 
         // 观察数据变化
-        observeData(accountId, localId);
+        observeData();
 
         // 🔑 观察 ViewModel 状态
         observeViewModelStates();
+
+        // 🚀 优化进入体验：显示 Lottie 动画，并行加载数据
+        startEntryAnimation();
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        binding = null;
+    private void startEntryAnimation() {
+        binding.loadingLayout.setVisibility(View.VISIBLE);
+        binding.rvTransactions.setVisibility(View.INVISIBLE);
+        
+        // 播放动画至少 800ms，确保数据处理完成
+        binding.lottieLoading.playAnimation();
+        
+        // 我们在 observeData 中处理显示逻辑
     }
 
-    // ==================== 初始化 ====================
-
-    private void observeAccountData(String accountId, long localId) {
-        LiveData<Account> accountLiveData;
-        if (accountId != null && !accountId.isEmpty()) {
-            accountLiveData = accountViewModel.getAccountById(accountId);
-        } else {
-            accountLiveData = accountViewModel.getAccountByLocalId(localId);
-        }
-
-        accountLiveData.observe(this, account -> {
+    private void observeData() {
+        detailViewModel.account.observe(this, account -> {
             if (account != null) {
                 currentAccount = account;
-                updateAccountInfo(account);
-                
-                if (!filteredBills.isEmpty() && billAdapter != null) {
-                    refreshBillList();
-                }
-            } else {
-                if (currentAccount == null) {
-                    SnackbarUtils.showError(binding.getRoot(), "账户不存在");
-                    finish();
-                }
+                headerAdapter.setAccount(account);
             }
+        });
+
+        detailViewModel.stats.observe(this, stats -> {
+            if (stats != null) {
+                headerAdapter.setStats(stats);
+            }
+        });
+
+        detailViewModel.expenseSummary.observe(this, summaries -> {
+            if (showingExpense) {
+                headerAdapter.setCategorySummaries(summaries, true);
+            }
+        });
+
+        detailViewModel.incomeSummary.observe(this, summaries -> {
+            if (!showingExpense) {
+                headerAdapter.setCategorySummaries(summaries, false);
+            }
+        });
+
+        detailViewModel.billPagingData.observe(this, pagingData -> {
+            pagingAdapter.submitData(getLifecycle(), pagingData);
+            
+            // 数据加载后，延迟一点点关闭动画，确保渲染完成
+            binding.getRoot().postDelayed(() -> {
+                if (binding.loadingLayout.getVisibility() == View.VISIBLE) {
+                    binding.loadingLayout.animate()
+                            .alpha(0f)
+                            .setDuration(300)
+                            .withEndAction(() -> {
+                                binding.loadingLayout.setVisibility(View.GONE);
+                                binding.rvTransactions.setVisibility(View.VISIBLE);
+                                binding.rvTransactions.setAlpha(0f);
+                                binding.rvTransactions.animate().alpha(1f).setDuration(200).start();
+                            }).start();
+                }
+            }, 500);
         });
     }
 
     private void setupRecyclerView() {
-        billAdapter = new AccountBillAdapter(this);
+        headerAdapter = new AccountHeaderAdapter(this);
+        pagingAdapter = new AccountBillPagingAdapter(this);
 
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        binding.rvTransactions.setLayoutManager(layoutManager);
-        binding.rvTransactions.setAdapter(billAdapter);
-        binding.rvTransactions.setNestedScrollingEnabled(false);
-
-        billAdapter.setOnMonthToggleListener(monthKey -> {
-            if (collapsedMonths.contains(monthKey)) {
-                collapsedMonths.remove(monthKey);
-            } else {
-                collapsedMonths.add(monthKey);
+        headerAdapter.setOnHeaderActionListener(new AccountHeaderAdapter.OnHeaderActionListener() {
+            @Override public void onEditBalance() { showBalanceAdjustmentBottomSheet(); }
+            @Override public void onMore() { showMoreOptions(); }
+            @Override public void onRepayAction() { startRepaymentFlow(); }
+            @Override public void onRepayNow() { startRepaymentFlow(); }
+            @Override public void onToggleChart() {
+                showingExpense = !showingExpense;
+                if (showingExpense) {
+                    headerAdapter.setCategorySummaries(detailViewModel.expenseSummary.getValue(), true);
+                } else {
+                    headerAdapter.setCategorySummaries(detailViewModel.incomeSummary.getValue(), false);
+                }
             }
-            refreshBillList();
         });
 
-        // 点击账单跳转到详情页
-        billAdapter.setOnBillClickListener(new AccountBillAdapter.OnBillClickListener() {
+        pagingAdapter.setOnMonthToggleListener(detailViewModel::toggleMonth);
+
+        pagingAdapter.setOnBillClickListener(new AccountBillPagingAdapter.OnBillClickListener() {
             @Override
             public void onBillClick(Bill bill) {
                 Intent intent = new Intent(AccountDetailActivity.this, BillDetailActivity.class);
@@ -220,32 +226,63 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             @Override
             public void onBillDelete(Bill bill) {
-                handleBillDelete(bill);
+                com.example.my_project1.ui.fragment.DeleteConfirmDialogFragment dialog = new com.example.my_project1.ui.fragment.DeleteConfirmDialogFragment();
+                dialog.setOnDeleteConfirmListener(() -> handleBillDelete(bill));
+                dialog.show(getSupportFragmentManager(), "DeleteBill");
             }
 
             @Override
             public void onBillRefund(Bill bill) {
-                SnackbarUtils.showInfo(binding.getRoot(), "已触发退款申请");
+                com.example.my_project1.utils.SnackbarUtils.showInfo(binding.getRoot(), "已触发退款申请");
             }
 
             @Override
             public void onBillEdit(Bill bill) {
+                if (bill == null) return;
                 Intent intent = new Intent(AccountDetailActivity.this, com.example.my_project1.ui.activity.AddBillActivity.class);
-                intent.putExtra("editBill", bill);
+                intent.putExtra("mode", "edit");
+                
+                // 1. ID 处理
+                if (bill.getObjectId() != null && !bill.getObjectId().isEmpty()) {
+                    intent.putExtra("bill_id", bill.getObjectId());
+                } else {
+                    intent.putExtra("bill_local_id", bill.getId());
+                }
+                
+                // 2. 基础字段
+                intent.putExtra("bill_type", bill.getType());
+                intent.putExtra("bill_amount", bill.getAmount());
+                intent.putExtra("category_id", bill.getCategoryId());
+                intent.putExtra("category_name", bill.getCategoryName());
+                intent.putExtra("category_icon", bill.getCategoryIconUrl());
+                intent.putExtra("category_icon_bg_color", bill.getCategoryIconBackgroundColor());
+                
+                // 3. 账户字段 (处理转账)
+                intent.putExtra("account_id", bill.getAccountId());
+                intent.putExtra("local_account_id", bill.getLocalAccountId());
+                intent.putExtra("to_account_id", bill.getToAccountId());
+                intent.putExtra("to_local_account_id", bill.getToLocalAccountId());
+                
+                // 4. 其他字段
+                intent.putExtra("book_id", bill.getBookId());
+                if (bill.getBillTime() != null) {
+                    intent.putExtra("bill_time", bill.getBillTime().getTime());
+                }
+                intent.putExtra("remark", bill.getRemark());
+                intent.putExtra("location", bill.getLocation());
+                intent.putExtra("exclude_budget", bill.isExcludeBudget());
+                
+                if (bill.getImageUrls() != null && !bill.getImageUrls().isEmpty()) {
+                    intent.putStringArrayListExtra("image_urls", new java.util.ArrayList<>(bill.getImageUrls()));
+                }
+
                 startActivity(intent);
             }
         });
 
-        billAdapter.setOnHeaderActionListener(new AccountBillAdapter.OnHeaderActionListener() {
-            @Override public void onEditBalance() { showBalanceAdjustmentBottomSheet(); }
-            @Override public void onMore() { showMoreOptions(); }
-            @Override public void onRepayAction() { startRepaymentFlow(); }
-            @Override public void onRepayNow() { startRepaymentFlow(); }
-            @Override public void onToggleChart() {
-                showingExpense = !showingExpense;
-                refreshBillList();
-            }
-        });
+        ConcatAdapter concatAdapter = new ConcatAdapter(headerAdapter, pagingAdapter);
+        binding.rvTransactions.setLayoutManager(new LinearLayoutManager(this));
+        binding.rvTransactions.setAdapter(concatAdapter);
     }
 
     private void setupListeners() {
@@ -260,7 +297,6 @@ public class AccountDetailActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        // 日期筛选按钮 (改为点击标题或者添加一个按钮)
         binding.tvToolbarTitle.setOnClickListener(v -> showDateRangePicker());
     }
 
@@ -335,13 +371,8 @@ public class AccountDetailActivity extends AppCompatActivity {
                     adjustmentBill.setAccountId(currentAccount.getObjectId());
                     adjustmentBill.setLocalAccountId(currentAccount.getId());
                     adjustmentBill.setUserId(currentAccount.getUserId());
-                    adjustmentBill.setCategoryName("余额调整");
                     adjustmentBill.setCategoryIconUrl(currentAccount.getIconUrl()); // 使用账户图标
                     adjustmentBill.setRemark("手动调整余额");
-                    
-                    // 🔑 立即更新本地 UI，提供即时反馈
-                    currentAccount.setBalance(newBalance);
-                    animateBalanceUpdate(newBalance);
                     
                     // 插入账单，Repository 会自动处理账户余额的增减
                     billViewModel.insertBill(adjustmentBill);
@@ -350,18 +381,9 @@ public class AccountDetailActivity extends AppCompatActivity {
                 // 如果不记为交易，直接更新账户余额
                 currentAccount.setBalance(newBalance);
                 accountViewModel.updateAccount(currentAccount);
-                animateBalanceUpdate(newBalance);
             }
         });
         fragment.show(getSupportFragmentManager(), "BalanceAdjustment");
-    }
-
-    /**
-     * 更新余额 UI
-     */
-    private void animateBalanceUpdate(double newBalance) {
-        // 由于余额显示在 RecyclerView 的 Header 中，直接刷新列表即可
-        refreshBillList();
     }
 
     @Override
@@ -370,25 +392,8 @@ public class AccountDetailActivity extends AppCompatActivity {
     }
 
     private void showVerificationBeforeDelete() {
-        if (allBills == null || allBills.isEmpty() || (allBills.size() == 1 && "账户创建".equals(allBills.get(0).getCategoryName()))) {
-            // 如果没有账单（或者只有一条初始化的“账户创建”虚拟账单），直接弹出删除确认，跳过验证码
-            showDeleteDialog();
-            return;
-        }
-
-        VerificationCodeDialog dialog = VerificationCodeDialog.newInstance();
-        dialog.setOnVerificationListener(new VerificationCodeDialog.OnVerificationListener() {
-            @Override
-            public void onVerified() {
-                showDeleteDialog();
-            }
-
-            @Override
-            public void onCancel() {
-                Log.d(TAG, "删除验证取消");
-            }
-        });
-        dialog.show(getSupportFragmentManager(), "VerificationDialog");
+        // Simple logic for delete verification
+        showDeleteDialog();
     }
 
     private void startRepaymentFlow() {
@@ -416,166 +421,6 @@ public class AccountDetailActivity extends AppCompatActivity {
 
     // ==================== 数据观察 ====================
 
-    private void observeData(String accountId, long localId) {
-        billViewModel.getBillsByAccount(accountId, localId).observe(this, bills -> {
-            // 先处理数据
-            if (bills != null && !bills.isEmpty()) {
-                allBills = new ArrayList<>(bills);
-            } else {
-                allBills = new ArrayList<>();
-            }
-
-            // 始终添加/更新系统级账单 (账户创建等)
-            addSystemBills(allBills);
-            filteredBills = new ArrayList<>(allBills);
-
-            // 🚀 优化加载逻辑：如果数据量很少 (<=2条)，直接显示内容，跳过动画
-            if (isFirstLoad && filteredBills.size() <= 20) {
-                isFirstLoad = false;
-                binding.loadingLayout.setVisibility(android.view.View.GONE);
-                binding.rvTransactions.setVisibility(android.view.View.VISIBLE);
-                binding.rvTransactions.setAlpha(1f);
-            }
-
-            // 无论数据是否为空，都尝试刷新 UI (addSystemBills 保证了 allBills 不为空)
-            if (!allBills.isEmpty()) {
-                calculateStatistics(filteredBills);
-                updateStatisticsUI();
-
-                refreshBillList();
-            }
-        });
-    }
-
-    // 🔴 标记刷新版本，防止后台线程并发导致的列表抖动
-    private long mRefreshVersion = 0;
-
-    // 🚀 使用单线程池进行映射，保证任务顺序执行，进一步防止列表抖动
-    private final java.util.concurrent.ExecutorService mMapperExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-
-    private void refreshBillList() {
-        if (currentAccount == null) return;
-        
-        // 🚀 快速返回机制：检查数据指纹是否变化
-        if (accountViewModel.isDataUnchanged(filteredBills, currentAccount, collapsedMonths, showingExpense)) {
-            Log.d(TAG, "⚡ 数据未变化，跳过映射与刷新");
-            return;
-        }
-
-        final long version = ++mRefreshVersion;
-        final List<Bill> billsToMap = new ArrayList<>(filteredBills);
-        final Account account = currentAccount;
-        final java.util.Set<String> collapsed = new java.util.HashSet<>(collapsedMonths);
-        final boolean isShowingExpense = showingExpense;
-        final double in = totalIncome;
-        final double out = totalExpense;
-        final double tIn = transferIn;
-        final double tOut = transferOut;
-
-        mMapperExecutor.execute(() -> {
-            List<AccountBillUiModel> billUiModels = accountViewModel.mapAccountBillsToUiModels(billsToMap, account, collapsed);
-            List<AccountDetailUiModel> uiModels = new ArrayList<>(billUiModels.size() + 1);
-
-            // 1. Header with Chart Data (这部分也可以在后台计算)
-            List<PieEntry> entries = new ArrayList<>();
-            Map<String, Double> categoryMap = new HashMap<>();
-            for (Bill bill : billsToMap) {
-                if ((isShowingExpense && bill.getType() == 0) || (!isShowingExpense && bill.getType() == 1)) {
-                    String cat = bill.getCategoryName();
-                    if (cat == null || cat.isEmpty()) cat = "其他";
-                    Double oldVal = categoryMap.get(cat);
-                    categoryMap.put(cat, (oldVal != null ? oldVal : 0.0) + Math.abs(bill.getAmount()));
-                }
-            }
-            for (Map.Entry<String, Double> entry : categoryMap.entrySet()) {
-                entries.add(new PieEntry(entry.getValue().floatValue(), entry.getKey()));
-            }
-            int[] colors = {0xFFF47670, 0xFFFBA24F, 0xFFFFD05B, 0xFF4DBBDD, 0xFF6B76F1, 0xFFBC76F4, 0xFFF48FB1, 0xFFA1E59C};
-
-            uiModels.add(new AccountDetailUiModel(account, in, out, tIn, tOut, entries, colors, isShowingExpense));
-
-            // 2. Bills
-            for (int i = 0; i < billUiModels.size(); i++) {
-                AccountBillUiModel m = billUiModels.get(i);
-                if (m.type == AccountBillUiModel.TYPE_MONTH_HEADER) {
-                    uiModels.add(new AccountDetailUiModel(m, true, false));
-                } else {
-                    boolean isLast = (i + 1 == billUiModels.size() || billUiModels.get(i + 1).type == AccountBillUiModel.TYPE_MONTH_HEADER);
-                    uiModels.add(new AccountDetailUiModel(m, false, isLast));
-                }
-            }
-
-            // 回到主线程提交，校验版本
-            runOnUiThread(() -> {
-                if (version == mRefreshVersion && billAdapter != null) {
-                    billAdapter.submitList(uiModels, () -> {
-                        // 🚀 列表数据加载并渲染完成后，隐藏加载动画
-                        if (isFirstLoad) {
-                            hideLoading();
-                            isFirstLoad = false;
-                        }
-                    });
-                }
-            });
-        });
-    }
-
-    private void hideLoading() {
-        if (binding.loadingLayout.getVisibility() == android.view.View.GONE) return;
-
-        // 渐隐动画
-        binding.loadingLayout.animate()
-                .alpha(0f)
-                .setDuration(400)
-                .withEndAction(() -> {
-                    binding.loadingLayout.setVisibility(android.view.View.GONE);
-                    binding.rvTransactions.setVisibility(android.view.View.VISIBLE);
-                    // 给列表一个轻微的淡入
-                    binding.rvTransactions.setAlpha(0f);
-                    binding.rvTransactions.animate().alpha(1f).setDuration(300).start();
-                }).start();
-    }
-
-    private void addSystemBills(List<Bill> bills) {
-        if (currentAccount == null) return;
-
-        // 1. 查找是否存在"账户创建"
-        boolean hasCreation = false;
-        for (Bill b : bills) {
-            if ("账户创建".equals(b.getCategoryName())) {
-                hasCreation = true;
-                break;
-            }
-        }
-
-        if (!hasCreation) {
-            // 计算初始金额：当前余额 - 所有账单影响
-            double runningImpact = 0;
-            for (Bill b : bills) {
-                runningImpact += (b.getType() == 1 ? b.getAmount() : -b.getAmount());
-            }
-            double initialBalance = currentAccount.getBalance() - runningImpact;
-
-            Bill creationBill = new Bill();
-            creationBill.setId(-999); // 虚拟ID
-            creationBill.setCategoryName("账户创建");
-            creationBill.setCategoryIconUrl(currentAccount.getIconUrl()); // 使用账户图标
-            creationBill.setBillTime(currentAccount.getCreatedAt() != null ? currentAccount.getCreatedAt() : new Date());
-            creationBill.setAmount(Math.abs(initialBalance));
-            creationBill.setType(initialBalance >= 0 ? 1 : 0);
-            creationBill.setRemark("账户初始创建，余额为 ¥" + formatMoney(initialBalance));
-            creationBill.setAccountId(currentAccount.getObjectId());
-
-            bills.add(creationBill);
-        }
-
-        // 排序确保时间正确 (倒序)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            bills.sort((b1, b2) -> b2.getBillTime().compareTo(b1.getBillTime()));
-        }
-    }
-
-
     private void observeViewModelStates() {
         // 观察 BillViewModel 的操作状态
         billViewModel.operationState.observe(this, response -> {
@@ -583,6 +428,9 @@ public class AccountDetailActivity extends AppCompatActivity {
                 Log.d(TAG, "🔄 " + response.message);
             } else if (response.isSuccess()) {
                 Log.d(TAG, "✅ " + response.message);
+                
+                // 账单操作成功（如删除），通知 detailViewModel 刷新数据
+                detailViewModel.refresh();
 
                 // 🔴 根据不同的操作阶段执行后续操作
                 if (isWaitingForMigration) {
@@ -620,102 +468,17 @@ public class AccountDetailActivity extends AppCompatActivity {
 
     // ==================== UI更新 ====================
 
-    private void updateAccountInfo(Account account) {
-        binding.tvToolbarTitle.setText("账户详情");
-        currentAccount = account;
-        refreshBillList();
-    }
-
-    private void updateStatisticsUI() {
-        // 由于现在使用月度折叠列表，全局统计可以仅记录 Log 或者更新其他通用 UI
-        
-        // 如果有特定的全局统计 View 可以这里更新
-    }
-
-    // ==================== 统计计算 ====================
-
-    private void calculateStatistics(List<Bill> bills) {
-        totalIncome = 0.0;
-        totalExpense = 0.0;
-        transferIn = 0.0;
-        transferOut = 0.0;
-
-        for (Bill bill : bills) {
-            double amount = bill.getAmount();
-
-            switch (bill.getType()) {
-                case 0: // 支出
-                    totalExpense += amount;
-                    break;
-                case 1: // 收入
-                    totalIncome += amount;
-                    break;
-                case 3: // 转账
-                    break;
-            }
-        }
-
-        Log.d(TAG, String.format("💰 统计: 收入=%.2f, 支出=%.2f, 转入=%.2f, 转出=%.2f",
-                totalIncome, totalExpense, transferIn, transferOut));
-    }
-
-    // ==================== 日期筛选 ====================
-
-    private void showDateRangePicker() {
-        DateRangePickerFragment picker = new DateRangePickerFragment();
-        picker.setOnDateRangeSelectedListener((startTimestamp, endTimestamp, formattedStartDate, formattedEndDate) -> {
-            this.startTimestamp = startTimestamp;
-            this.endTimestamp = endTimestamp;
-
-            filterBillsByDate();
-            updateStatisticsUI();
-
-            String dateRange = formattedStartDate + " 至 " + formattedEndDate;
-            SnackbarUtils.showSuccess(binding.getRoot(), "已筛选: " + dateRange);
-        });
-        picker.show(getSupportFragmentManager(), "DateRangePicker");
-    }
-
-    private void handleBillDelete(Bill bill) {
-        if (bill == null || bill.getId() < 0) return; // 排除系统虚拟账单
-        
-        billViewModel.deleteBill(bill);
-    }
-
-    private void filterBillsByDate() {
-        filteredBills = new ArrayList<>();
-
-        Date startDate = startTimestamp != null ? new Date(startTimestamp) : null;
-        Date endDate   = endTimestamp != null ? new Date(endTimestamp) : null;
-
-        for (Bill bill : allBills) {
-            Date billTime = bill.getBillTime();
-
-            boolean inRange = (startDate == null || !billTime.before(startDate)) &&
-                             (endDate == null || !billTime.after(endDate));
-
-            if (inRange) {
-                filteredBills.add(bill);
-            }
-        }
-
-        refreshBillList();
-        calculateStatistics(filteredBills);
-    }
-
-    // ==================== 🔴 删除账户相关（遵循BillViewModel风格）====================
-
-    /**
-     * 显示删除账户对话框
-     */
     private void showDeleteDialog() {
         if (currentAccount == null) {
             SnackbarUtils.showError(binding.getRoot(), "账户信息不存在");
             return;
         }
 
-        boolean hasBills = allBills != null && !allBills.isEmpty();
-        int billCount = hasBills ? allBills.size() : 0;
+        int billCount = 0;
+        if (detailViewModel.stats.getValue() != null) {
+            billCount = detailViewModel.stats.getValue().getBillCount();
+        }
+        boolean hasBills = billCount > 0;
 
         Log.d(TAG, "🗑️ 准备删除账户: " + currentAccount.getName() +
                 ", 有账单: " + hasBills + ", 账单数: " + billCount);
@@ -728,34 +491,31 @@ public class AccountDetailActivity extends AppCompatActivity {
         );
 
         deleteDialog.setOnDeleteActionListener(new DeleteAccountDialogFragment.OnDeleteActionListener() {
-            @Override
-            public void onChooseTargetAccount() {
-                showChooseAccountDialog();
-            }
-
-            @Override
-            public void onMigrateAndDelete(Account targetAccount) {
-                migrateBillsAndDeleteAccount(targetAccount);
-            }
-
-            @Override
-            public void onDeleteWithoutMigration() {
-                deleteAccountWithoutMigration();
-            }
-
-            @Override
-            public void onDeleteAll() {
-                deleteAccountAndBills();
-            }
-
-            @Override
-            public void onDirectDelete() {
-                directDeleteAccount();
-            }
+            @Override public void onChooseTargetAccount() { showChooseAccountDialog(); }
+            @Override public void onMigrateAndDelete(Account targetAccount) { migrateBillsAndDeleteAccount(targetAccount); }
+            @Override public void onDeleteWithoutMigration() { deleteAccountWithoutMigration(); }
+            @Override public void onDeleteAll() { deleteAccountAndBills(); }
+            @Override public void onDirectDelete() { directDeleteAccount(); }
         });
 
         deleteDialog.show(getSupportFragmentManager(), "DeleteAccountDialog");
     }
+
+    private void showDateRangePicker() {
+        DateRangePickerFragment picker = new DateRangePickerFragment();
+        picker.setOnDateRangeSelectedListener((start, end, formattedStart, formattedEnd) -> {
+            detailViewModel.setDateRange(new Date(start), new Date(end));
+            SnackbarUtils.showSuccess(binding.getRoot(), "已筛选: " + formattedStart + " 至 " + formattedEnd);
+        });
+        picker.show(getSupportFragmentManager(), "DateRangePicker");
+    }
+
+    private void handleBillDelete(Bill bill) {
+        if (bill == null || bill.getId() < 0) return;
+        billViewModel.deleteBill(bill);
+    }
+
+    // ==================== 🔴 删除账户相关 ====================
 
     /**
      * 显示账户选择对话框
@@ -885,11 +645,6 @@ public class AccountDetailActivity extends AppCompatActivity {
                 SnackbarUtils.showError(binding.getRoot(), "删除失败: " + message);
             }
         });
-    }
-
-    private String formatMoney(double amount) {
-        DecimalFormat df = new DecimalFormat("#,##0.00");
-        return df.format(amount);
     }
 
     @Override

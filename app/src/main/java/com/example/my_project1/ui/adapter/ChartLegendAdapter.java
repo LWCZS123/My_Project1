@@ -57,10 +57,9 @@ public class ChartLegendAdapter extends ListAdapter<ChartLegendAdapter.LegendIte
     public void onBindViewHolder(@NonNull LegendViewHolder holder, int position) {
         LegendItem item = getItem(position);
 
-        // 设置颜色指示器
+        // 设置颜色指示器 (圆点)
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
-        drawable.setCornerRadius(6f);
+        drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(item.color);
         holder.colorIndicator.setBackground(drawable);
 

@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.example.my_project1.utils.ui.SwipeMenuLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/swipeLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp">
+
+    <!-- 1. 正面内容 (带分割线容器) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@android:color/white"
+            app:cardElevation="0dp"
+            app:cardPreventCornerOverlap="false"
+            app:shapeAppearance="@style/NoRoundedAppearance">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/contentView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp">
+
+                <ImageView
+                    android:id="@+id/iv_category_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:padding="8dp"
+                    android:background="@drawable/bg_circle_grey"
+                    android:src="@drawable/ic_category"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/tv_category_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="类别"
+                    android:textColor="#333333"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toEndOf="@+id/iv_category_icon"
+                    app:layout_constraintTop_toTopOf="@+id/iv_category_icon" />
+
+                <TextView
+                    android:id="@+id/tv_transaction_time"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="时间 · 备注"
+                    android:textColor="#999999"
+                    android:textSize="11sp"
+                    app:layout_constraintEnd_toStartOf="@+id/ll_amount_area"
+                    app:layout_constraintStart_toStartOf="@+id/tv_category_name"
+                    app:layout_constraintTop_toBottomOf="@+id/tv_category_name" />
+
+                <LinearLayout
+                    android:id="@+id/ll_amount_area"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:orientation="vertical"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <TextView
+                        android:id="@+id/tv_amount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-¥0.00"
+                        android:textColor="#FF6B6B"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_balance_after"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="余额: ¥0.00"
+                        android:textColor="#CCCCCC"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 💡 分割线：颜色加深，并保证在侧滑菜单下方也显示 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.8dp"
+            android:background="#F2F2F2"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="16dp" />
+
+    </LinearLayout>
+
+    <!-- 2. 侧滑菜单 (胶囊风格) -->
+    <LinearLayout
+        android:id="@+id/menuView"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="8dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/btnRefund"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical">
+            <View
+                android:layout_width="54dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_pill_blue" />
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="-25dp"
+                android:src="@drawable/ic_convert"
+                app:tint="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="退款"
+                android:textColor="#2196F3"
+                android:textSize="10sp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnEdit"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:orientation="vertical">
+            <View
+                android:layout_width="54dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_pill_black" />
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="-25dp"
+                android:src="@drawable/ic_edit"
+                app:tint="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="编辑"
+                android:textColor="#666666"
+                android:textSize="10sp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnDelete"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:orientation="vertical">
+            <View
+                android:layout_width="54dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_pill_red" />
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="-25dp"
+                android:src="@drawable/ic_trash"
+                app:tint="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="删除"
+                android:textColor="#FF5252"
+                android:textSize="10sp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+</com.example.my_project1.utils.ui.SwipeMenuLayout>
