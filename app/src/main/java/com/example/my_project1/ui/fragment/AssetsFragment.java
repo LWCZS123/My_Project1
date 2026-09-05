@@ -222,7 +222,7 @@ public class AssetsFragment extends Fragment {
             public void onAccountHide(Account account) {
                 account.setIncludeInTotal(false);
                 viewModel.updateAccount(account);
-                // 🔕 移除提示，按用户要求静默隐藏
+                //  移除提示，按用户要求静默隐藏
             }
 
             @Override

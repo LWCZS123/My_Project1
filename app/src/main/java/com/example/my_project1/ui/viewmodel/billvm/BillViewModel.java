@@ -47,11 +47,11 @@ import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
 
 /**
- * BillViewModel (旗舰级秒开版)
+ * BillViewModel (优化版)
  * -------------------------------------------------------
- * ✅ 1. 快照优先：构造时立即从 SP 恢复上一次的统计和账单，实现零等待。
- * ✅ 2. 保护机制：冷启动设置 500ms 保护期，防止数据闪烁。
- * ✅ 3. 静默刷新：后台默默更新数据，DiffUtil 平滑过渡。
+ * 1. 快照优先：构造时立即从 SP 恢复上一次的统计和账单，实现零等待。
+ * 2. 保护机制：冷启动设置 500ms 保护期，防止数据闪烁。
+ * 3. 静默刷新：后台默默更新数据，DiffUtil 平滑过渡。
  */
 public class BillViewModel extends AndroidViewModel {
 
@@ -61,15 +61,15 @@ public class BillViewModel extends AndroidViewModel {
     private static final String KEY_BILL_ITEMS_SNAPSHOT = "bill_items";
     private static final String KEY_CALENDAR_SNAPSHOT = "calendar_stats";
 
-    // ── 分页常量 ──────────────────────────────────────
+    // 分页常量
     private static final int PAGE_SIZE        = 500;  // 每页条数
     private static final long SNAPSHOT_PROTECT_MS = 500L; // 快照保护期
 
-    // ── 后台计算线程 ───────────────────────────────────
+    // 后台计算线程
     private final Handler mainHandler        = new Handler(Looper.getMainLooper());
     private final Gson gson = new Gson();
 
-    // 🔴 性能优化相关
+    // 性能优化相关
     private final Map<String, BillUiModel> billUiCache = new ConcurrentHashMap<>();
     private volatile Map<String, List<Bill>> dailyBillsCache = Collections.emptyMap();
     private volatile boolean dailyBillsCacheReady = false;
@@ -87,11 +87,11 @@ public class BillViewModel extends AndroidViewModel {
     private final UserProfileRepository userProfileRepository;
     private final com.example.my_project1.utils.AppExecutors executors;
 
-    // ── 用户 ─────────────────────────────────────────
+    // 用户
     private String currentUserId;
     private String lastUserId;
 
-    // ──────────────── LiveData ────────────────────────
+    // LiveData
 
     /** 触发器：值变化时重新查询当月账单 */
     private final MutableLiveData<Long> _refreshTrigger = new MutableLiveData<>(System.currentTimeMillis());
@@ -113,7 +113,7 @@ public class BillViewModel extends AndroidViewModel {
 
     private volatile HomeBillsPagingSource homeBillsPagingSource;
 
-    /** ✅ 新增：供 HeaderAdapter 使用的统计概览数据 */
+    /** 供 HeaderAdapter 使用的统计概览数据 */
     private final MutableLiveData<HeaderUiModel> _headerData =
             new MutableLiveData<>(
                     new HeaderUiModel(
@@ -148,37 +148,35 @@ public class BillViewModel extends AndroidViewModel {
     private final MutableLiveData<String> _toastMessage = new MutableLiveData<>();
     public final LiveData<String> toastMessage = _toastMessage;
 
-    /** ✅ 日历专用的每日统计映射 */
+    /** 日历专用的每日统计映射 */
     private final MutableLiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> _dailyStatsMap = new MutableLiveData<>(new HashMap<>());
     public final LiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> dailyStatsMap = _dailyStatsMap;
 
-    /** ✅ 新增：选中日期的账单列表（取代全量分组映射） */
+    /** 选中日期的账单列表（取代全量分组映射） */
     private final MutableLiveData<Date> _selectedDate = new MutableLiveData<>(new Date());
     public LiveData<List<Bill>> selectedDateBills;
 
-    // ── 同步节流 ──────────────────────────────────────
+    // 同步节流
     private long    lastSyncTime        = 0;
     private static final long SYNC_THROTTLE_MS = 5 * 60 * 1000L;
     private boolean isSyncing           = false;
     private boolean isFirstInit         = true;
 
-    // ── 统计防抖 ──────────────────────────────────────
+    // 统计防抖
     private final Handler statsDebounceHandler = new Handler(Looper.getMainLooper());
     private static final long STATS_DEBOUNCE_MS = 2000L;
     private Runnable statsDebounceRunnable;
     private int lastSyncedCount = -1;
     private int lastSyncedDays  = -1;
 
-    // ── Observer 引用（防内存泄漏）────────────────────
+    // Observer 引用（防内存泄漏）
     private Observer<Integer> billCountObserver;
     private Observer<Integer> billDaysObserver;
     private Observer<List<Bill>> monthBillsObserver;
     private Observer<List<Account>> accountsObserver;
     private Observer<List<Bill>> allBillsObserver;
 
-    // ════════════════════════════════════════════════════
-    //  构造
-    // ════════════════════════════════════════════════════
+    // 构造
     public BillViewModel(@NonNull Application application) {
         super(application);
 
@@ -246,7 +244,7 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     /**
-     * ✅ 快照优先：从 SharedPreferences 恢复数据
+     * 快照优先：从 SharedPreferences 恢复数据
      */
     private void loadSnapshot() {
         android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
@@ -257,7 +255,6 @@ public class BillViewModel extends AndroidViewModel {
                 sp.getString(KEY_CALENDAR_SNAPSHOT, null));
         String billItemsJson = sp.getString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT),
                 sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null));
-        boolean billSnapshotRestored = false;
 
         if (headerJson != null) {
             HeaderUiModel header = gson.fromJson(headerJson, HeaderUiModel.class);
@@ -275,20 +272,15 @@ public class BillViewModel extends AndroidViewModel {
             List<HomeBillUiModel> billItems = gson.fromJson(billItemsJson, type);
             if (billItems != null) {
                 ImageLoaderUtils.preloadHomeBillCategoryIcons(getApplication(), collectCategoryIconUrls(billItems));
-                // 注意：由于 Pager 是异步加载的，快照加载只作为展示，不写入 _homeBillPagingData
-                // 如果需要快照立即显示，可能需要单独的 LiveData 配合 ConcatAdapter 或其他逻辑。
-                // 暂时注释掉快照写入分页流的逻辑，优先保证 Paging 正常工作。
-                // _homeBillPagingData.setValue(PagingData.from(billItems));
-                billSnapshotRestored = true;
             }
         }
 
-        isSnapshotLoaded = billSnapshotRestored;
-        Log.d(TAG, "⚡ 快照加载完成");
+        isSnapshotLoaded = true;
+        Log.d(TAG, "快照加载完成");
     }
 
     /**
-     * ✅ 保存快照：包含统计数据和日历统计
+     * 保存快照：包含统计数据和日历统计
      */
     private String snapshotKey(String baseKey) {
         return snapshotKey(baseKey, currentUserId);
@@ -311,7 +303,7 @@ public class BillViewModel extends AndroidViewModel {
                 .putString(snapshotKey(KEY_CALENDAR_SNAPSHOT, snapshotUserId), gson.toJson(calendarStats))
                 .putString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, snapshotUserId), gson.toJson(billItems))
                 .apply();
-            Log.d(TAG, "💾 快照已持久化");
+            Log.d(TAG, "快照已持久化");
         });
     }
 
@@ -416,9 +408,7 @@ public class BillViewModel extends AndroidViewModel {
         _selectedDate.setValue(cal.getTime());
     }
 
-    // ════════════════════════════════════════════════════
-    //  LiveData 初始化
-    // ════════════════════════════════════════════════════
+    // LiveData 初始化
     private void initializeLiveData() {
         if (currentUserId != null) {
             currentMonthBills = Transformations.switchMap(_refreshTrigger, trigger -> {
@@ -446,8 +436,7 @@ public class BillViewModel extends AndroidViewModel {
     /**
      * 快速判断首页数据指纹是否变化
      * -------------------------------------------------------
-     * 🔴 修复：原逻辑只比对首尾账单，导致中间账单被修改（如备注、分类）时 UI 不刷新。
-     * 现在通过累加所有账单的更新时间戳来生成更可靠的指纹。
+     * 数据对比优化：通过累加所有账单的更新时间戳来生成更可靠的指纹。
      */
     public boolean isHomeDataUnchanged(List<Bill> bills, List<Account> accounts) {
         if (bills == null) return false;
@@ -455,7 +444,7 @@ public class BillViewModel extends AndroidViewModel {
         StringBuilder sb = new StringBuilder();
         sb.append(bills.size()).append("_");
 
-        // 🔑 核心改进：累加所有账单的 ID 和更新时间，确保中间项修改也能被感知
+        // 核心改进：累加所有账单的 ID 和更新时间，确保中间项修改也能被感知
         long billChecksum = 0;
         for (Bill b : bills) {
             billChecksum += b.getId();
@@ -483,7 +472,7 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     /**
-     * ✅ 核心优化：联动观察账单与账户以更新 Header 统计
+     * 核心优化：联动观察账单与账户以更新 Header 统计
      * 首页账单列表现在由 Paging 3 自动接管，此处仅负责 Header 统计和快照保存。
      */
     private void observeMonthBillsForHeaderUpdate() {
@@ -541,8 +530,7 @@ public class BillViewModel extends AndroidViewModel {
         _pagerVersion.setValue(current == null ? 1 : current + 1);
     }
 
-    // ════════════════════════════════════════════════════
-    //  ✅ UiModel 映射 (单层列表版) - 优化版
+    //  UiModel 映射 (单层列表版) - 优化版
     // ════════════════════════════════════════════════════
     public List<BillUiModel> mapBillsToUiModels(List<Bill> bills) {
         if (bills == null || bills.isEmpty()) return new ArrayList<>();
@@ -621,8 +609,8 @@ public class BillViewModel extends AndroidViewModel {
 
 
     /**
-     * ✅ 构建 HeaderAdapter 需要的统计卡片数据
-     * 优化：传入已获取的账户列表，避免重复查询数据库
+     * 构建页眉统计数据。
+     * 优化：传入已获取的账户列表，避免重复查询数据库。
      */
     private HeaderUiModel buildHeaderUiModel(List<Bill> monthBills, List<Account> accounts) {
         double monthlyExpense = 0, monthlyIncome = 0;
@@ -738,12 +726,7 @@ public class BillViewModel extends AndroidViewModel {
         return new ArrayList<>(urls);
     }
 
-    // ════════════════════════════════════════════════════
-    //  原有公开方法（保留，未修改逻辑）
-    // ════════════════════════════════════════════════════
-
-    /** 兼容旧代码：返回原始账单列表（首页请改用 billItems） */
-    public LiveData<List<Bill>> getHomeBills() { return currentMonthBills; }
+    /** 兼容旧代码：返回所有账单列表 */
     public LiveData<List<Bill>> getAllBills()   { return allBills; }
 
     public LiveData<List<Account>> getAllAccountsLive() { return allAccountsLive; }
@@ -796,16 +779,10 @@ public class BillViewModel extends AndroidViewModel {
         return result;
     }
 
-    public LiveData<List<Bill>> getBillsByCategory(String categoryId) {
-        if (currentUserId == null) return new MutableLiveData<>(new ArrayList<>());
-        return repository.getBillsByCategory(currentUserId, categoryId);
-    }
-
     public void refreshData() {
         _refreshTrigger.setValue(System.currentTimeMillis());
 
-        // HomeBillsPagingSource performs synchronous Room queries, so it is not
-        // invalidated by Room automatically. Refresh it whenever bill data changes.
+        // HomeBillsPagingSource 执行 Room 查询，手动刷新以同步数据
         invalidateHomeBillsPaging();
     }
 
@@ -830,45 +807,6 @@ public class BillViewModel extends AndroidViewModel {
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("添加失败: " + r.message);
-            }
-        });
-    }
-
-    public void insertBillWithCallback(Bill bill, ApiResponse.Callback<Long> callback) {
-        if (currentUserId == null) {
-            _toastMessage.setValue("请先登录");
-            if (callback != null) callback.onComplete(ApiResponse.error("请先登录"));
-            return;
-        }
-        if (bill == null) {
-            _toastMessage.setValue("账单数据为空");
-            if (callback != null) callback.onComplete(ApiResponse.error("账单数据为空"));
-            return;
-        }
-        bill.setUserId(currentUserId);
-        repository.insertBill(bill, r -> {
-            if (r == null) {
-                r = ApiResponse.error("插入返回为空");
-            }
-
-            if (r.isSuccess()) { refreshData(); triggerBackgroundSync(); }
-            if (callback != null) callback.onComplete(r);
-        });
-    }
-
-    public void insertBills(List<Bill> bills) {
-        if (currentUserId == null) { _toastMessage.setValue("请先登录"); return; }
-        if (bills == null || bills.isEmpty()) { _toastMessage.setValue("账单列表为空"); return; }
-        for (Bill b : bills) b.setUserId(currentUserId);
-        _operationState.setValue(ApiResponse.loading("正在批量添加..."));
-        repository.insertBills(bills, r -> {
-            if (r.isSuccess()) {
-                _operationState.setValue(ApiResponse.success(r.message));
-                _toastMessage.setValue(r.message);
-                refreshData(); triggerBackgroundSync();
-            } else {
-                _operationState.setValue(ApiResponse.error(r.message));
-                _toastMessage.setValue("批量添加失败: " + r.message);
             }
         });
     }
@@ -964,7 +902,7 @@ public class BillViewModel extends AndroidViewModel {
         });
     }
 
-    // ── 同步 ─────────────────────────────────────────
+    // 同步
     private void triggerBackgroundSync() {
         try { BillSyncWorker.enqueue(getApplication()); }
         catch (Exception e) { Log.e(TAG, "触发同步失败", e); }
@@ -994,10 +932,10 @@ public class BillViewModel extends AndroidViewModel {
         lastSyncTime  = System.currentTimeMillis();
         _syncState.setValue(ApiResponse.loading("正在同步..."));
 
-        // 🔴 联动同步：先同步账户，再同步账单
+        // 联动同步：先同步账户，再同步账单
         accountRepository.syncFromAccountGroupCloud((success, message) -> {
             if (!success) {
-                Log.w(TAG, "⚠️ 账户同步失败: " + message);
+                Log.w(TAG, "账户同步失败: " + message);
             }
 
             repository.syncFromCloud(currentUserId, r -> {
@@ -1006,7 +944,7 @@ public class BillViewModel extends AndroidViewModel {
                     _syncState.setValue(ApiResponse.success(r.data, r.message));
                     _toastMessage.setValue("同步成功");
 
-                    // ✅ 关键：同步成功后，触发本地数据库重新查询
+                    // 同步成功后，触发本地数据库重新查询
                     mainHandler.post(this::refreshData);
                 } else {
 
@@ -1041,22 +979,21 @@ public class BillViewModel extends AndroidViewModel {
         });
     }
 
-    // ── 用户切换 ──────────────────────────────────────
+    // 用户切换
     public void checkUserSwitch() {
         BmobUser user      = BmobUser.getCurrentUser();
         String   newUserId = user != null ? user.getObjectId() : null;
         if (!isUserIdEqual(lastUserId, newUserId)) {
-            Log.d(TAG, "🔄 用户切换: " + lastUserId + " -> " + newUserId);
+            Log.d(TAG, "用户切换: " + lastUserId + " -> " + newUserId);
             lastUserId    = newUserId;
             currentUserId = newUserId;
             isFirstInit   = true;
             isSyncing     = false;
             lastSyncTime  = 0;
-//            hasRoomBillsPublished = false;
             dailyBillsCache = Collections.emptyMap();
             dailyBillsCacheReady = false;
             reinitializeLiveData();
-            if (currentUserId != null) Log.d(TAG, "✅ 新用户登录，将自动加载数据");
+            if (currentUserId != null) Log.d(TAG, "新用户登录，将自动加载数据");
         }
     }
 
@@ -1097,8 +1034,7 @@ public class BillViewModel extends AndroidViewModel {
         checkUserSwitch();
         if (currentUserId == null) return;
 
-        // 🔑 修复：每次检查同步时，也触发一次本地数据刷新逻辑，
-        // 确保从其他 Activity 返回首页时，UI 状态（如月份范围、触发器）是最新的。
+        // 自动同步检查：触发本地数据刷新，确保从其他 Activity 返回首页时 UI 状态最新
         refreshData();
 
         long now = System.currentTimeMillis();
@@ -1109,7 +1045,7 @@ public class BillViewModel extends AndroidViewModel {
         }
     }
 
-    // ── 统计写回 UserProfile ──────────────────────────
+    // 统计写回 UserProfile
     private void observeStatsForSync() {
         if (currentUserId == null) return;
         billCountObserver = v -> scheduleSyncStats();
@@ -1135,7 +1071,7 @@ public class BillViewModel extends AndroidViewModel {
         userProfileRepository.updateBillStats(currentUserId, days, count);
     }
 
-    // ── 工具 ─────────────────────────────────────────
+    // 工具
     private int computeBillCount(List<Bill> bills) { return bills == null ? 0 : bills.size(); }
 
     private int computeBillDays(List<Bill> bills) {
@@ -1161,10 +1097,6 @@ public class BillViewModel extends AndroidViewModel {
     private String formatDate(Date d) {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(d);
     }
-
-    public void resetOperationState() { _operationState.setValue(ApiResponse.idle()); }
-    public void resetSyncState()       { _syncState.setValue(ApiResponse.idle()); }
-    public LiveData<String> getUiMessage() { return toastMessage; }
 
     @Override
     protected void onCleared() {
