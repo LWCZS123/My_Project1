@@ -285,6 +285,17 @@ public class AccountDetailActivity extends AppCompatActivity {
 
         ConcatAdapter concatAdapter = new ConcatAdapter(headerAdapter, pagingAdapter);
         binding.rvTransactions.setLayoutManager(new LinearLayoutManager(this));
+        
+        // Optimize folding animation speed
+        androidx.recyclerview.widget.RecyclerView.ItemAnimator animator = binding.rvTransactions.getItemAnimator();
+        if (animator instanceof androidx.recyclerview.widget.DefaultItemAnimator) {
+            androidx.recyclerview.widget.DefaultItemAnimator defaultAnimator = (androidx.recyclerview.widget.DefaultItemAnimator) animator;
+            defaultAnimator.setRemoveDuration(200);
+            defaultAnimator.setAddDuration(200);
+            defaultAnimator.setMoveDuration(200);
+            defaultAnimator.setChangeDuration(200);
+        }
+
         binding.rvTransactions.setAdapter(concatAdapter);
     }
 

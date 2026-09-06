@@ -156,7 +156,9 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
             b.tvBillAmountLabel.setText(m.billAmountText);
             b.tvInflow.setText(m.inflowText);
             b.tvOutflow.setText(m.outflowText);
-            b.ivArrow.setRotation(m.isCollapsed ? 0 : 180);
+            
+            // 优化折叠箭头动画速度
+            b.ivArrow.animate().rotation(m.isCollapsed ? 0 : 180).setDuration(200).start();
 
             if (m.isCollapsed) {
                 b.getRoot().setBackgroundResource(R.drawable.bg_item_single);

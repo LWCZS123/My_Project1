@@ -57,7 +57,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
     
     public final LiveData<PagingData<AccountBillUiModel>> billPagingData;
 
-    private static final int PAGE_SIZE = 200;
+    private static final int PAGE_SIZE = 50;
 
     private final ThreadLocal<SimpleDateFormat> monthKeyFmt = new ThreadLocal<SimpleDateFormat>() {
         @Override protected SimpleDateFormat initialValue() { return new SimpleDateFormat("yyyy-MM", Locale.getDefault()); }
@@ -132,7 +132,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
                         Transformations.switchMap(account, acc -> {
                             double currentBal = acc != null ? acc.getBalance() : 0;
                             Pager<Integer, BillWithBalance> pager = new Pager<>(
-                                new PagingConfig(PAGE_SIZE, 5, false),
+                                new PagingConfig(PAGE_SIZE, PAGE_SIZE, false),
                                 () -> new AccountBillsPagingSource(billDao, userId, id, localId, currentBal, range.start, range.end)
                             );
                             LiveData<PagingData<BillWithBalance>> paged = PagingLiveData.getLiveData(pager);
@@ -213,13 +213,8 @@ public class AccountDetailViewModel extends AndroidViewModel {
                         return PagingDataTransforms.filter(withSeparators, AppExecutors.get().computation(), item -> {
                             if (item == null) return false;
                             if (item.type == AccountBillUiModel.TYPE_MONTH_HEADER) return true;
-                            String mKey = null;
-                            if (item.type == AccountBillUiModel.TYPE_BILL_ITEM && item.originalBill != null && item.originalBill.getBillTime() != null) {
-                                mKey = monthKeyFmt.get().format(item.originalBill.getBillTime());
-                            } else if (item.type == AccountBillUiModel.TYPE_DAY_HEADER) {
-                                mKey = item.key;
-                            }
-                            return mKey == null || !collapsed.contains(mKey);
+                            // 使用预计算的 key 进行过滤，避免在此频繁调用 format()
+                            return item.key == null || !collapsed.contains(item.key);
                         });
                     })
                 )
@@ -310,7 +305,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
         String label = (acc != null && acc.isCredit()) ? "欠款: " : "余额: ";
         String balanceStr = label + "¥" + moneyFmt.get().format(balanceAfter);
         
-        return new AccountBillUiModel(
+        AccountBillUiModel m = new AccountBillUiModel(
                 bill.getId(),
                 bill.getObjectId(),
                 bill.getCategoryName(),
@@ -321,6 +316,10 @@ public class AccountDetailViewModel extends AndroidViewModel {
                 balanceStr,
                 bill
         );
+        if (bill.getBillTime() != null) {
+            m.key = monthKeyFmt.get().format(bill.getBillTime());
+        }
+        return m;
     }
 
     public static class DateRange {
