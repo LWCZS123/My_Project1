@@ -62,6 +62,7 @@ public class HomeFragment extends Fragment {
 
     private String currentUserId;
     private boolean isFirstLoad = true;
+    private boolean hasResumedOnce;
 
     @Nullable
     @Override
@@ -98,6 +99,11 @@ public class HomeFragment extends Fragment {
         super.onResume();
         // 检查用户登录状态切换
         checkUserSession();
+        // 从编辑页返回时立即创建新的分页代际，确保首页显示最新的本地账单。
+        if (hasResumedOnce && billViewModel != null) {
+            billViewModel.refreshData();
+        }
+        hasResumedOnce = true;
     }
 
     @Override
@@ -118,6 +124,7 @@ public class HomeFragment extends Fragment {
         if (binding != null) {
             binding.rvBills.clearOnScrollListeners();
         }
+        hasResumedOnce = false;
         binding = null;
     }
 

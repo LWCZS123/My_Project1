@@ -343,11 +343,8 @@ public class AssetsFragment extends Fragment {
         }
 
         Log.d(TAG, "✅ 数据合并完成: 总显示分组 " + displayGroups.size());
-        
-        adapter.setGroups(displayGroups);
-        for (Map.Entry<String, List<Account>> entry : groupToAccountsMap.entrySet()) {
-            adapter.updateAccountsForExpandedGroup(entry.getKey(), entry.getValue());
-        }
+
+        adapter.setGroupsAndAccounts(displayGroups, groupToAccountsMap);
         updateTotalAssets();
     }
 

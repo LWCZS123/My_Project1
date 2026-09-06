@@ -702,9 +702,7 @@ public class BillViewModel extends AndroidViewModel {
         return new Date[]{start, c.getTime()};
     }
 
-    /**
-     * 下拉刷新只检查云端增量，不能清空或重建当前已展示的本地账单。
-     */
+    /** 下拉刷新先同步云端增量，再重建首页分页数据。 */
     public void refresh() {
         Log.d(TAG, "开始下拉刷新...");
 
@@ -780,11 +778,27 @@ public class BillViewModel extends AndroidViewModel {
         return result;
     }
 
+    /**
+     * 刷新首页数据。统计依赖 Room LiveData，列表依赖自定义 PagingSource，
+     * 因此两者分别触发，并保证调用线程不会影响 LiveData 的安全性。
+     */
     public void refreshData() {
-        _refreshTrigger.setValue(System.currentTimeMillis());
+        Runnable refreshAction = () -> {
+            if (isCleared) return;
 
-        // HomeBillsPagingSource 执行 Room 查询，手动刷新以同步数据
-        invalidateHomeBillsPaging();
+            // Room LiveData 会自动刷新统计数据；分页数据使用新的 Pager 代际，
+            // 这样即使旧 PagingSource 尚未创建，也不会丢失本次刷新请求。
+            _refreshTrigger.setValue(System.currentTimeMillis());
+            rebuildHomeBillsPager();
+            invalidateHomeBillsPaging();
+        };
+
+        // 所有 LiveData 写操作统一切回主线程，避免后台回调触发线程异常。
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            refreshAction.run();
+        } else {
+            mainHandler.post(refreshAction);
+        }
     }
 
     public Bill saveBill(String objectId) {
@@ -875,6 +889,18 @@ public class BillViewModel extends AndroidViewModel {
 
     public void updateBill(Bill bill) {
         if (bill == null) { _toastMessage.setValue("账单数据为空"); return; }
+        if (currentUserId == null) {
+            _toastMessage.setValue("请先登录");
+            return;
+        }
+        // 兼容旧数据中 userId 为空的账单，同时阻止跨用户修改。
+        if (bill.getUserId() == null) {
+            bill.setUserId(currentUserId);
+        }
+        if (!currentUserId.equals(bill.getUserId())) {
+            _toastMessage.setValue("账单所属用户无效");
+            return;
+        }
         _operationState.setValue(ApiResponse.loading("正在更新..."));
         repository.updateBill(bill, r -> {
             if (r.isSuccess()) {

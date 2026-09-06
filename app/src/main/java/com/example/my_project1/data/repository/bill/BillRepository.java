@@ -139,8 +139,18 @@ public class BillRepository {
     public void updateBill(Bill bill, ApiResponse.Callback<Integer> callback) {
         executors.diskIO().execute(() -> {
             try {
-                // 获取原始账单数据
-                Bill oldBill = billDao.getBillByObjectIdSync(bill.getObjectId());
+                // 优先使用云端 ID 查询；本地账单可能还没有 objectId，需回退到 Room 主键。
+                Bill oldBill = null;
+                if (bill.getObjectId() != null && !bill.getObjectId().isEmpty()) {
+                    oldBill = billDao.getBillByObjectIdSync(bill.getObjectId());
+                }
+                if (oldBill == null && bill.getId() > 0) {
+                    oldBill = billDao.getBillByIdSync(bill.getId());
+                }
+                if (oldBill == null) {
+                    postUpdateResult(callback, ApiResponse.error("找不到要更新的账单"));
+                    return;
+                }
 
                 bill.setUpdatedAt(new Date());
                 bill.setSyncState(SyncState.TO_UPDATE);
@@ -148,22 +158,27 @@ public class BillRepository {
 
                 int rows = billDao.update(bill);
 
-                if (rows > 0 && oldBill != null) {
-                    //调整账户余额(先恢复旧值,再添加新值)
+                if (rows > 0) {
+                    // 调整账户余额：先撤销旧账单影响，再应用新账单影响。
                     updateAccountBalanceForBillUpdate(oldBill, bill);
                 }
 
                 Log.d(TAG, "✅ 更新账单: " + rows + " 行");
-                executors.mainThread().execute(() ->
-                        callback.onComplete(ApiResponse.success(rows, "更新成功"))
-                );
+                if (rows == 0) {
+                    postUpdateResult(callback, ApiResponse.error("账单未发生更新"));
+                } else {
+                    postUpdateResult(callback, ApiResponse.success(rows, "更新成功"));
+                }
             } catch (Exception e) {
                 Log.e(TAG, "更新账单异常", e);
-                executors.mainThread().execute(() ->
-                        callback.onComplete(ApiResponse.error(e))
-                );
+                postUpdateResult(callback, ApiResponse.error(e));
             }
         });
+    }
+
+    /** 将更新结果统一投递到主线程，保证 ViewModel 能安全驱动界面刷新。 */
+    private void postUpdateResult(ApiResponse.Callback<Integer> callback, ApiResponse<Integer> response) {
+        executors.mainThread().execute(() -> callback.onComplete(response));
     }
 
     /**
