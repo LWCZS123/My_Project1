@@ -242,6 +242,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                 .billType(billType)
                 .remarkText(bill.getRemark())
                 .imageUrls(bill.getImageUrls())
+                .originalBill(bill) // 🔑 设置原始对象
                 .build();
     }
 }

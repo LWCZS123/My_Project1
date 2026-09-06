@@ -117,7 +117,7 @@
         android:background="#F2F4F8"
         android:clickable="true"
         android:focusable="true"
-        android:visibility="visible">
+        android:visibility="gone">
 
         <com.airbnb.lottie.LottieAnimationView
             android:id="@+id/lottie_loading"

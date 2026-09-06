@@ -31,6 +31,7 @@ public class BillUiModel {
     public final String remarkText;        // 备注，空串则隐藏
     public final String locationText;      // 位置，空串则隐藏
     public final java.util.List<String> imageUrls; // 图片 URL 列表
+    public final com.example.my_project1.data.model.bill.Bill originalBill; // 原始账单对象
 
     // ── 时间轴连线状态（Adapter 按位置判定后写入）────────
     /** true → 该 item 是当天第一笔，上方没有连线（隐藏上半段竖线） */
@@ -58,6 +59,7 @@ public class BillUiModel {
         this.remarkText     = b.remarkText;
         this.locationText   = b.locationText;
         this.imageUrls      = b.imageUrls;
+        this.originalBill   = b.originalBill;
         this.isFirstOfDay   = b.isFirstOfDay;
         this.isLastOfDay    = b.isLastOfDay;
         this.diffKey        = (objectId != null && !objectId.isEmpty())
@@ -85,14 +87,15 @@ public class BillUiModel {
                 java.util.Objects.equals(accountIconUrl, that.accountIconUrl) &&
                 java.util.Objects.equals(remarkText, that.remarkText) &&
                 java.util.Objects.equals(locationText, that.locationText) &&
-                java.util.Objects.equals(imageUrls, that.imageUrls);
+                java.util.Objects.equals(imageUrls, that.imageUrls) &&
+                java.util.Objects.equals(originalBill, that.originalBill);
     }
 
     @Override
     public int hashCode() {
         return java.util.Objects.hash(localId, objectId, timeText, categoryName, categoryIconUrl,
                 categoryIconBackgroundColor, amountText, amountColor, accountName, toAccountName,
-                accountIconUrl, billType, remarkText, locationText, imageUrls, isFirstOfDay, isLastOfDay);
+                accountIconUrl, billType, remarkText, locationText, imageUrls, originalBill, isFirstOfDay, isLastOfDay);
     }
 
     public static Builder builder() { return new Builder(); }
@@ -113,6 +116,7 @@ public class BillUiModel {
         String remarkText     = "";
         String locationText   = "";
         java.util.List<String> imageUrls = new java.util.ArrayList<>();
+        com.example.my_project1.data.model.bill.Bill originalBill;
         boolean isFirstOfDay  = false;
         boolean isLastOfDay   = false;
 
@@ -131,6 +135,7 @@ public class BillUiModel {
         public Builder remarkText(String v)   { remarkText = v != null ? v : ""; return this; }
         public Builder locationText(String v) { locationText = v != null ? v : ""; return this; }
         public Builder imageUrls(java.util.List<String> v){ imageUrls = v != null ? v : new java.util.ArrayList<>(); return this; }
+        public Builder originalBill(com.example.my_project1.data.model.bill.Bill v) { originalBill = v; return this; }
         public Builder isFirstOfDay(boolean v){ isFirstOfDay = v; return this; }
         public Builder isLastOfDay(boolean v) { isLastOfDay = v; return this; }
 

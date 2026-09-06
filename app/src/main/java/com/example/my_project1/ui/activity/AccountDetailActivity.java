@@ -226,9 +226,12 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             @Override
             public void onBillDelete(Bill bill) {
-                com.example.my_project1.ui.fragment.DeleteConfirmDialogFragment dialog = new com.example.my_project1.ui.fragment.DeleteConfirmDialogFragment();
-                dialog.setOnDeleteConfirmListener(() -> handleBillDelete(bill));
-                dialog.show(getSupportFragmentManager(), "DeleteBill");
+                new com.example.my_project1.ui.dialog.ConfirmDialog(AccountDetailActivity.this)
+                        .setTitle("确认删除")
+                        .setMessage("确定要删除这笔账单吗？删除后将无法恢复。")
+                        .setConfirmText("删除")
+                        .setConfirmListener(() -> handleBillDelete(bill))
+                        .show();
             }
 
             @Override

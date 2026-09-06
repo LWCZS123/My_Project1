@@ -155,10 +155,46 @@ public class HomeFragment extends Fragment {
                 handleBillDelete(bill);
             }
             @Override
-            public void onBillEdit(BillUiModel bill) {
-                if (bill == null) return;
+            public void onBillEdit(BillUiModel billUi) {
+                if (billUi == null || billUi.originalBill == null) return;
+                com.example.my_project1.data.model.bill.Bill bill = billUi.originalBill;
                 Intent intent = new Intent(getActivity(), com.example.my_project1.ui.activity.AddBillActivity.class);
-                intent.putExtra("editBillLocalId", bill.localId);
+                intent.putExtra("mode", "edit");
+                
+                // 1. ID 处理
+                if (bill.getObjectId() != null && !bill.getObjectId().isEmpty()) {
+                    intent.putExtra("bill_id", bill.getObjectId());
+                } else {
+                    intent.putExtra("bill_local_id", bill.getId());
+                }
+                
+                // 2. 基础字段
+                intent.putExtra("bill_type", bill.getType());
+                intent.putExtra("bill_amount", bill.getAmount());
+                intent.putExtra("category_id", bill.getCategoryId());
+                intent.putExtra("category_name", bill.getCategoryName());
+                intent.putExtra("category_icon", bill.getCategoryIconUrl());
+                intent.putExtra("category_icon_bg_color", bill.getCategoryIconBackgroundColor());
+                
+                // 3. 账户字段
+                intent.putExtra("account_id", bill.getAccountId());
+                intent.putExtra("local_account_id", bill.getLocalAccountId());
+                intent.putExtra("to_account_id", bill.getToAccountId());
+                intent.putExtra("to_local_account_id", bill.getToLocalAccountId());
+                
+                // 4. 其他字段
+                intent.putExtra("book_id", bill.getBookId());
+                if (bill.getBillTime() != null) {
+                    intent.putExtra("bill_time", bill.getBillTime().getTime());
+                }
+                intent.putExtra("remark", bill.getRemark());
+                intent.putExtra("location", bill.getLocation());
+                intent.putExtra("exclude_budget", bill.isExcludeBudget());
+                
+                if (bill.getImageUrls() != null && !bill.getImageUrls().isEmpty()) {
+                    intent.putStringArrayListExtra("image_urls", new java.util.ArrayList<>(bill.getImageUrls()));
+                }
+
                 startActivity(intent);
             }
             @Override
@@ -293,12 +329,19 @@ public class HomeFragment extends Fragment {
 
     private void handleBillDelete(BillUiModel billUiModel) {
         if (billUiModel == null) return;
-        AppExecutors.get().diskIO().execute(() -> {
-            Bill bill = billViewModel.saveBillLocal(billUiModel.localId);
-            if (bill != null) {
-                AppExecutors.get().mainThread().execute(() -> billViewModel.deleteBill(bill));
-            }
-        });
+        new com.example.my_project1.ui.dialog.ConfirmDialog(requireContext())
+                .setTitle("确认删除")
+                .setMessage("确定要删除这笔账单吗？删除后将无法恢复。")
+                .setConfirmText("删除")
+                .setConfirmListener(() -> {
+                    AppExecutors.get().diskIO().execute(() -> {
+                        Bill bill = billViewModel.saveBillLocal(billUiModel.localId);
+                        if (bill != null) {
+                            AppExecutors.get().mainThread().execute(() -> billViewModel.deleteBill(bill));
+                        }
+                    });
+                })
+                .show();
     }
 
     private void openBillDetail(long localId, String objectId) {

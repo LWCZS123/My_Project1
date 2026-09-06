@@ -173,52 +173,59 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 2. 侧滑菜单 (优化：背景色设为 F2F4F8) -->
+    <!-- 2. 侧滑菜单 (胶囊风格) -->
     <LinearLayout
         android:id="@+id/menuView"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:orientation="horizontal"
-        android:background="#F2F4F8">
+        android:gravity="center_vertical"
+        android:paddingHorizontal="8dp"
+        android:orientation="horizontal">
 
-        <!-- 退款 -->
         <LinearLayout
             android:id="@+id/btnRefund"
-            android:layout_width="72dp"
-            android:layout_height="match_parent"
-            android:background="?attr/selectableItemBackground"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
             android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
             android:orientation="vertical">
+            <View
+                android:layout_width="54dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_pill_blue" />
             <ImageView
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:padding="8dp"
-                android:background="@drawable/bg_circle_blue"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="-25dp"
                 android:src="@drawable/ic_convert"
                 app:tint="#FFFFFF" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="退款"
-                android:textColor="#666666"
+                android:textColor="#2196F3"
                 android:textSize="10sp"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/font3_regular" />
+                android:layout_marginTop="8dp" />
         </LinearLayout>
 
-        <!-- 编辑 -->
         <LinearLayout
             android:id="@+id/btnEdit"
-            android:layout_width="72dp"
-            android:layout_height="match_parent"
-            android:background="?attr/selectableItemBackground"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
             android:orientation="vertical">
+            <View
+                android:layout_width="54dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_pill_black" />
             <ImageView
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:padding="8dp"
-                android:background="@drawable/bg_circle_gray"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="-25dp"
                 android:src="@drawable/ic_edit"
                 app:tint="#FFFFFF" />
             <TextView
@@ -227,35 +234,36 @@
                 android:text="编辑"
                 android:textColor="#666666"
                 android:textSize="10sp"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/font3_regular" />
+                android:layout_marginTop="8dp" />
         </LinearLayout>
 
-        <!-- 删除 -->
         <LinearLayout
             android:id="@+id/btnDelete"
-            android:layout_width="72dp"
-            android:layout_height="match_parent"
-            android:background="?attr/selectableItemBackground"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
             android:orientation="vertical">
+            <View
+                android:layout_width="54dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_pill_red" />
             <ImageView
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:padding="8dp"
-                android:background="@drawable/bg_circle_red"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="-25dp"
                 android:src="@drawable/ic_trash"
                 app:tint="#FFFFFF" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="删除"
-                android:textColor="#666666"
+                android:textColor="#FF5252"
                 android:textSize="10sp"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/font3_regular" />
+                android:layout_marginTop="8dp" />
         </LinearLayout>
-
     </LinearLayout>
 
 </com.example.my_project1.utils.ui.SwipeMenuLayout>
