@@ -10,15 +10,32 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.data.model.icon.IconItem;
 import com.example.my_project1.data.repository.icon.IconRepository;
+import com.example.my_project1.utils.AppExecutors;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Pattern;
 
 public class IconSelectionViewModel extends AndroidViewModel {
 
+    public static final String STYLE_LINEAR = "线性图标";
+    public static final String STYLE_EMOJI = "Emoji";
+    public static final String STYLE_PRO = "彩色图标(PRO)";
+
     private final IconRepository repository;
     private final Pattern chinesePattern = Pattern.compile("^[\\u4e00-\\u9fa5]+$");
+
+    private final MutableLiveData<String> _currentStyle = new MutableLiveData<>(STYLE_LINEAR);
+    public final LiveData<String> currentStyle = _currentStyle;
+
+    private JSONObject linearPacksJson;
+    private JSONObject emojiPacksJson;
 
     private final MutableLiveData<List<IconCategory>> _categories = new MutableLiveData<>(new ArrayList<>());
     public final LiveData<List<IconCategory>> categories = _categories;
@@ -59,9 +76,20 @@ public class IconSelectionViewModel extends AndroidViewModel {
     }
 
     /**
-     * 加载初始数据：前20个分类
+     * 加载初始数据
      */
     public void loadInitialData() {
+        String style = _currentStyle.getValue();
+        if (STYLE_LINEAR.equals(style)) {
+            loadLinearIcons();
+        } else if (STYLE_EMOJI.equals(style)) {
+            loadEmojiIcons();
+        } else {
+            loadRemoteIcons();
+        }
+    }
+
+    private void loadRemoteIcons() {
         _loading.setValue(true);
         // 加载第一页分类 (10个)
         repository.getCategoryPage(0, new IconRepository.Callback<List<IconCategory>>() {
@@ -98,13 +126,153 @@ public class IconSelectionViewModel extends AndroidViewModel {
     }
 
     /**
+     * 加载 assets 中的线性图标
+     */
+    private void loadLinearIcons() {
+        if (linearPacksJson != null) {
+            displayLinearCategories();
+            return;
+        }
+
+        _loading.setValue(true);
+        AppExecutors.get().diskIO().execute(() -> {
+            try (InputStream is = getApplication().getAssets().open("线性色.json")) {
+                int size = is.available();
+                byte[] buffer = new byte[size];
+                int read = is.read(buffer);
+                if (read <= 0) return;
+                String json = new String(buffer, 0, read, StandardCharsets.UTF_8);
+
+                linearPacksJson = new JSONObject(json).getJSONObject("packs");
+                displayLinearCategories();
+            } catch (Exception e) {
+                _errorMessage.postValue("加载线性图标失败");
+                _loading.postValue(false);
+            }
+        });
+    }
+
+    /**
+     * 加载 assets 中的 Emoji 图标 (数据源：freeicon_line.json)
+     * 限制展示 200 个集合
+     */
+    private void loadEmojiIcons() {
+        if (emojiPacksJson != null) {
+            displayEmojiCategories();
+            return;
+        }
+
+        _loading.setValue(true);
+        AppExecutors.get().diskIO().execute(() -> {
+            try (InputStream is = getApplication().getAssets().open("freeicon_line.json")) {
+                int size = is.available();
+                byte[] buffer = new byte[size];
+                int read = is.read(buffer);
+                if (read <= 0) return;
+                String json = new String(buffer, 0, read, StandardCharsets.UTF_8);
+
+                emojiPacksJson = new JSONObject(json).getJSONObject("packs");
+                displayEmojiCategories();
+            } catch (Exception e) {
+                _errorMessage.postValue("加载 Emoji 图标失败");
+                _loading.postValue(false);
+            }
+        });
+    }
+
+    private void displayEmojiCategories() {
+        try {
+            List<IconCategory> categoryList = new ArrayList<>();
+            Iterator<String> keys = emojiPacksJson.keys();
+            int count = 0;
+            while (keys.hasNext() && count < 200) { // 限制 200 个集合
+                String key = keys.next();
+                JSONObject packObj = emojiPacksJson.getJSONObject(key);
+                IconCategory cat = new IconCategory();
+                cat.setCategory(packObj.optString("title"));
+                cat.setFile(key);
+
+                JSONArray iconsArr = packObj.optJSONArray("icons");
+                if (iconsArr != null) {
+                    cat.setCount(iconsArr.length());
+                    List<String> thumbs = new ArrayList<>();
+                    int thumbCount = Math.min(9, iconsArr.length());
+                    for (int j = 0; j < thumbCount; j++) {
+                        thumbs.add(iconsArr.getJSONObject(j).optString("cdn_url"));
+                    }
+                    cat.setThumbUrls(thumbs);
+                }
+                categoryList.add(cat);
+                count++;
+            }
+            _categories.postValue(categoryList);
+            if (!categoryList.isEmpty()) {
+                selectCategory(categoryList.get(0));
+            }
+            _loading.postValue(false);
+        } catch (Exception e) {
+            _loading.postValue(false);
+        }
+    }
+
+    private void displayLinearCategories() {
+        try {
+            List<IconCategory> categoryList = new ArrayList<>();
+            Iterator<String> keys = linearPacksJson.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject packObj = linearPacksJson.getJSONObject(key);
+                IconCategory cat = new IconCategory();
+                cat.setCategory(packObj.optString("title"));
+                cat.setFile(key); // 借用 file 字段存 pack key
+
+                JSONArray iconsArr = packObj.optJSONArray("icons");
+                if (iconsArr != null) {
+                    cat.setCount(iconsArr.length());
+                    List<String> thumbs = new ArrayList<>();
+                    int thumbCount = Math.min(9, iconsArr.length());
+                    for (int j = 0; j < thumbCount; j++) {
+                        thumbs.add(iconsArr.getJSONObject(j).optString("cdn_url"));
+                    }
+                    cat.setThumbUrls(thumbs);
+                }
+                categoryList.add(cat);
+            }
+            _categories.postValue(categoryList);
+            if (!categoryList.isEmpty()) {
+                selectCategory(categoryList.get(0));
+            }
+            _loading.postValue(false);
+        } catch (Exception e) {
+            _loading.postValue(false);
+        }
+    }
+
+    public void switchStyle(String style) {
+        if (style.equals(_currentStyle.getValue())) return;
+        _currentStyle.setValue(style);
+        _selectedCategory.setValue(null);
+        _iconItems.setValue(new ArrayList<>());
+        loadInitialData();
+    }
+
+    /**
      * 选中分类，加载该分类前50个图标
      */
     public void selectCategory(IconCategory category) {
         if (_selectedCategory.getValue() == category) return;
-        _selectedCategory.setValue(category);
-        _loading.setValue(true);
+        _selectedCategory.postValue(category);
 
+        String style = _currentStyle.getValue();
+        if (STYLE_LINEAR.equals(style)) {
+            loadLocalCategoryDetail(category, linearPacksJson, 100);
+            return;
+        } else if (STYLE_EMOJI.equals(style)) {
+            loadLocalCategoryDetail(category, emojiPacksJson, 50); // 每个集合显示 50 个图标
+            return;
+        }
+
+        _loading.setValue(true);
         repository.getCategoryDetail(category, 0, new IconRepository.Callback<List<IconItem>>() {
             @Override
             public void onSuccess(List<IconItem> page1) {
@@ -152,6 +320,30 @@ public class IconSelectionViewModel extends AndroidViewModel {
         });
     }
 
+    private void loadLocalCategoryDetail(IconCategory category, JSONObject packsJson, int limit) {
+        if (packsJson == null) return;
+        try {
+            JSONObject packObj = packsJson.getJSONObject(category.getFile());
+            JSONArray iconsArr = packObj.getJSONArray("icons");
+            List<IconItem> items = new ArrayList<>();
+            int count = Math.min(limit, iconsArr.length());
+            for (int i = 0; i < count; i++) {
+                JSONObject obj = iconsArr.getJSONObject(i);
+                IconItem item = new IconItem();
+                item.setName(obj.optString("name"));
+                item.setUrl(obj.optString("cdn_url"));
+                item.setThumb(obj.optString("cdn_url"));
+                items.add(item);
+            }
+            _iconItems.postValue(items);
+            if (!items.isEmpty()) {
+                _selectedIcon.postValue(items.get(0));
+            }
+        } catch (Exception e) {
+            _errorMessage.postValue("加载图标详情失败");
+        }
+    }
+
     public void selectIcon(IconItem icon) {
         _selectedIcon.setValue(icon);
     }
@@ -180,6 +372,14 @@ public class IconSelectionViewModel extends AndroidViewModel {
             return;
         }
 
+        if (STYLE_LINEAR.equals(_currentStyle.getValue())) {
+            searchLocal(keyword, linearPacksJson);
+            return;
+        } else if (STYLE_EMOJI.equals(_currentStyle.getValue())) {
+            searchLocal(keyword, emojiPacksJson);
+            return;
+        }
+
         _loading.setValue(true);
         repository.search(keyword, 0, new IconRepository.Callback<List<IconItem>>() {
             @Override
@@ -200,6 +400,38 @@ public class IconSelectionViewModel extends AndroidViewModel {
             public void onError(String message) {
                 _errorMessage.postValue(message);
                 _loading.postValue(false);
+            }
+        });
+    }
+
+    private void searchLocal(String keyword, JSONObject packsJson) {
+        if (packsJson == null) return;
+        AppExecutors.get().computation().execute(() -> {
+            try {
+                List<IconItem> results = new ArrayList<>();
+                Iterator<String> keys = packsJson.keys();
+                while (keys.hasNext()) {
+                    JSONObject pack = packsJson.getJSONObject(keys.next());
+                    JSONArray iconsArr = pack.getJSONArray("icons");
+                    for (int i = 0; i < iconsArr.length(); i++) {
+                        JSONObject obj = iconsArr.getJSONObject(i);
+                        String name = obj.optString("name");
+                        if (name.contains(keyword)) {
+                            IconItem item = new IconItem();
+                            item.setName(name);
+                            item.setUrl(obj.optString("cdn_url"));
+                            item.setThumb(obj.optString("cdn_url"));
+                            results.add(item);
+                        }
+                    }
+                }
+                if (results.size() > 100) results = results.subList(0, 100);
+                _iconItems.postValue(results);
+                if (!results.isEmpty()) {
+                    _selectedIcon.postValue(results.get(0));
+                }
+            } catch (Exception e) {
+                // ignore
             }
         });
     }

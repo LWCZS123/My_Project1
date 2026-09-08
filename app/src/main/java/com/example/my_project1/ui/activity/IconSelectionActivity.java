@@ -193,6 +193,10 @@ public class IconSelectionActivity extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable s) {}
         });
+
+        binding.tvStyleLinear.setOnClickListener(v -> viewModel.switchStyle(IconSelectionViewModel.STYLE_LINEAR));
+        binding.tvStyleEmoji.setOnClickListener(v -> viewModel.switchStyle(IconSelectionViewModel.STYLE_EMOJI));
+        binding.tvStylePro.setOnClickListener(v -> viewModel.switchStyle(IconSelectionViewModel.STYLE_PRO));
     }
 
     private void handleConfirm() {
@@ -295,5 +299,22 @@ public class IconSelectionActivity extends AppCompatActivity {
         viewModel.errorMessage.observe(this, msg -> {
             if (msg != null) SnackbarUtils.showError(binding.getRoot(), msg);
         });
+
+        viewModel.currentStyle.observe(this, this::updateStyleUi);
+    }
+
+    private void updateStyleUi(String style) {
+        boolean isLinear = IconSelectionViewModel.STYLE_LINEAR.equals(style);
+        boolean isEmoji = IconSelectionViewModel.STYLE_EMOJI.equals(style);
+        boolean isPro = IconSelectionViewModel.STYLE_PRO.equals(style);
+
+        binding.tvStyleLinear.setBackgroundResource(isLinear ? R.drawable.bg_white_rounded_pill : 0);
+        binding.tvStyleLinear.setTextColor(isLinear ? Color.BLACK : Color.parseColor("#999999"));
+
+        binding.tvStyleEmoji.setBackgroundResource(isEmoji ? R.drawable.bg_white_rounded_pill : 0);
+        binding.tvStyleEmoji.setTextColor(isEmoji ? Color.BLACK : Color.parseColor("#999999"));
+
+        binding.tvStylePro.setBackgroundResource(isPro ? R.drawable.bg_white_rounded_pill : 0);
+        binding.tvStylePro.setTextColor(isPro ? Color.BLACK : Color.parseColor("#999999"));
     }
 }

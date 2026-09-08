@@ -45,13 +45,16 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             new DiffUtil.ItemCallback<IconCategory>() {
                 @Override
                 public boolean areItemsTheSame(@NonNull IconCategory a, @NonNull IconCategory b) {
-                    return a.getCategory().equals(b.getCategory());
+                    // 同时校验名称和所属文件（pack key），确保不同风格下同名分类能正确刷新
+                    return a.getCategory().equals(b.getCategory())
+                            && a.getFile().equals(b.getFile());
                 }
 
                 @Override
                 public boolean areContentsTheSame(@NonNull IconCategory a, @NonNull IconCategory b) {
                     return a.getCount() == b.getCount()
-                            && a.getCategory().equals(b.getCategory());
+                            && a.getCategory().equals(b.getCategory())
+                            && java.util.Objects.equals(a.getThumbUrls(), b.getThumbUrls());
                 }
             };
 

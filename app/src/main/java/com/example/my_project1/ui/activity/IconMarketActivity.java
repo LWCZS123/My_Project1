@@ -83,6 +83,7 @@ public class IconMarketActivity extends AppCompatActivity {
         initCategoryRecyclerView();
         initSearchRecyclerView();
         initSearchBar();
+        initStyleSelector();
         initSearchMultiSelectToolbar();
         observeViewModel();
         observeSearchMultiSelect();
@@ -124,6 +125,47 @@ public class IconMarketActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    /**
+     * 初始化风格切换器
+     */
+    private void initStyleSelector() {
+        binding.tvStyleDefault.setOnClickListener(v ->
+                viewModel.switchStyle(IconMarketViewModel.IconStyle.DEFAULT));
+        binding.tvStyleLinear.setOnClickListener(v ->
+                viewModel.switchStyle(IconMarketViewModel.IconStyle.LINEAR));
+        binding.tvStyleColored.setOnClickListener(v ->
+                viewModel.switchStyle(IconMarketViewModel.IconStyle.COLORED));
+    }
+
+    /**
+     * 更新风格切换器的 UI 状态
+     */
+    private void updateStyleUI(IconMarketViewModel.IconStyle style) {
+        // 重置所有状态
+        binding.tvStyleDefault.setBackgroundResource(0);
+        binding.tvStyleDefault.setTextColor(0xFF999999);
+        binding.tvStyleLinear.setBackgroundResource(0);
+        binding.tvStyleLinear.setTextColor(0xFF999999);
+        binding.tvStyleColored.setBackgroundResource(0);
+        binding.tvStyleColored.setTextColor(0xFF999999);
+
+        // 设置选中状态
+        switch (style) {
+            case DEFAULT:
+                binding.tvStyleDefault.setBackgroundResource(R.drawable.bg_white_rounded_pill);
+                binding.tvStyleDefault.setTextColor(0xFF333333);
+                break;
+            case LINEAR:
+                binding.tvStyleLinear.setBackgroundResource(R.drawable.bg_white_rounded_pill);
+                binding.tvStyleLinear.setTextColor(0xFF333333);
+                break;
+            case COLORED:
+                binding.tvStyleColored.setBackgroundResource(R.drawable.bg_white_rounded_pill);
+                binding.tvStyleColored.setTextColor(0xFF333333);
+                break;
+        }
     }
 
     /**
@@ -295,6 +337,8 @@ public class IconMarketActivity extends AppCompatActivity {
      * 分类、搜索结果、加载状态、错误信息
      */
     private void observeViewModel() {
+        viewModel.currentStyle.observe(this, this::updateStyleUI);
+
         viewModel.categories.observe(this, categories -> {
             if (categories != null) {
                 categoryAdapter.submitList(new ArrayList<>(categories));
@@ -362,6 +406,7 @@ public class IconMarketActivity extends AppCompatActivity {
      */
     private void showNormalToolbar() {
         binding.toolbarNormal.setVisibility(View.VISIBLE);
+        binding.layoutStyleSelector.setVisibility(View.VISIBLE);
         binding.searchToolbarMultiSelect.setVisibility(View.GONE);
     }
 
@@ -370,6 +415,7 @@ public class IconMarketActivity extends AppCompatActivity {
      */
     private void showMultiSelectToolbar() {
         binding.toolbarNormal.setVisibility(View.GONE);
+        binding.layoutStyleSelector.setVisibility(View.GONE);
         binding.searchToolbarMultiSelect.setVisibility(View.VISIBLE);
     }
 

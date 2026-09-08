@@ -67,6 +67,13 @@ public class IconMarketViewModel extends AndroidViewModel {
 
     public enum PageStatus { IDLE, LOADING, LOADED, ERROR }
 
+    public enum IconStyle {
+        DEFAULT, LINEAR, COLORED
+    }
+
+    private final MutableLiveData<IconStyle> _currentStyle = new MutableLiveData<>(IconStyle.DEFAULT);
+    public  final LiveData<IconStyle>         currentStyle  = _currentStyle;
+
     public static class PageState {
         public final PageStatus     status;
         public final List<IconItem> items;
@@ -223,6 +230,31 @@ public class IconMarketViewModel extends AndroidViewModel {
     }
 
     // ══════════════════════════════════════════════════════════
+    // 风格切换
+    // ══════════════════════════════════════════════════════════
+
+    public void switchStyle(IconStyle style) {
+        if (_currentStyle.getValue() == style) return;
+        _currentStyle.setValue(style);
+        
+        // 强制重新加载分类列表
+        loadCategoriesInternal(true);
+        
+        // 如果当前有搜索关键词，同步更新搜索结果
+        String keyword = _currentKeyword.getValue();
+        if (keyword != null && !keyword.isEmpty()) {
+            search(keyword);
+        }
+    }
+
+    private String getStyleFileName() {
+        IconStyle style = _currentStyle.getValue();
+        if (style == IconStyle.LINEAR) return "freeicon_line.json";
+        if (style == IconStyle.COLORED) return "线性色.json";
+        return null;
+    }
+
+    // ══════════════════════════════════════════════════════════
     // 详情页（保持不变）
     // ══════════════════════════════════════════════════════════
 
@@ -234,10 +266,18 @@ public class IconMarketViewModel extends AndroidViewModel {
         _detailLoading.setValue(true);
         notifyPageStatesChanged();
 
-        repository.getCategoryPageCount(category, new IconRepository.Callback<Integer>() {
-            @Override public void onSuccess(Integer totalPages) { _detailTotalPages.setValue(totalPages); }
-            @Override public void onError(String message)       { Log.e(TAG, "获取总页数失败: " + message); }
-        });
+        String fileName = getStyleFileName();
+        if (fileName == null) {
+            repository.getCategoryPageCount(category, new IconRepository.Callback<Integer>() {
+                @Override public void onSuccess(Integer totalPages) { _detailTotalPages.setValue(totalPages); }
+                @Override public void onError(String message)       { Log.e(TAG, "获取总页数失败: " + message); }
+            });
+        } else {
+            repository.getAssetCategoryPageCount(getApplication().getAssets(), fileName, category, new IconRepository.Callback<Integer>() {
+                @Override public void onSuccess(Integer totalPages) { _detailTotalPages.setValue(totalPages); }
+                @Override public void onError(String message)       { Log.e(TAG, "获取 Asset 总页数失败: " + message); }
+            });
+        }
 
         loadDetailPage(category, 0);
     }
@@ -256,21 +296,40 @@ public class IconMarketViewModel extends AndroidViewModel {
         notifyPageStatesChanged();
         refreshGlobalLoadingState();
 
-        repository.getCategoryDetail(category, page, new IconRepository.Callback<List<IconItem>>() {
-            @Override public void onSuccess(List<IconItem> data) {
-                inflightPages.remove(page);
-                pageStates.put(page, PageState.loaded(data));
-                notifyPageStatesChanged();
-                refreshGlobalLoadingState();
-            }
-            @Override public void onError(String message) {
-                inflightPages.remove(page);
-                pageStates.put(page, PageState.error(message));
-                notifyPageStatesChanged();
-                refreshGlobalLoadingState();
-                _detailError.setValue(message);
-            }
-        });
+        String fileName = getStyleFileName();
+        if (fileName == null) {
+            repository.getCategoryDetail(category, page, new IconRepository.Callback<List<IconItem>>() {
+                @Override public void onSuccess(List<IconItem> data) {
+                    inflightPages.remove(page);
+                    pageStates.put(page, PageState.loaded(data));
+                    notifyPageStatesChanged();
+                    refreshGlobalLoadingState();
+                }
+                @Override public void onError(String message) {
+                    inflightPages.remove(page);
+                    pageStates.put(page, PageState.error(message));
+                    notifyPageStatesChanged();
+                    refreshGlobalLoadingState();
+                    _detailError.setValue(message);
+                }
+            });
+        } else {
+            repository.getAssetCategoryDetail(getApplication().getAssets(), fileName, category, page, new IconRepository.Callback<List<IconItem>>() {
+                @Override public void onSuccess(List<IconItem> data) {
+                    inflightPages.remove(page);
+                    pageStates.put(page, PageState.loaded(data));
+                    notifyPageStatesChanged();
+                    refreshGlobalLoadingState();
+                }
+                @Override public void onError(String message) {
+                    inflightPages.remove(page);
+                    pageStates.put(page, PageState.error(message));
+                    notifyPageStatesChanged();
+                    refreshGlobalLoadingState();
+                    _detailError.setValue(message);
+                }
+            });
+        }
     }
 
     public PageState getPageState(int page) {
@@ -624,23 +683,45 @@ public class IconMarketViewModel extends AndroidViewModel {
     // ══════════════════════════════════════════════════════════
 
     public void loadCategories() {
-        if (Boolean.TRUE.equals(_categoryLoading.getValue())) return;
+        loadCategoriesInternal(false);
+    }
+
+    private void loadCategoriesInternal(boolean force) {
+        if (!force && Boolean.TRUE.equals(_categoryLoading.getValue())) return;
+        
         categoryPage = 0;
         _categoryLoading.setValue(true);
         _categories.setValue(new ArrayList<>());
+        _categoryHasMore.setValue(true);
 
-        repository.getCategoryPage(categoryPage, new IconRepository.Callback<List<IconCategory>>() {
-            @Override public void onSuccess(List<IconCategory> data) {
-                _categoryLoading.setValue(false);
-                _categories.setValue(data);
-                _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
-                categoryPage = 1;
-            }
-            @Override public void onError(String message) {
-                _categoryLoading.setValue(false);
-                _categoryError.setValue(message);
-            }
-        });
+        String fileName = getStyleFileName();
+        if (fileName == null) {
+            repository.getCategoryPage(categoryPage, new IconRepository.Callback<List<IconCategory>>() {
+                @Override public void onSuccess(List<IconCategory> data) {
+                    _categoryLoading.setValue(false);
+                    _categories.setValue(data);
+                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
+                    categoryPage = 1;
+                }
+                @Override public void onError(String message) {
+                    _categoryLoading.setValue(false);
+                    _categoryError.setValue(message);
+                }
+            });
+        } else {
+            repository.getAssetCategoryPage(getApplication().getAssets(), fileName, categoryPage, new IconRepository.Callback<List<IconCategory>>() {
+                @Override public void onSuccess(List<IconCategory> data) {
+                    _categoryLoading.setValue(false);
+                    _categories.setValue(data);
+                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
+                    categoryPage = 1;
+                }
+                @Override public void onError(String message) {
+                    _categoryLoading.setValue(false);
+                    _categoryError.setValue(message);
+                }
+            });
+        }
     }
 
     public void loadMoreCategories() {
@@ -649,25 +730,48 @@ public class IconMarketViewModel extends AndroidViewModel {
         isCategoryLoadingMore = true;
         _categoryLoadingMore.setValue(true);
 
-        repository.getCategoryPage(categoryPage, new IconRepository.Callback<List<IconCategory>>() {
-            @Override public void onSuccess(List<IconCategory> data) {
-                isCategoryLoadingMore = false;
-                _categoryLoadingMore.setValue(false);
-                if (data.isEmpty()) { _categoryHasMore.setValue(false); return; }
-                List<IconCategory> current = _categories.getValue();
-                if (current == null) current = new ArrayList<>();
-                List<IconCategory> merged = new ArrayList<>(current);
-                merged.addAll(data);
-                _categories.setValue(merged);
-                _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
-                categoryPage++;
-            }
-            @Override public void onError(String message) {
-                isCategoryLoadingMore = false;
-                _categoryLoadingMore.setValue(false);
-                _categoryError.setValue(message);
-            }
-        });
+        String fileName = getStyleFileName();
+        if (fileName == null) {
+            repository.getCategoryPage(categoryPage, new IconRepository.Callback<List<IconCategory>>() {
+                @Override public void onSuccess(List<IconCategory> data) {
+                    isCategoryLoadingMore = false;
+                    _categoryLoadingMore.setValue(false);
+                    if (data.isEmpty()) { _categoryHasMore.setValue(false); return; }
+                    List<IconCategory> current = _categories.getValue();
+                    if (current == null) current = new ArrayList<>();
+                    List<IconCategory> merged = new ArrayList<>(current);
+                    merged.addAll(data);
+                    _categories.setValue(merged);
+                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
+                    categoryPage++;
+                }
+                @Override public void onError(String message) {
+                    isCategoryLoadingMore = false;
+                    _categoryLoadingMore.setValue(false);
+                    _categoryError.setValue(message);
+                }
+            });
+        } else {
+            repository.getAssetCategoryPage(getApplication().getAssets(), fileName, categoryPage, new IconRepository.Callback<List<IconCategory>>() {
+                @Override public void onSuccess(List<IconCategory> data) {
+                    isCategoryLoadingMore = false;
+                    _categoryLoadingMore.setValue(false);
+                    if (data.isEmpty()) { _categoryHasMore.setValue(false); return; }
+                    List<IconCategory> current = _categories.getValue();
+                    if (current == null) current = new ArrayList<>();
+                    List<IconCategory> merged = new ArrayList<>(current);
+                    merged.addAll(data);
+                    _categories.setValue(merged);
+                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
+                    categoryPage++;
+                }
+                @Override public void onError(String message) {
+                    isCategoryLoadingMore = false;
+                    _categoryLoadingMore.setValue(false);
+                    _categoryError.setValue(message);
+                }
+            });
+        }
     }
 
     // ══════════════════════════════════════════════════════════
@@ -687,18 +791,34 @@ public class IconMarketViewModel extends AndroidViewModel {
         if (trimmed.isEmpty()) { _searchLoading.setValue(false); return; }
 
         _searchLoading.setValue(true);
-        repository.search(trimmed, 0, new IconRepository.Callback<List<IconItem>>() {
-            @Override public void onSuccess(List<IconItem> data) {
-                _searchLoading.setValue(false);
-                _searchResults.setValue(data);
-                _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
-                searchPage = 1;
-            }
-            @Override public void onError(String message) {
-                _searchLoading.setValue(false);
-                _searchError.setValue(message);
-            }
-        });
+        String fileName = getStyleFileName();
+        if (fileName == null) {
+            repository.search(trimmed, 0, new IconRepository.Callback<List<IconItem>>() {
+                @Override public void onSuccess(List<IconItem> data) {
+                    _searchLoading.setValue(false);
+                    _searchResults.setValue(data);
+                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
+                    searchPage = 1;
+                }
+                @Override public void onError(String message) {
+                    _searchLoading.setValue(false);
+                    _searchError.setValue(message);
+                }
+            });
+        } else {
+            repository.searchAsset(getApplication().getAssets(), fileName, trimmed, 0, new IconRepository.Callback<List<IconItem>>() {
+                @Override public void onSuccess(List<IconItem> data) {
+                    _searchLoading.setValue(false);
+                    _searchResults.setValue(data);
+                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
+                    searchPage = 1;
+                }
+                @Override public void onError(String message) {
+                    _searchLoading.setValue(false);
+                    _searchError.setValue(message);
+                }
+            });
+        }
     }
 
     public void loadMoreSearchResults() {
@@ -709,25 +829,48 @@ public class IconMarketViewModel extends AndroidViewModel {
         isSearchLoadingMore = true;
         _searchLoadingMore.setValue(true);
 
-        repository.search(lastKeyword, searchPage, new IconRepository.Callback<List<IconItem>>() {
-            @Override public void onSuccess(List<IconItem> data) {
-                isSearchLoadingMore = false;
-                _searchLoadingMore.setValue(false);
-                if (data.isEmpty()) { _searchHasMore.setValue(false); return; }
-                List<IconItem> current = _searchResults.getValue();
-                if (current == null) current = new ArrayList<>();
-                List<IconItem> merged = new ArrayList<>(current);
-                merged.addAll(data);
-                _searchResults.setValue(merged);
-                _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
-                searchPage++;
-            }
-            @Override public void onError(String message) {
-                isSearchLoadingMore = false;
-                _searchLoadingMore.setValue(false);
-                _searchError.setValue(message);
-            }
-        });
+        String fileName = getStyleFileName();
+        if (fileName == null) {
+            repository.search(lastKeyword, searchPage, new IconRepository.Callback<List<IconItem>>() {
+                @Override public void onSuccess(List<IconItem> data) {
+                    isSearchLoadingMore = false;
+                    _searchLoadingMore.setValue(false);
+                    if (data.isEmpty()) { _searchHasMore.setValue(false); return; }
+                    List<IconItem> current = _searchResults.getValue();
+                    if (current == null) current = new ArrayList<>();
+                    List<IconItem> merged = new ArrayList<>(current);
+                    merged.addAll(data);
+                    _searchResults.setValue(merged);
+                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
+                    searchPage++;
+                }
+                @Override public void onError(String message) {
+                    isSearchLoadingMore = false;
+                    _searchLoadingMore.setValue(false);
+                    _searchError.setValue(message);
+                }
+            });
+        } else {
+            repository.searchAsset(getApplication().getAssets(), fileName, lastKeyword, searchPage, new IconRepository.Callback<List<IconItem>>() {
+                @Override public void onSuccess(List<IconItem> data) {
+                    isSearchLoadingMore = false;
+                    _searchLoadingMore.setValue(false);
+                    if (data.isEmpty()) { _searchHasMore.setValue(false); return; }
+                    List<IconItem> current = _searchResults.getValue();
+                    if (current == null) current = new ArrayList<>();
+                    List<IconItem> merged = new ArrayList<>(current);
+                    merged.addAll(data);
+                    _searchResults.setValue(merged);
+                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
+                    searchPage++;
+                }
+                @Override public void onError(String message) {
+                    isSearchLoadingMore = false;
+                    _searchLoadingMore.setValue(false);
+                    _searchError.setValue(message);
+                }
+            });
+        }
     }
 
     // ══════════════════════════════════════════════════════════

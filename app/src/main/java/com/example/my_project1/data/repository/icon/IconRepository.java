@@ -1,5 +1,6 @@
 package com.example.my_project1.data.repository.icon;
 
+import android.content.res.AssetManager;
 import android.util.Log;
 
 import com.example.my_project1.data.model.icon.IconCategory;
@@ -9,8 +10,11 @@ import com.example.my_project1.utils.AppExecutors;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,6 +87,13 @@ public class IconRepository {
 
     /** search.json 缓存（懒加载） */
     private List<IconItem> searchCache = null;
+
+    // ==================== Asset 缓存 ====================
+
+    private final ConcurrentHashMap<String, JSONObject> assetJsonCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, List<IconCategory>> assetCategoryCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, List<IconItem>> assetSearchCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ConcurrentHashMap<String, List<IconItem>>> assetCategoryDetailCache = new ConcurrentHashMap<>();
 
     // ==================== 回调接口 ====================
 
@@ -225,6 +236,192 @@ public class IconRepository {
                 postMainError(callback, e.getMessage());
             }
         });
+    }
+
+    // ==================== Asset 数据支持 ====================
+
+    /**
+     * 获取 Asset 中的分类列表（分页）
+     */
+    public void getAssetCategoryPage(AssetManager assets, String fileName, int page, Callback<List<IconCategory>> callback) {
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconCategory> all = loadAssetCategories(assets, fileName);
+                int start = page * PAGE_SIZE_CATEGORY;
+                if (start >= all.size()) {
+                    postMain(callback, new ArrayList<>());
+                    return;
+                }
+                int end = Math.min(start + PAGE_SIZE_CATEGORY, all.size());
+                List<IconCategory> pageData = new ArrayList<>(all.subList(start, end));
+
+                // 填充缩略图
+                for (IconCategory cat : pageData) {
+                    if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                        fillAssetCategoryThumbs(assets, fileName, cat);
+                    }
+                }
+                postMain(callback, pageData);
+            } catch (Exception e) {
+                Log.e(TAG, "getAssetCategoryPage 异常: " + e.getMessage());
+                postMainError(callback, "加载本地分类失败");
+            }
+        });
+    }
+
+    /**
+     * 获取 Asset 分类详情
+     */
+    public void getAssetCategoryDetail(AssetManager assets, String fileName, IconCategory category, int page, Callback<List<IconItem>> callback) {
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconItem> all = loadAssetCategoryItems(assets, fileName, category.getFile());
+                int start = page * PAGE_SIZE_DETAIL;
+                if (start >= all.size()) {
+                    postMain(callback, new ArrayList<>());
+                    return;
+                }
+                int end = Math.min(start + PAGE_SIZE_DETAIL, all.size());
+                postMain(callback, new ArrayList<>(all.subList(start, end)));
+            } catch (Exception e) {
+                postMainError(callback, "加载本地图标详情失败");
+            }
+        });
+    }
+
+    public void getAssetCategoryPageCount(AssetManager assets, String fileName, IconCategory category, Callback<Integer> callback) {
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconItem> all = loadAssetCategoryItems(assets, fileName, category.getFile());
+                int total = (int) Math.ceil((double) all.size() / PAGE_SIZE_DETAIL);
+                postMain(callback, total);
+            } catch (Exception e) {
+                postMainError(callback, e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Asset 搜索
+     */
+    public void searchAsset(AssetManager assets, String fileName, String keyword, int page, Callback<List<IconItem>> callback) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            postMain(callback, new ArrayList<>());
+            return;
+        }
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconItem> allItems = assetSearchCache.get(fileName);
+                if (allItems == null) {
+                    allItems = new ArrayList<>();
+                    List<IconCategory> categories = loadAssetCategories(assets, fileName);
+                    for (IconCategory cat : categories) {
+                        allItems.addAll(loadAssetCategoryItems(assets, fileName, cat.getFile()));
+                    }
+                    assetSearchCache.put(fileName, allItems);
+                }
+
+                final String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
+                List<IconItem> results = new ArrayList<>();
+                for (IconItem item : allItems) {
+                    if (matchKeyword(item, lowerKeyword)) {
+                        results.add(item);
+                    }
+                }
+
+                int start = page * PAGE_SIZE_SEARCH;
+                if (start >= results.size()) {
+                    postMain(callback, new ArrayList<>());
+                    return;
+                }
+                int end = Math.min(start + PAGE_SIZE_SEARCH, results.size());
+                postMain(callback, new ArrayList<>(results.subList(start, end)));
+            } catch (Exception e) {
+                postMainError(callback, "搜索本地图标失败");
+            }
+        });
+    }
+
+    private List<IconCategory> loadAssetCategories(AssetManager assets, String fileName) throws Exception {
+        List<IconCategory> cached = assetCategoryCache.get(fileName);
+        if (cached != null) return cached;
+
+        JSONObject root = getAssetJsonObject(assets, fileName);
+        JSONObject packs = root.getJSONObject("packs");
+        List<IconCategory> list = new ArrayList<>();
+        Iterator<String> keys = packs.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            JSONObject pack = packs.getJSONObject(key);
+            IconCategory cat = new IconCategory();
+            cat.setCategory(pack.optString("title"));
+            cat.setCount(pack.optInt("icon_count"));
+            cat.setFile(key); // 使用 key 作为标识
+            list.add(cat);
+        }
+        assetCategoryCache.put(fileName, list);
+        return list;
+    }
+
+    private List<IconItem> loadAssetCategoryItems(AssetManager assets, String fileName, String packKey) throws Exception {
+        ConcurrentHashMap<String, List<IconItem>> packCache = assetCategoryDetailCache.get(fileName);
+        if (packCache == null) {
+            packCache = new ConcurrentHashMap<>();
+            assetCategoryDetailCache.put(fileName, packCache);
+        }
+        List<IconItem> cached = packCache.get(packKey);
+        if (cached != null) return cached;
+
+        JSONObject root = getAssetJsonObject(assets, fileName);
+        JSONObject pack = root.getJSONObject("packs").getJSONObject(packKey);
+        JSONArray icons = pack.getJSONArray("icons");
+        List<IconItem> list = new ArrayList<>();
+        for (int i = 0; i < icons.length(); i++) {
+            JSONObject obj = icons.getJSONObject(i);
+            IconItem item = new IconItem();
+            item.setId(packKey + "_" + i);
+            item.setName(obj.optString("name"));
+            item.setCategory(pack.optString("title"));
+            item.setUrl(obj.optString("cdn_url"));
+            item.setThumb(obj.optString("cdn_url"));
+            list.add(item);
+        }
+        packCache.put(packKey, list);
+        return list;
+    }
+
+    private JSONObject getAssetJsonObject(AssetManager assets, String fileName) throws Exception {
+        JSONObject cached = assetJsonCache.get(fileName);
+        if (cached != null) return cached;
+        String json = readAssetString(assets, fileName);
+        JSONObject root = new JSONObject(json);
+        assetJsonCache.put(fileName, root);
+        return root;
+    }
+
+    private void fillAssetCategoryThumbs(AssetManager assets, String fileName, IconCategory category) {
+        try {
+            List<IconItem> items = loadAssetCategoryItems(assets, fileName, category.getFile());
+            List<String> thumbs = new ArrayList<>();
+            int count = Math.min(9, items.size());
+            for (int i = 0; i < count; i++) {
+                thumbs.add(items.get(i).getThumbUrl());
+            }
+            category.setThumbUrls(thumbs);
+        } catch (Exception e) {
+            Log.e(TAG, "fillAssetCategoryThumbs 异常: " + e.getMessage());
+        }
+    }
+
+    private String readAssetString(AssetManager assets, String fileName) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(assets.open(fileName)))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        return sb.toString();
     }
 
     // ==================== 搜索 ====================
