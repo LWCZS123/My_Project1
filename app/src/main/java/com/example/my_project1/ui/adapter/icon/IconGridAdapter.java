@@ -257,7 +257,14 @@ public class IconGridAdapter extends ListAdapter<IconItem, IconGridAdapter.ViewH
             // 1. 加载图标（关闭 Glide 淡入动画，防止重绑时闪烁）
             GlideImageLoader.loadThumbnailNoAnim(itemView.getContext(), item.getThumbUrl(), ivIcon);
 
-            // 2. 圆形背景
+            // 2. 统一图标大小：Flaticon 和本地 Asset 图标通常占满画布，需要增加额外 padding 以对齐原有图标
+            String id = item.getId();
+            String url = item.getUrl();
+            boolean needsPadding = (id != null && id.contains("_")) || (url != null && url.contains("flaticon.com"));
+            int padding = needsPadding ? (int) (3 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f) : 0;
+            ivIcon.setPadding(padding, padding, padding, padding);
+
+            // 3. 圆形背景
             if (showCircleBg) {
                 iconContainer.setBackgroundResource(R.drawable.bg_icon_circle);
             } else {

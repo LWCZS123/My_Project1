@@ -56,7 +56,7 @@ public class AccountSyncWorker extends Worker {
         try {
             Log.i(TAG, "========== 开始同步 ==========");
 
-            // 🔴 关键修改：先处理删除，再处理创建和更新
+            // 关键修改：先处理删除，再处理创建和更新
             // 删除顺序：先账户（避免外键约束），再账户组
             boolean okDeleteAccounts = syncDeleteAccounts();
             if (!okDeleteAccounts) {
@@ -86,7 +86,7 @@ public class AccountSyncWorker extends Worker {
         }
     }
 
-    // ======================== 🔴 新增：专门处理账户删除 ========================
+    // ======================== 新增：专门处理账户删除 ========================
 
     /**
      * 同步删除账户
@@ -113,7 +113,7 @@ public class AccountSyncWorker extends Worker {
             deleteCount++;
 
             String objectId = account.getObjectId();
-            Log.d(TAG, "🗑️ 处理待删除账户: " + account.getName() + " (ID: " + objectId + ")");
+            Log.d(TAG, "处理待删除账户: " + account.getName() + " (ID: " + objectId + ")");
 
             if (objectId == null || objectId.isEmpty()) {
                 // 本地账户没有云端ID，直接物理删除
@@ -136,11 +136,11 @@ public class AccountSyncWorker extends Worker {
                         @Override
                         public void done(BmobException e) {
                             if (e == null) {
-                                Log.d(TAG, "   ✅ 云端删除成功（第" + finalAttempt + "次）");
+                                Log.d(TAG, "   云端删除成功（第" + finalAttempt + "次）");
                                 ok[0] = true;
                             } else {
                                 errorCode[0] = e.getErrorCode();
-                                Log.e(TAG, "   ❌ 云端删除失败（第" + finalAttempt + "次）: "
+                                Log.e(TAG, "   云端删除失败（第" + finalAttempt + "次）: "
                                         + e.getMessage() + " (错误码: " + errorCode[0] + ")");
                             }
                             latch.countDown();
@@ -150,7 +150,7 @@ public class AccountSyncWorker extends Worker {
                     boolean awaited = latch.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
                     if (!awaited) {
-                        Log.w(TAG, "   ⚠️ 等待云端删除超时（第" + attempt + "次）");
+                        Log.w(TAG, "   等待云端删除超时（第" + attempt + "次）");
                         continue;
                     }
 
@@ -159,32 +159,32 @@ public class AccountSyncWorker extends Worker {
                         break;
                     }
 
-                    // 🔴 关键：如果云端对象不存在（错误码101），视为删除成功
+            // 关键：如果云端对象不存在（错误码101），视为删除成功
                     if (errorCode[0] == 101) {
-                        Log.i(TAG, "   ✅ 云端对象已不存在（404），视为删除成功");
+                        Log.i(TAG, "   云端对象已不存在（404），视为删除成功");
                         cloudDeleteSuccess = true;
                         break;
                     }
 
                 } catch (Exception e) {
-                    Log.e(TAG, "   ❌ 删除异常（第" + attempt + "次）: " + e.getMessage(), e);
+                    Log.e(TAG, "   删除异常（第" + attempt + "次）: " + e.getMessage(), e);
                 }
             }
 
-            // 🔴 关键：根据云端删除结果决定本地操作
+            // 关键：根据云端删除结果决定本地操作
             if (cloudDeleteSuccess) {
                 // 云端删除成功，物理删除本地数据
                 try {
                     db.accountDao().delete(account);
-                    Log.i(TAG, "   ✅ 本地账户物理删除成功: " + account.getName());
+                    Log.i(TAG, "   本地账户物理删除成功: " + account.getName());
                     successCount++;
                 } catch (Exception e) {
-                    Log.e(TAG, "   ❌ 本地物理删除失败: " + e.getMessage(), e);
+                    Log.e(TAG, "   本地物理删除失败: " + e.getMessage(), e);
                     failCount++;
                 }
             } else {
                 // 云端删除失败，保留 TO_DELETE 状态，下次重试
-                Log.w(TAG, "   ⚠️ 云端删除失败，保留待删除标记: " + account.getName());
+                Log.w(TAG, "   云端删除失败，保留待删除标记: " + account.getName());
                 failCount++;
             }
         }
@@ -192,7 +192,7 @@ public class AccountSyncWorker extends Worker {
         Log.i(TAG, String.format("syncDeleteAccounts 完成 - 总计:%d, 成功:%d, 失败:%d",
                 deleteCount, successCount, failCount));
 
-        // 🔴 只要有失败的，就返回 false 让 Worker 重试
+        // 只要有失败的，就返回 false 让 Worker 重试
         return failCount == 0;
     }
 
@@ -218,7 +218,7 @@ public class AccountSyncWorker extends Worker {
             }
             deleteCount++;
 
-            Log.d(TAG, "🗑️ 处理待删除账户组: " + group.getName());
+            Log.d(TAG, "处理待删除账户组: " + group.getName());
 
             boolean cloudDeleteSuccess = deleteGroupSync(group);
 
@@ -226,14 +226,14 @@ public class AccountSyncWorker extends Worker {
                 // 云端删除成功，物理删除本地数据
                 try {
                     db.accountDao().deleteGroup(group);
-                    Log.i(TAG, "   ✅ 本地账户组物理删除成功: " + group.getName());
+                    Log.i(TAG, "   本地账户组物理删除成功: " + group.getName());
                     successCount++;
                 } catch (Exception e) {
-                    Log.e(TAG, "   ❌ 本地物理删除失败: " + e.getMessage(), e);
+                    Log.e(TAG, "   本地物理删除失败: " + e.getMessage(), e);
                     failCount++;
                 }
             } else {
-                Log.w(TAG, "   ⚠️ 云端删除失败，保留待删除标记: " + group.getName());
+                Log.w(TAG, "   云端删除失败，保留待删除标记: " + group.getName());
                 failCount++;
             }
         }
@@ -265,7 +265,7 @@ public class AccountSyncWorker extends Worker {
                 try {
                     SyncState state = g.getSyncState();
                     if (state == SyncState.TO_CREATE || state == SyncState.TO_UPDATE) {
-                        // 🔴 关键：直接调用 API 层的同步方法，该方法已包含去重逻辑
+                        // 关键：直接调用 API 层的同步方法，该方法已包含去重逻辑
                         ok = api.uploadAccountGroupSync(g);
                     } else {
                         ok = true;
@@ -286,7 +286,7 @@ public class AccountSyncWorker extends Worker {
         return true;
     }
 
-    // 🔴 删除了 Worker 内部冗余的 async 转 sync 封装方法
+    // 删除了 Worker 内部冗余的 async 转 sync 封装方法
     // 现在直接使用 api.uploadAccountGroupSync(g) 即可
 
 
@@ -319,7 +319,7 @@ public class AccountSyncWorker extends Worker {
 
             latch.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
-            // 🔴 如果云端对象不存在，视为删除成功
+            // 如果云端对象不存在，视为删除成功
             if (errorCode[0] == 101) {
                 Log.i(TAG, "deleteGroupSync - 云端对象已不存在，视为删除成功");
                 return true;
@@ -350,7 +350,7 @@ public class AccountSyncWorker extends Worker {
             boolean ok = false;
             for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
                 try {
-                    // 🔴 优化：上传前再次检查所属组的 objectId，防止因同步顺序导致的关联丢失
+                    // 优化：上传前再次检查所属组的 objectId，防止因同步顺序导致的关联丢失
                     if (a.getGroupId() == null || a.getGroupId().isEmpty()) {
                         // 尝试通过本地组 ID 寻找云端 objectId (假设我们有这种映射，目前 schema 较简单)
                         // 这里可以根据业务逻辑补充关联修复代码

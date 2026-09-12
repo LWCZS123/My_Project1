@@ -10,6 +10,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.bumptech.glide.Glide;
@@ -25,7 +27,9 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 import cn.bmob.v3.BmobUser;
 
-
+/**
+ * 分类更多操作底部菜单
+ */
 public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
 
     private String title, categoryName, categoryIconUrl, type;
@@ -42,17 +46,13 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        categoryViewModel = new ViewModelProvider(requireActivity())
-                .get(CategoryViewModel.class);
-        subCategoryViewModel = new ViewModelProvider(requireActivity())
-                .get(SubCategoryViewModel.class);
+        categoryViewModel = new ViewModelProvider(requireActivity()).get(CategoryViewModel.class);
+        subCategoryViewModel = new ViewModelProvider(requireActivity()).get(SubCategoryViewModel.class);
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.layout_category_action_sheet,
-                container, false);
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.layout_category_action_sheet, container, false);
 
         tvCategoryName = view.findViewById(R.id.tv_category_name);
         ivCategoryIcon = view.findViewById(R.id.iv_category_icon);
@@ -69,7 +69,7 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
 
         Bundle args = getArguments();
         if (args != null) {
-            title = args.getString("title", "分类标题");
+            title = args.getString("title", "分类详情");
             categoryName = args.getString("categoryName");
             categoryIconUrl = args.getString("categoryIconUrl");
             categoryId = args.getLong("categoryId", -1);
@@ -86,14 +86,15 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
                 .error(R.drawable.ic_default_category)
                 .into(ivCategoryIcon);
 
-        // 仅在子分类时显示 "调整为一级分类"
+        // 仅在子分类时显示 "晋升为一级分类"
         if ("subcategory".equals(type)) {
             btnPromote.setVisibility(View.VISIBLE);
             dividerPromote.setVisibility(View.VISIBLE);
         } else {
-            // 一级分类不显示“归属到其它分类”
+            // 一级分类隐藏归属调整
             btnBelongTo.setVisibility(View.GONE);
-            view.findViewById(R.id.divider_belong_to).setVisibility(View.GONE);
+            View divider = view.findViewById(R.id.divider_belong_to);
+            if (divider != null) divider.setVisibility(View.GONE);
         }
 
         btnModify.setOnClickListener(v -> showEditDialog());
@@ -116,8 +117,7 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
                 .setConfirmText("确定")
                 .setCancelText("取消")
                 .setConfirmListener(() -> {
-                    String catType = argsType();
-                    categoryViewModel.promoteToMainCategory(subcategoryId, catType);
+                    categoryViewModel.promoteToMainCategory(subcategoryId, argsType());
                     dismiss();
                 })
                 .show();
@@ -170,16 +170,15 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
 
     private void showMigrationDialog() {
         String catType = argsType();
-        String sourceIdStr = "category".equals(type) ? String.valueOf(categoryCloudId) : String.valueOf(categoryCloudId);
-        // 实际上 migrateBills 在 ViewModel 中需要的是 String sourceId (CloudId)
-        CategoryMigrationBottomSheetFragment fragment = CategoryMigrationBottomSheetFragment.newInstance("migrate", sourceIdStr, categoryName, catType);
+        // 迁移需要云端 ID (CloudId)
+        CategoryMigrationBottomSheetFragment fragment = CategoryMigrationBottomSheetFragment.newInstance("migrate", categoryCloudId, categoryName, catType);
         fragment.show(getParentFragmentManager(), "category_migration");
         dismiss();
     }
 
     private void showBelongToDialog() {
         String catType = argsType();
-        String sourceIdStr = String.valueOf(subcategoryId); // 归属调整需要 long id 进行本地更新
+        String sourceIdStr = String.valueOf(subcategoryId);
         long currentParentId = getArguments() != null ? getArguments().getLong("parentCategoryId", -1) : -1;
         CategoryMigrationBottomSheetFragment fragment = CategoryMigrationBottomSheetFragment.newInstance("change_parent", sourceIdStr, categoryName, catType);
         Bundle extra = fragment.getArguments();
@@ -195,7 +194,6 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
         intent.putExtra(com.example.my_project1.ui.activity.CategoryBillsActivity.EXTRA_CATEGORY_NAME, categoryName);
         intent.putExtra(com.example.my_project1.ui.activity.CategoryBillsActivity.EXTRA_CATEGORY_ICON, categoryIconUrl);
         intent.putExtra(com.example.my_project1.ui.activity.CategoryBillsActivity.EXTRA_CATEGORY_ID, categoryCloudId);
-        // 如果是支出分类，type=0，收入分类 type=1。这里简单判断。
         int billType = title.contains("支出") || "expense".equals(argsType()) ? 0 : 1;
         intent.putExtra(com.example.my_project1.ui.activity.CategoryBillsActivity.EXTRA_BILL_TYPE, billType);
         startActivity(intent);
@@ -204,15 +202,16 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
 
     private String argsType() {
         Bundle args = getArguments();
-        return args != null ? args.getString("categoryType") : "";
+        return args != null ? args.getString("categoryType", "") : "";
     }
 
-    /**删除分类*/
     private void showDeleteDialog() {
-        String userId = BmobUser.getCurrentUser().getObjectId();
-        categoryViewModel.checkCategoryBills(userId, categoryCloudId, count -> {
+        BmobUser currentUser = BmobUser.getCurrentUser();
+        if (currentUser == null) return;
+        
+        categoryViewModel.checkCategoryBills(currentUser.getObjectId(), categoryCloudId, count -> {
             String message = count > 0 
-                    ? "该分类下关联了 " + count + " 条账单，删除后这些账单将变成未分类。建议先「迁移数据」或选择「归档」。确定要删除吗？"
+                    ? "该分类下关联了 " + count + " 条账单，删除后这些账单将变成未分类。建议先迁移数据或选择归档。确定要删除吗？"
                     : "确定要删除该分类吗？";
             
             new ConfirmDialog(requireContext())
@@ -220,7 +219,7 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
                     .setMessage(message)
                     .setConfirmText("确定删除")
                     .setCancelText("取消")
-                    .setConfirmListener(() -> executeDelete())
+                    .setConfirmListener(this::executeDelete)
                     .show();
         });
     }
@@ -240,7 +239,6 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
         dismiss();
     }
 
-    /** 弹出修改分类的 IconSelectionActivity */
     private void showEditDialog() {
         android.content.Intent intent = new android.content.Intent(requireContext(), IconSelectionActivity.class);
         intent.putExtra(IconSelectionActivity.EXTRA_MODE, "modify");
@@ -251,31 +249,27 @@ public class CategoryMoreBottomSheetFragment extends BottomSheetDialogFragment {
         intent.putExtra(IconSelectionActivity.EXTRA_ID, "category".equals(type) ? categoryId : subcategoryId);
         
         if (getArguments() != null) {
-            intent.putExtra(IconSelectionActivity.EXTRA_EXCLUDE_BUDGET, 
-                    getArguments().getBoolean("excludeBudget", false));
-            intent.putExtra(IconSelectionActivity.EXTRA_ICON_BG_COLOR,
-                    getArguments().getString("categoryIconBg"));
+            intent.putExtra(IconSelectionActivity.EXTRA_EXCLUDE_BUDGET, getArguments().getBoolean("excludeBudget", false));
+            intent.putExtra(IconSelectionActivity.EXTRA_ICON_BG_COLOR, getArguments().getString("categoryIconBg"));
         }
 
         startActivity(intent);
         dismiss();
     }
 
+    @NonNull
     @Override
-    public Dialog onCreateDialog(Bundle savedInstanceState) {
-        BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
-        bottomSheetDialog.setOnShowListener(dialog -> {
-            FrameLayout bottomSheet = bottomSheetDialog.findViewById(
-                    com.google.android.material.R.id.design_bottom_sheet);
+    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+        BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
+        dialog.setOnShowListener(dialogInterface -> {
+            FrameLayout bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
                 bottomSheet.setBackgroundResource(android.R.color.transparent);
-                // 默认展开 BottomSheet
                 BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
                 behavior.setSkipCollapsed(true);
                 behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             }
         });
-
-        return bottomSheetDialog;
+        return dialog;
     }
 }

@@ -237,6 +237,9 @@ public class IconMarketViewModel extends AndroidViewModel {
         if (_currentStyle.getValue() == style) return;
         _currentStyle.setValue(style);
         
+        // 切换风格时清理仓库缓存，确保 DEFAULT 风格能正确重新聚合 INDEX_URL 和 FLATICON_URL
+        repository.clearCache();
+        
         // 强制重新加载分类列表
         loadCategoriesInternal(true);
         

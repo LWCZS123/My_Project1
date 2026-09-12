@@ -3,6 +3,7 @@ package com.example.my_project1.data.repository.icon;
 import android.content.res.AssetManager;
 import android.util.Log;
 
+import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.data.model.icon.IconItem;
 import com.example.my_project1.utils.AppExecutors;
@@ -24,85 +25,60 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * IconRepository - 图标数据仓库
+ * IconRepository - 高性能图标数据仓库
  * -------------------------------------------------------
- * 数据源：阿里云 OSS JSON 文件
- *
- * JSON 文件结构：
- *   index.json   → 所有分类元信息列表
- *   search.json  → 全量搜索数据（约 20000 条，按需分块）
- *   {file}.json  → 每个分类的图标详情
- *
- * OSS 基础路径：https://icons-classify.oss-cn-hangzhou.aliyuncs.com/
- *
- * 性能优化：
- *   - 分类详情 JSON 按需加载，不预加载全部
- *   - 内存缓存已加载的分类 JSON，避免重复网络请求
- *   - 搜索数据懒加载，首次搜索时才拉取 search.json
- *   - computation 线程池处理 JSON 解析，不阻塞 networkIO
- *   - 分页截取：Repository 层直接切片，减少 ViewModel 数据处理量
- *   - 【使用 OkHttp 加载】
+ * 职责：聚合管理 阿里云 OSS、本地 Asset、Flaticon 三种数据源。
+ * 优化点：
+ *   1. 统一使用 ApiResponse<T> 状态流转。
+ *   2. 缩略图异步延后加载，首屏数据秒开返回。
+ *   3. 消除 Future.get() 线程阻塞，使用安全的非阻塞并发。
+ *   4. 双重检查锁（DCL）确保高并发下缓存不被重复重复加载。
+ *   5. 代码高度提炼，抽取通用分页与异常安全边界。
  */
 public class IconRepository {
 
     private static final String TAG = "IconRepository";
 
-    // ==================== OSS 配置 ====================
-
-    public static final String OSS_BASE =
-            "https://icons-classify.oss-cn-hangzhou.aliyuncs.com/";
-
-    /** index.json 的完整 URL */
+    // ==================== 常量配置 ====================
+    public static final String OSS_BASE = "https://icons-classify.oss-cn-hangzhou.aliyuncs.com/";
     private static final String INDEX_URL = OSS_BASE + "json/index.json";
-
-    /** search.json 的完整 URL */
     private static final String SEARCH_URL = OSS_BASE + "json/search.json";
-
-    /** OSS 缩略图参数 */
+    private static final String FLATICON_URL = OSS_BASE + "json/flaticon_lineal-color-icons.json";
     public static final String THUMB_SUFFIX = "?x-oss-process=image/resize,w_100";
 
-    // ==================== 分页配置 ====================
-
-    /** 分类市集首页每页加载分类数 */
     public static final int PAGE_SIZE_CATEGORY = 10;
-
-    /** 图标详情页每页图标数 */
     public static final int PAGE_SIZE_DETAIL = 50;
-
-    /** 搜索结果每页图标数 */
     public static final int PAGE_SIZE_SEARCH = 200;
 
-    // ==================== 单例 ====================
-
+    // ==================== 单例与并发锁 ====================
     private static volatile IconRepository instance;
+    private final Object indexLock = new Object();
+    private final Object searchLock = new Object();
+    private final Object flaticonLock = new Object();
 
     private final AppExecutors executors;
     private final OkHttpClient okHttpClient;
 
-    /** 分类详情缓存：file → List<IconItem>，避免重复请求 */
+    // ==================== 缓存容器 ====================
     private final ConcurrentHashMap<String, List<IconItem>> categoryCache = new ConcurrentHashMap<>();
-
-    /** index.json 缓存 */
-    private List<IconCategory> categoryIndexCache = null;
-
-    /** search.json 缓存（懒加载） */
-    private List<IconItem> searchCache = null;
-
-    // ==================== Asset 缓存 ====================
+    private volatile List<IconCategory> categoryIndexCache = null;
+    private volatile List<IconItem> searchCache = null;
 
     private final ConcurrentHashMap<String, JSONObject> assetJsonCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, List<IconCategory>> assetCategoryCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, List<IconItem>> assetSearchCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ConcurrentHashMap<String, List<IconItem>>> assetCategoryDetailCache = new ConcurrentHashMap<>();
 
-    // ==================== 回调接口 ====================
+    private volatile JSONObject flaticonJsonCache = null;
+    private volatile List<IconCategory> flaticonCategoryCache = null;
+    private final ConcurrentHashMap<String, List<IconItem>> flaticonCategoryDetailCache = new ConcurrentHashMap<>();
+    private volatile List<IconItem> flaticonSearchCache = null;
 
+    // ==================== 回调接口 ====================
     public interface Callback<T> {
         void onSuccess(T data);
         void onError(String message);
     }
-
-    // ==================== 单例 ====================
 
     private IconRepository() {
         this.executors = AppExecutors.get();
@@ -123,168 +99,139 @@ public class IconRepository {
         return instance;
     }
 
-    // ==================== 分类市集首页 ====================
+    public void clearCache() {
+        synchronized (indexLock) {
+            categoryIndexCache = null;
+        }
+        synchronized (searchLock) {
+            searchCache = null;
+        }
+        synchronized (flaticonLock) {
+            flaticonJsonCache = null;
+            flaticonCategoryCache = null;
+            flaticonSearchCache = null;
+        }
+        categoryCache.clear();
+        assetJsonCache.clear();
+        assetCategoryCache.clear();
+        assetSearchCache.clear();
+        assetCategoryDetailCache.clear();
+        flaticonCategoryDetailCache.clear();
+        Log.d(TAG, "clearCache: 内存缓存已全部清空");
+    }
 
-    /**
-     * 获取分类列表（分页）
-     * 首次调用拉取 index.json 并缓存，后续直接从缓存分页
-     *
-     * 修复：fillCategoryThumbs 同步在 networkIO 线程内完成，
-     * 所有缩略图填充完毕后再 postMain，保证 UI 拿到数据时 thumbUrls 已就绪。
-     * 同时将缩略图加载移至 computation 线程，避免占用 networkIO 线程槽位。
-     *
-     * @param page     页码（从 0 开始）
-     * @param callback 主线程回调
-     */
+    // ==================== 核心业务：分类市集首页 ====================
+
     public void getCategoryPage(int page, Callback<List<IconCategory>> callback) {
         executors.networkIO().execute(() -> {
             try {
-                // 1. 若缓存为空则拉取 index.json
                 if (categoryIndexCache == null) {
-                    String json = fetchUrl(INDEX_URL);
-                    categoryIndexCache = parseIndex(json);
-                    Log.d(TAG, "getCategoryPage - index.json 加载完成: "
-                            + categoryIndexCache.size() + " 个分类");
+                    synchronized (indexLock) {
+                        if (categoryIndexCache == null) {
+                            List<IconCategory> merged = new ArrayList<>();
+                            try {
+                                String json = fetchUrl(INDEX_URL);
+                                merged.addAll(parseIndex(json));
+                            } catch (Exception e) {
+                                Log.e(TAG, "加载 INDEX_URL 失败", e);
+                            }
+                            try {
+                                merged.addAll(loadFlaticonCategoriesInternal());
+                            } catch (Exception e) {
+                                Log.e(TAG, "加载 Flaticon 失败", e);
+                            }
+                            categoryIndexCache = merged;
+                        }
+                    }
                 }
 
-                // 2. 分页截取
-                int start = page * PAGE_SIZE_CATEGORY;
-                if (start >= categoryIndexCache.size()) {
-                    postMain(callback, new ArrayList<>());
-                    return;
-                }
-                int end = Math.min(start + PAGE_SIZE_CATEGORY, categoryIndexCache.size());
-                List<IconCategory> pageData = new ArrayList<>(categoryIndexCache.subList(start, end));
+                List<IconCategory> pageData = paginate(categoryIndexCache, page, PAGE_SIZE_CATEGORY);
+                
+                // 【性能飞跃点】首屏纯列表数据不带图片秒开返回，绝不阻塞 UI
+                dispatchResult(callback, ApiResponse.success(new ArrayList<>(pageData)));
 
-                // 3. 【修复 Bug1 + Bug3】
-                //    在 computation 线程同步填充所有缩略图后，再回调主线程。
-                //    这样 UI 拿到 pageData 时 thumbUrls 已全部就绪，不再出现空白格子。
-                //    同时不占用 networkIO 线程做 CPU 解析，后续分页请求可以顺利拿到线程槽位。
-                try {
-                    executors.computation().submit(() -> {
-                        for (IconCategory cat : pageData) {
-                            if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                // 异步延后去抓取前9张缩略图，完成后触发增量差分刷新
+                executors.computation().execute(() -> {
+                    boolean updated = false;
+                    for (IconCategory cat : pageData) {
+                        if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                            if (cat.getFile() != null && cat.getFile().startsWith("flaticon:")) {
+                                fillFlaticonCategoryThumbs(cat);
+                            } else {
                                 fillCategoryThumbs(cat);
                             }
+                            updated = true;
                         }
-                    }).get(); // 阻塞等待缩略图全部填充完毕
-                } catch (Exception e) {
-                    Log.w(TAG, "getCategoryPage - 预取缩略图异常（不影响主流程）: " + e.getMessage());
-                }
-
-                postMain(callback, pageData);
+                    }
+                    if (updated) {
+                        executors.mainThread().execute(() -> callback.onSuccess(new ArrayList<>(pageData)));
+                    }
+                });
 
             } catch (Exception e) {
-                Log.e(TAG, "getCategoryPage 异常: " + e.getMessage(), e);
-                postMainError(callback, "加载分类列表失败：" + e.getMessage());
+                dispatchResult(callback, ApiResponse.error("加载分类列表失败"));
             }
         });
     }
 
-    /**
-     * 获取分类详情（分页）
-     * 按需加载对应分类 JSON，并缓存到内存
-     *
-     * @param category 分类对象（含 file 字段）
-     * @param page     页码（从 0 开始）
-     * @param callback 主线程回调
-     */
-    public void getCategoryDetail(IconCategory category, int page,
-                                  Callback<List<IconItem>> callback) {
+    public void getCategoryDetail(IconCategory category, int page, Callback<List<IconItem>> callback) {
         executors.networkIO().execute(() -> {
             try {
-                Log.d(TAG, "=== getCategoryDetail 执行 ===");
-                Log.d(TAG, "分类: " + category.getCategory());
-                Log.d(TAG, "请求页码: " + page);
-
                 List<IconItem> all = loadCategoryItems(category);
-                Log.d(TAG, "该分类总图标数: " + all.size());
-
-                int start = page * PAGE_SIZE_DETAIL;
-                int end = Math.min(start + PAGE_SIZE_DETAIL, all.size());
-                Log.d(TAG, "分页区间 start=" + start + " end=" + end);
-
-
-                if (start >= all.size()) {
-                    Log.w(TAG, "getCategoryDetail: 页码超出，返回空列表");
-                    postMain(callback, new ArrayList<>());
-                    return;
-                }
-
-                List<IconItem> pageList = new ArrayList<>(all.subList(start, end));
-                Log.d(TAG, "分页返回数量: " + pageList.size());
-                postMain(callback, pageList);
-
+                dispatchResult(callback, ApiResponse.success(paginate(all, page, PAGE_SIZE_DETAIL)));
             } catch (Exception e) {
-                Log.e(TAG, "getCategoryDetail 异常: " + e.getMessage(), e);
-                postMainError(callback, "加载图标详情失败：" + e.getMessage());
+                dispatchResult(callback, ApiResponse.error("加载图标详情失败"));
             }
         });
     }
 
-    /**
-     * 获取某分类的总页数
-     */
     public void getCategoryPageCount(IconCategory category, Callback<Integer> callback) {
         executors.networkIO().execute(() -> {
             try {
                 List<IconItem> all = loadCategoryItems(category);
                 int total = (int) Math.ceil((double) all.size() / PAGE_SIZE_DETAIL);
-                postMain(callback, total);
+                dispatchResult(callback, ApiResponse.success(total));
             } catch (Exception e) {
-                Log.e(TAG, "getCategoryPageCount 异常: " + e.getMessage(), e);
-                postMainError(callback, e.getMessage());
+                dispatchResult(callback, ApiResponse.error(e.getMessage()));
             }
         });
     }
 
-    // ==================== Asset 数据支持 ====================
+    // ==================== 核心业务：Asset 数据源支持 ====================
 
-    /**
-     * 获取 Asset 中的分类列表（分页）
-     */
     public void getAssetCategoryPage(AssetManager assets, String fileName, int page, Callback<List<IconCategory>> callback) {
         executors.networkIO().execute(() -> {
             try {
                 List<IconCategory> all = loadAssetCategories(assets, fileName);
-                int start = page * PAGE_SIZE_CATEGORY;
-                if (start >= all.size()) {
-                    postMain(callback, new ArrayList<>());
-                    return;
-                }
-                int end = Math.min(start + PAGE_SIZE_CATEGORY, all.size());
-                List<IconCategory> pageData = new ArrayList<>(all.subList(start, end));
+                List<IconCategory> pageData = paginate(all, page, PAGE_SIZE_CATEGORY);
+                
+                dispatchResult(callback, ApiResponse.success(new ArrayList<>(pageData)));
 
-                // 填充缩略图
-                for (IconCategory cat : pageData) {
-                    if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
-                        fillAssetCategoryThumbs(assets, fileName, cat);
+                executors.computation().execute(() -> {
+                    boolean updated = false;
+                    for (IconCategory cat : pageData) {
+                        if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                            fillAssetCategoryThumbs(assets, fileName, cat);
+                            updated = true;
+                        }
                     }
-                }
-                postMain(callback, pageData);
+                    if (updated) {
+                        executors.mainThread().execute(() -> callback.onSuccess(new ArrayList<>(pageData)));
+                    }
+                });
             } catch (Exception e) {
-                Log.e(TAG, "getAssetCategoryPage 异常: " + e.getMessage());
-                postMainError(callback, "加载本地分类失败");
+                dispatchResult(callback, ApiResponse.error("加载本地分类失败"));
             }
         });
     }
 
-    /**
-     * 获取 Asset 分类详情
-     */
     public void getAssetCategoryDetail(AssetManager assets, String fileName, IconCategory category, int page, Callback<List<IconItem>> callback) {
         executors.networkIO().execute(() -> {
             try {
                 List<IconItem> all = loadAssetCategoryItems(assets, fileName, category.getFile());
-                int start = page * PAGE_SIZE_DETAIL;
-                if (start >= all.size()) {
-                    postMain(callback, new ArrayList<>());
-                    return;
-                }
-                int end = Math.min(start + PAGE_SIZE_DETAIL, all.size());
-                postMain(callback, new ArrayList<>(all.subList(start, end)));
+                dispatchResult(callback, ApiResponse.success(paginate(all, page, PAGE_SIZE_DETAIL)));
             } catch (Exception e) {
-                postMainError(callback, "加载本地图标详情失败");
+                dispatchResult(callback, ApiResponse.error("加载本地图标详情失败"));
             }
         });
     }
@@ -294,19 +241,16 @@ public class IconRepository {
             try {
                 List<IconItem> all = loadAssetCategoryItems(assets, fileName, category.getFile());
                 int total = (int) Math.ceil((double) all.size() / PAGE_SIZE_DETAIL);
-                postMain(callback, total);
+                dispatchResult(callback, ApiResponse.success(total));
             } catch (Exception e) {
-                postMainError(callback, e.getMessage());
+                dispatchResult(callback, ApiResponse.error(e.getMessage()));
             }
         });
     }
 
-    /**
-     * Asset 搜索
-     */
     public void searchAsset(AssetManager assets, String fileName, String keyword, int page, Callback<List<IconItem>> callback) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            postMain(callback, new ArrayList<>());
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>()));
             return;
         }
         executors.networkIO().execute(() -> {
@@ -321,25 +265,209 @@ public class IconRepository {
                     assetSearchCache.put(fileName, allItems);
                 }
 
-                final String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
+                String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
                 List<IconItem> results = new ArrayList<>();
                 for (IconItem item : allItems) {
                     if (matchKeyword(item, lowerKeyword)) {
                         results.add(item);
                     }
                 }
-
-                int start = page * PAGE_SIZE_SEARCH;
-                if (start >= results.size()) {
-                    postMain(callback, new ArrayList<>());
-                    return;
-                }
-                int end = Math.min(start + PAGE_SIZE_SEARCH, results.size());
-                postMain(callback, new ArrayList<>(results.subList(start, end)));
+                dispatchResult(callback, ApiResponse.success(paginate(results, page, PAGE_SIZE_SEARCH)));
             } catch (Exception e) {
-                postMainError(callback, "搜索本地图标失败");
+                dispatchResult(callback, ApiResponse.error("搜索本地图标失败"));
             }
         });
+    }
+
+    // ==================== 核心业务：Flaticon 独立源支持 ====================
+
+    public void getFlaticonCategoryPage(int page, Callback<List<IconCategory>> callback) {
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconCategory> all = loadFlaticonCategoriesInternal();
+                List<IconCategory> pageData = paginate(all, page, PAGE_SIZE_CATEGORY);
+                dispatchResult(callback, ApiResponse.success(new ArrayList<>(pageData)));
+
+                executors.computation().execute(() -> {
+                    boolean updated = false;
+                    for (IconCategory cat : pageData) {
+                        if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                            fillFlaticonCategoryThumbs(cat);
+                            updated = true;
+                        }
+                    }
+                    if (updated) {
+                        executors.mainThread().execute(() -> callback.onSuccess(new ArrayList<>(pageData)));
+                    }
+                });
+            } catch (Exception e) {
+                dispatchResult(callback, ApiResponse.error("加载 Flaticon 分类失败"));
+            }
+        });
+    }
+
+    public void getFlaticonCategoryDetail(IconCategory category, int page, Callback<List<IconItem>> callback) {
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconItem> all = loadFlaticonCategoryItemsInternal(category.getFile());
+                dispatchResult(callback, ApiResponse.success(paginate(all, page, PAGE_SIZE_DETAIL)));
+            } catch (Exception e) {
+                dispatchResult(callback, ApiResponse.error("加载 Flaticon 图标详情失败"));
+            }
+        });
+    }
+
+    public void getFlaticonCategoryPageCount(IconCategory category, Callback<Integer> callback) {
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconItem> all = loadFlaticonCategoryItemsInternal(category.getFile());
+                int total = (int) Math.ceil((double) all.size() / PAGE_SIZE_DETAIL);
+                dispatchResult(callback, ApiResponse.success(total));
+            } catch (Exception e) {
+                dispatchResult(callback, ApiResponse.error(e.getMessage()));
+            }
+        });
+    }
+
+    public void searchFlaticon(String keyword, int page, Callback<List<IconItem>> callback) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>()));
+            return;
+        }
+        executors.networkIO().execute(() -> {
+            try {
+                ensureFlaticonSearchCacheBuilt();
+                String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
+                List<IconItem> results = new ArrayList<>();
+                for (IconItem item : flaticonSearchCache) {
+                    if (matchKeyword(item, lowerKeyword)) {
+                        results.add(item);
+                    }
+                }
+                dispatchResult(callback, ApiResponse.success(paginate(results, page, PAGE_SIZE_SEARCH)));
+            } catch (Exception e) {
+                dispatchResult(callback, ApiResponse.error("搜索 Flaticon 图标失败"));
+            }
+        });
+    }
+
+    // ==================== 全量业务：全局聚合检索 ====================
+
+    public void search(String keyword, int page, Callback<List<IconItem>> callback) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>()));
+            return;
+        }
+        executors.networkIO().execute(() -> {
+            try {
+                if (searchCache == null) {
+                    synchronized (searchLock) {
+                        if (searchCache == null) {
+                            List<IconItem> merged = new ArrayList<>();
+                            try {
+                                String json = fetchUrl(SEARCH_URL);
+                                merged.addAll(parseIconItems(json));
+                            } catch (Exception e) {
+                                Log.e(TAG, "加载全球搜索索引失败", e);
+                            }
+                            try {
+                                ensureFlaticonSearchCacheBuilt();
+                                merged.addAll(flaticonSearchCache);
+                            } catch (Exception e) {
+                                Log.e(TAG, "构建 Flaticon 搜索高速缓存失败", e);
+                            }
+                            searchCache = merged;
+                        }
+                    }
+                }
+
+                String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
+                List<IconItem> allResults = new ArrayList<>();
+                for (IconItem item : searchCache) {
+                    if (matchKeyword(item, lowerKeyword)) {
+                        allResults.add(item);
+                    }
+                }
+                dispatchResult(callback, ApiResponse.success(paginate(allResults, page, PAGE_SIZE_SEARCH)));
+            } catch (Exception e) {
+                dispatchResult(callback, ApiResponse.error("全局搜索失败"));
+            }
+        });
+    }
+
+    // ==================== 内部实现：高内聚底层子源加载器 ====================
+
+    private List<IconCategory> loadFlaticonCategoriesInternal() throws Exception {
+        if (flaticonCategoryCache != null) return flaticonCategoryCache;
+        synchronized (flaticonLock) {
+            if (flaticonCategoryCache != null) return flaticonCategoryCache;
+            JSONObject root = getFlaticonJsonObject();
+            JSONObject packs = root.getJSONObject("packs");
+            List<IconCategory> list = new ArrayList<>();
+            Iterator<String> keys = packs.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject pack = packs.getJSONObject(key);
+                IconCategory cat = new IconCategory();
+                cat.setCategory(pack.optString("title_zh", pack.optString("title")));
+                cat.setCount(pack.optInt("icon_count"));
+                cat.setFile("flaticon:" + key);
+                list.add(cat);
+            }
+            flaticonCategoryCache = list;
+            return list;
+        }
+    }
+
+    private List<IconItem> loadFlaticonCategoryItemsInternal(String packKey) throws Exception {
+        String realKey = (packKey != null && packKey.startsWith("flaticon:")) ? packKey.replace("flaticon:", "") : packKey;
+        List<IconItem> cached = flaticonCategoryDetailCache.get(realKey);
+        if (cached != null) return cached;
+
+        JSONObject root = getFlaticonJsonObject();
+        JSONObject pack = root.getJSONObject("packs").getJSONObject(realKey);
+        JSONArray icons = pack.getJSONArray("icons");
+        List<IconItem> list = new ArrayList<>();
+        for (int i = 0; i < icons.length(); i++) {
+            JSONObject obj = icons.getJSONObject(i);
+            IconItem item = new IconItem();
+            item.setId("flaticon_" + realKey + "_" + obj.optString("id", String.valueOf(i)));
+            item.setName(obj.optString("name_zh", obj.optString("name")));
+            item.setCategory(pack.optString("title_zh", pack.optString("title")));
+            String cdnUrl = obj.optString("cdn_url");
+            item.setUrl(cdnUrl);
+            item.setThumb(cdnUrl + THUMB_SUFFIX);
+            list.add(item);
+        }
+        flaticonCategoryDetailCache.put(realKey, list);
+        return list;
+    }
+
+    private void ensureFlaticonSearchCacheBuilt() throws Exception {
+        if (flaticonSearchCache != null) return;
+        synchronized (flaticonLock) {
+            if (flaticonSearchCache != null) return;
+            List<IconItem> allItems = new ArrayList<>();
+            List<IconCategory> categories = loadFlaticonCategoriesInternal();
+            for (IconCategory cat : categories) {
+                allItems.addAll(loadFlaticonCategoryItemsInternal(cat.getFile()));
+            }
+            flaticonSearchCache = allItems;
+        }
+    }
+
+    private List<IconItem> loadCategoryItems(IconCategory category) throws Exception {
+        String key = category.getFile();
+        if (key != null && key.startsWith("flaticon:")) {
+            return loadFlaticonCategoryItemsInternal(key);
+        }
+        List<IconItem> cached = categoryCache.get(key);
+        if (cached != null) return cached;
+
+        String json = fetchUrl(OSS_BASE + "json/" + key);
+        List<IconItem> items = parseIconItems(json);
+        categoryCache.put(key, items);
+        return items;
     }
 
     private List<IconCategory> loadAssetCategories(AssetManager assets, String fileName) throws Exception {
@@ -356,7 +484,7 @@ public class IconRepository {
             IconCategory cat = new IconCategory();
             cat.setCategory(pack.optString("title"));
             cat.setCount(pack.optInt("icon_count"));
-            cat.setFile(key); // 使用 key 作为标识
+            cat.setFile(key);
             list.add(cat);
         }
         assetCategoryCache.put(fileName, list);
@@ -367,7 +495,8 @@ public class IconRepository {
         ConcurrentHashMap<String, List<IconItem>> packCache = assetCategoryDetailCache.get(fileName);
         if (packCache == null) {
             packCache = new ConcurrentHashMap<>();
-            assetCategoryDetailCache.put(fileName, packCache);
+            assetCategoryDetailCache.putIfAbsent(fileName, packCache);
+            packCache = assetCategoryDetailCache.get(fileName);
         }
         List<IconItem> cached = packCache.get(packKey);
         if (cached != null) return cached;
@@ -399,6 +528,43 @@ public class IconRepository {
         return root;
     }
 
+    private JSONObject getFlaticonJsonObject() throws Exception {
+        if (flaticonJsonCache != null) return flaticonJsonCache;
+        String json = fetchUrl(FLATICON_URL);
+        flaticonJsonCache = new JSONObject(json);
+        return flaticonJsonCache;
+    }
+
+    // ==================== 缩略图前置渲染提取器 ====================
+
+    private void fillCategoryThumbs(IconCategory category) {
+        try {
+            List<IconItem> items = loadCategoryItems(category);
+            List<String> thumbs = new ArrayList<>();
+            int count = Math.min(9, items.size());
+            for (int i = 0; i < count; i++) {
+                thumbs.add(items.get(i).getThumbUrl());
+            }
+            category.setThumbUrls(thumbs);
+        } catch (Exception e) {
+            Log.e(TAG, "fillCategoryThumbs 异常", e);
+        }
+    }
+
+    private void fillFlaticonCategoryThumbs(IconCategory category) {
+        try {
+            List<IconItem> items = loadFlaticonCategoryItemsInternal(category.getFile());
+            List<String> thumbs = new ArrayList<>();
+            int count = Math.min(9, items.size());
+            for (int i = 0; i < count; i++) {
+                thumbs.add(items.get(i).getThumbUrl());
+            }
+            category.setThumbUrls(thumbs);
+        } catch (Exception e) {
+            Log.e(TAG, "fillFlaticonCategoryThumbs 异常", e);
+        }
+    }
+
     private void fillAssetCategoryThumbs(AssetManager assets, String fileName, IconCategory category) {
         try {
             List<IconItem> items = loadAssetCategoryItems(assets, fileName, category.getFile());
@@ -409,7 +575,75 @@ public class IconRepository {
             }
             category.setThumbUrls(thumbs);
         } catch (Exception e) {
-            Log.e(TAG, "fillAssetCategoryThumbs 异常: " + e.getMessage());
+            Log.e(TAG, "fillAssetCategoryThumbs 异常", e);
+        }
+    }
+
+    // ==================== 工具类内部私有方法 ====================
+
+    private <T> List<T> paginate(List<T> all, int page, int pageSize) {
+        int start = page * pageSize;
+        if (all == null || start >= all.size()) return new ArrayList<>();
+        int end = Math.min(start + pageSize, all.size());
+        return new ArrayList<>(all.subList(start, end));
+    }
+
+    private boolean matchKeyword(IconItem item, String lowerKeyword) {
+        return (item.getName() != null && item.getName().toLowerCase(Locale.CHINA).contains(lowerKeyword))
+                || (item.getPinyin() != null && item.getPinyin().toLowerCase(Locale.CHINA).contains(lowerKeyword))
+                || (item.getInitial() != null && item.getInitial().toLowerCase(Locale.CHINA).startsWith(lowerKeyword))
+                || (item.getCategory() != null && item.getCategory().toLowerCase(Locale.CHINA).contains(lowerKeyword));
+    }
+
+    private List<IconCategory> parseIndex(String json) throws Exception {
+        List<IconCategory> list = new ArrayList<>();
+        JSONArray arr = new JSONArray(json);
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.getJSONObject(i);
+            String name = obj.optString("category");
+            if (name == null || "json".equalsIgnoreCase(name.trim())) continue;
+
+            IconCategory cat = new IconCategory();
+            cat.setCategory(name);
+            cat.setCount(obj.optInt("count"));
+            cat.setFile(obj.optString("file"));
+            list.add(cat);
+        }
+        return list;
+    }
+
+    private List<IconItem> parseIconItems(String json) throws Exception {
+        List<IconItem> list = new ArrayList<>();
+        JSONArray arr = new JSONArray(json);
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.getJSONObject(i);
+            IconItem item = new IconItem();
+            item.setId(obj.optString("id"));
+            item.setName(obj.optString("name"));
+            item.setCategory(obj.optString("category"));
+
+            String url = obj.optString("url");
+            if (!url.isEmpty() && !url.startsWith("http")) url = OSS_BASE + url;
+            item.setUrl(url);
+
+            String thumb = obj.optString("thumb");
+            if (!thumb.isEmpty() && !thumb.startsWith("http")) thumb = OSS_BASE + thumb;
+            item.setThumb(thumb);
+
+            item.setPinyin(obj.optString("pinyin"));
+            item.setInitial(obj.optString("initial"));
+            list.add(item);
+        }
+        return list;
+    }
+
+    private String fetchUrl(String urlStr) throws Exception {
+        Request request = new Request.Builder().url(urlStr).build();
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) {
+                throw new IOException("HTTP " + response.code() + " - " + urlStr);
+            }
+            return response.body().string();
         }
     }
 
@@ -424,204 +658,14 @@ public class IconRepository {
         return sb.toString();
     }
 
-    // ==================== 搜索 ====================
-
-    /**
-     * 搜索图标（支持名称、拼音、首字母）
-     * 首次搜索懒加载 search.json，后续走内存缓存
-     *
-     * @param keyword  搜索关键词
-     * @param page     页码（从 0 开始）
-     * @param callback 主线程回调
-     */
-    public void search(String keyword, int page, Callback<List<IconItem>> callback) {
-        if (keyword == null || keyword.trim().isEmpty()) {
-            postMain(callback, new ArrayList<>());
-            return;
-        }
-
-        executors.networkIO().execute(() -> {
-            try {
-                // 1. 懒加载 search.json
-                if (searchCache == null) {
-                    Log.d(TAG, "search - 首次搜索，开始加载 search.json");
-                    String json = fetchUrl(SEARCH_URL);
-                    searchCache = parseIconItems(json);
-                    Log.d(TAG, "search - search.json 加载完成: " + searchCache.size() + " 条");
-                }
-
-                // 2. computation 线程过滤（避免在 networkIO 做 CPU 密集操作）
-                final String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
-                List<IconItem> allResults = new ArrayList<>();
-
-                executors.computation().submit(() -> {
-                    for (IconItem item : searchCache) {
-                        if (matchKeyword(item, lowerKeyword)) {
-                            allResults.add(item);
-                        }
-                    }
-                }).get(); // 等待计算完成
-
-                // 3. 分页
-                int start = page * PAGE_SIZE_SEARCH;
-                if (start >= allResults.size()) {
-                    postMain(callback, new ArrayList<>());
-                    return;
-                }
-                int end = Math.min(start + PAGE_SIZE_SEARCH, allResults.size());
-                postMain(callback, new ArrayList<>(allResults.subList(start, end)));
-
-                Log.d(TAG, "search - 关键词「" + keyword + "」命中 " + allResults.size() + " 条");
-
-            } catch (Exception e) {
-                Log.e(TAG, "search 异常: " + e.getMessage(), e);
-                postMainError(callback, "搜索失败：" + e.getMessage());
+    private <T> void dispatchResult(Callback<T> callback, ApiResponse<T> response) {
+        if (callback == null) return;
+        executors.mainThread().execute(() -> {
+            if (response.isSuccess()) {
+                callback.onSuccess(response.getData());
+            } else {
+                callback.onError(response.getMessage());
             }
         });
-    }
-
-    // ==================== 内部：数据加载 ====================
-
-    /**
-     * 加载分类图标列表，命中缓存直接返回
-     */
-    private List<IconItem> loadCategoryItems(IconCategory category) throws Exception {
-        String key = category.getFile();
-        List<IconItem> cached = categoryCache.get(key);
-        if (cached != null) {
-            Log.d(TAG, "loadCategoryItems - 命中缓存: " + key);
-            return cached;
-        }
-
-        String fileUrl = OSS_BASE + "json/" + category.getFile();
-        Log.d(TAG, "loadCategoryItems - 网络加载: " + fileUrl);
-        String json = fetchUrl(fileUrl);
-        List<IconItem> items = parseIconItems(json);
-        categoryCache.put(key, items);
-        return items;
-    }
-
-    /**
-     * 为分类填充前 9 张缩略图 URL
-     * 注意：此方法需在 networkIO 或 computation 线程调用
-     */
-    private void fillCategoryThumbs(IconCategory category) {
-        try {
-            List<IconItem> items = loadCategoryItems(category);
-            List<String> thumbs = new ArrayList<>();
-            int count = Math.min(9, items.size());
-            for (int i = 0; i < count; i++) {
-                thumbs.add(items.get(i).getThumbUrl());
-            }
-            category.setThumbUrls(thumbs);
-        } catch (Exception e) {
-            Log.e(TAG, "fillCategoryThumbs 异常: " + e.getMessage());
-        }
-    }
-
-    // ==================== 内部：关键词匹配 ====================
-
-    private boolean matchKeyword(IconItem item, String lowerKeyword) {
-        if (item.getName() != null
-                && item.getName().toLowerCase(Locale.CHINA).contains(lowerKeyword)) return true;
-        if (item.getPinyin() != null
-                && item.getPinyin().toLowerCase(Locale.CHINA).contains(lowerKeyword)) return true;
-        if (item.getInitial() != null
-                && item.getInitial().toLowerCase(Locale.CHINA).startsWith(lowerKeyword)) return true;
-        if (item.getCategory() != null
-                && item.getCategory().toLowerCase(Locale.CHINA).contains(lowerKeyword)) return true;
-        return false;
-    }
-
-    // ==================== 内部：JSON 解析 ====================
-
-    /**
-     * 解析 index.json → List<IconCategory>
-     */
-    private List<IconCategory> parseIndex(String json) throws Exception {
-        List<IconCategory> list = new ArrayList<>();
-        JSONArray arr = new JSONArray(json);
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.getJSONObject(i);
-            String categoryName = obj.optString("category");
-            if ("json".equalsIgnoreCase(categoryName.trim())) {
-                continue;
-            }
-            IconCategory cat = new IconCategory();
-            cat.setCategory(obj.optString("category"));
-
-            cat.setCount(obj.optInt("count"));
-            cat.setFile(obj.optString("file"));
-            list.add(cat);
-        }
-        return list;
-    }
-
-    /**
-     * 解析图标 JSON（search.json / category.json）→ List<IconItem>
-     */
-    private List<IconItem> parseIconItems(String json) throws Exception {
-        List<IconItem> list = new ArrayList<>();
-        JSONArray arr = new JSONArray(json);
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.getJSONObject(i);
-            IconItem item = new IconItem();
-            item.setId(obj.optString("id"));
-            item.setName(obj.optString("name"));
-            item.setCategory(obj.optString("category"));
-
-            // 修复：补全 URL 路径
-            String url = obj.optString("url");
-            if (!url.isEmpty() && !url.startsWith("http")) {
-                url = OSS_BASE + url;
-            }
-            item.setUrl(url);
-
-            String thumb = obj.optString("thumb");
-            if (!thumb.isEmpty() && !thumb.startsWith("http")) {
-                thumb = OSS_BASE + thumb;
-            }
-            item.setThumb(thumb);
-
-            item.setPinyin(obj.optString("pinyin"));
-            item.setInitial(obj.optString("initial"));
-            list.add(item);
-        }
-        return list;
-    }
-
-    // ==================== 内部：网络请求 ====================
-
-    /**
-     * 同步拉取 URL 文本内容
-     * 在 networkIO 线程调用，不阻塞主线程
-     * 【已重构为使用 OkHttp】
-     */
-    private String fetchUrl(String urlStr) throws Exception {
-        Request request = new Request.Builder()
-                .url(urlStr)
-                .build();
-
-        try (Response response = okHttpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("HTTP " + response.code() + " - " + urlStr);
-            }
-            if (response.body() == null) {
-                throw new IOException("Empty body - " + urlStr);
-            }
-            return response.body().string();
-        }
-    }
-
-    // ==================== 内部：线程切换工具 ====================
-
-    private <T> void postMain(Callback<T> callback, T data) {
-        if (callback == null) return;
-        executors.mainThread().execute(() -> callback.onSuccess(data));
-    }
-
-    private <T> void postMainError(Callback<T> callback, String message) {
-        if (callback == null) return;
-        executors.mainThread().execute(() -> callback.onError(message));
     }
 }

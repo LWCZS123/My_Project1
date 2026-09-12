@@ -103,11 +103,17 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             });
 
             List<String> thumbUrls = category.getThumbUrls();
+            // 识别是否需要 Padding：原有 INDEX_URL 的分类以 .json 结尾且自带边距，
+            // 其他（Flaticon, LINEAR, COLORED）则占满画布，需要增加 Padding 以对齐
+            String file = category.getFile();
+            boolean needsPadding = file != null && !file.endsWith(".json");
+            int padding = needsPadding ? (int) (4 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f) : 0;
 
             for (int i = 0; i < 9; i++) {
                 ImageView iv = thumbViews[i];
                 if (iv == null) continue;
 
+                iv.setPadding(padding, padding, padding, padding);
                 Glide.with(itemView.getContext()).clear(iv);
 
                 if (thumbUrls != null && i < thumbUrls.size()) {

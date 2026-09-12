@@ -27,7 +27,7 @@ import io.reactivex.annotations.NonNull;
 /**
  * BillSyncWorker - 账单同步Worker (完整修复版)
  * -------------------------------------------------------
- * 🔧 修复内容:
+ * 修复内容:
  * 1. 移除syncBills()中的重复数据库更新
  * 2. uploadBillSync()已经更新了数据库,无需重复操作
  * 3. 统一删除同步逻辑，移除重复的syncDeletedBills方法
@@ -53,7 +53,7 @@ public class BillSyncWorker extends Worker {
         try {
             Log.i(TAG, "========== 开始账单同步 ==========");
 
-            // 🔴 关键:先处理删除,再处理创建和更新
+            // 关键:先处理删除,再处理创建和更新
             boolean okDelete = syncDeleteBills();
             if (!okDelete) {
                 Log.w(TAG, "账单删除同步未完全成功,将重试");
@@ -76,7 +76,7 @@ public class BillSyncWorker extends Worker {
         }
     }
 
-    // ======================== 🔴 删除账单同步 ========================
+    // ======================== 删除账单同步 ========================
 
     /**
      * 同步删除账单（完整版）
@@ -96,21 +96,21 @@ public class BillSyncWorker extends Worker {
         int successCount = 0;
         int failCount = 0;
 
-        Log.i(TAG, "🔄 开始同步删除 " + deleteCount + " 条账单");
+        Log.i(TAG, "开始同步删除 " + deleteCount + " 条账单");
 
         for (Bill bill : deletedBills) {
             String objectId = bill.getObjectId();
-            Log.d(TAG, "🗑️ 处理待删除账单: " + bill.getAmount() + " (ID: " + objectId + ")");
+            Log.d(TAG, "处理待删除账单: " + bill.getAmount() + " (ID: " + objectId + ")");
 
             if (objectId == null || objectId.isEmpty()) {
                 // 本地账单没有云端ID,直接物理删除
                 try {
                     db.billDao().delete(bill);
                     successCount++;
-                    Log.i(TAG, "   ✅ 无云端ID,直接物理删除本地数据");
+                    Log.i(TAG, "   无云端ID,直接物理删除本地数据");
                 } catch (Exception e) {
                     failCount++;
-                    Log.e(TAG, "   ❌ 本地删除失败: " + e.getMessage(), e);
+                    Log.e(TAG, "   本地删除失败: " + e.getMessage(), e);
                 }
                 continue;
             }
@@ -121,20 +121,20 @@ public class BillSyncWorker extends Worker {
             // 方案2: 使用同步删除（可选，更简单但需要Bmob SDK支持）
             // boolean cloudDeleteSuccess = deleteCloudBillSync(objectId);
 
-            // 🔑 关键:根据云端删除结果决定本地操作
+            // 关键:根据云端删除结果决定本地操作
             if (cloudDeleteSuccess) {
                 // 云端删除成功,物理删除本地数据
                 try {
                     db.billDao().delete(bill);
-                    Log.i(TAG, "   ✅ 本地账单物理删除成功");
+                    Log.i(TAG, "   本地账单物理删除成功");
                     successCount++;
                 } catch (Exception e) {
-                    Log.e(TAG, "   ❌ 本地物理删除失败: " + e.getMessage(), e);
+                    Log.e(TAG, "   本地物理删除失败: " + e.getMessage(), e);
                     failCount++;
                 }
             } else {
                 // 云端删除失败,保留 TO_DELETE 状态,下次重试
-                Log.w(TAG, "   ⚠️ 云端删除失败,保留待删除标记");
+                Log.w(TAG, "   云端删除失败,保留待删除标记");
                 failCount++;
             }
         }
@@ -142,7 +142,7 @@ public class BillSyncWorker extends Worker {
         Log.i(TAG, String.format("syncDeleteBills 完成 - 总计:%d, 成功:%d, 失败:%d",
                 deleteCount, successCount, failCount));
 
-        // 🔑 只要有失败的,就返回 false 让 Worker 重试
+        // 只要有失败的,就返回 false 让 Worker 重试
         return failCount == 0;
     }
 
@@ -161,11 +161,11 @@ public class BillSyncWorker extends Worker {
                     @Override
                     public void done(BmobException e) {
                         if (e == null) {
-                            Log.d(TAG, "   ✅ 云端删除成功(第" + finalAttempt + "次)");
+                            Log.d(TAG, "   云端删除成功(第" + finalAttempt + "次)");
                             ok[0] = true;
                         } else {
                             errorCode[0] = e.getErrorCode();
-                            Log.e(TAG, "   ❌ 云端删除失败(第" + finalAttempt + "次): "
+                            Log.e(TAG, "   云端删除失败(第" + finalAttempt + "次): "
                                     + e.getMessage() + " (错误码: " + errorCode[0] + ")");
                         }
                         latch.countDown();
@@ -175,7 +175,7 @@ public class BillSyncWorker extends Worker {
                 boolean awaited = latch.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
                 if (!awaited) {
-                    Log.w(TAG, "   ⚠️ 等待云端删除超时(第" + attempt + "次)");
+                    Log.w(TAG, "   等待云端删除超时(第" + attempt + "次)");
                     continue;
                 }
 
@@ -183,14 +183,14 @@ public class BillSyncWorker extends Worker {
                     return true;
                 }
 
-                // 🔑 关键:如果云端对象不存在(错误码 101),视为删除成功
+                // 关键:如果云端对象不存在(错误码 101),视为删除成功
                 if (errorCode[0] == 101) {
-                    Log.i(TAG, "   ✅ 云端对象已不存在(404),视为删除成功");
+                    Log.i(TAG, "   云端对象已不存在(404),视为删除成功");
                     return true;
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "   ❌ 删除异常(第" + attempt + "次): " + e.getMessage(), e);
+                Log.e(TAG, "   删除异常(第" + attempt + "次): " + e.getMessage(), e);
             }
         }
 
@@ -205,12 +205,12 @@ public class BillSyncWorker extends Worker {
             try {
                 boolean success = api.deleteBillSync(objectId);
                 if (success) {
-                    Log.d(TAG, "   ✅ 云端删除成功(第" + attempt + "次)");
+                    Log.d(TAG, "   云端删除成功(第" + attempt + "次)");
                     return true;
                 }
-                Log.e(TAG, "   ❌ 云端删除失败(第" + attempt + "次)");
+                Log.e(TAG, "   云端删除失败(第" + attempt + "次)");
             } catch (Exception e) {
-                Log.e(TAG, "   ❌ 删除异常(第" + attempt + "次): " + e.getMessage(), e);
+                Log.e(TAG, "   删除异常(第" + attempt + "次): " + e.getMessage(), e);
             }
         }
         return false;
@@ -221,7 +221,7 @@ public class BillSyncWorker extends Worker {
     /**
      * 同步账单(创建和更新)
      *
-     * 🔧 修复说明:
+     * 修复说明:
      * - api.uploadBillSync() 内部已经更新了数据库
      * - 包括设置 syncState=SYNCED 和 updatedAt=当前时间
      * - 所以这里不需要再次更新数据库!
@@ -240,7 +240,7 @@ public class BillSyncWorker extends Worker {
         int failCount = 0;
 
         for (Bill bill : bills) {
-            // 🔑 跳过待删除的(已在 syncDeleteBills 中处理)
+            // 跳过待删除的(已在 syncDeleteBills 中处理)
             if (bill.getSyncState() == SyncState.TO_DELETE) {
                 Log.d(TAG, "跳过待删除账单: " + bill.getAmount());
                 continue;
@@ -266,13 +266,13 @@ public class BillSyncWorker extends Worker {
             if (ok) {
                 successCount++;
                 // ========================================
-                // 🔑 关键修复: 移除重复的数据库更新
+                // 关键修复: 移除重复的数据库更新
                 // uploadBillSync() 已经更新过数据库了!
                 // ========================================
 
             } else {
                 failCount++;
-                Log.e(TAG, "❌ 账单同步最终失败: " + bill.getAmount());
+                Log.e(TAG, "账单同步最终失败: " + bill.getAmount());
             }
         }
 

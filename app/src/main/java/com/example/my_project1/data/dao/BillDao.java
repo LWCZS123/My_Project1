@@ -350,7 +350,7 @@ public interface BillDao {
     @Query("DELETE FROM bills WHERE id IN (:billIds)")
     void deleteBillsByIds(List<Long> billIds);
 
-    /** 🔥 批量根据ID查询账单 */
+    /** 批量根据ID查询账单 */
     @Query("SELECT * FROM bills WHERE id IN (:billIds)")
     List<Bill> getBillsByIds(List<Long> billIds);
 
@@ -369,7 +369,7 @@ public interface BillDao {
 
 
 
-    // 🔴 在 BillDao 接口中新增以下方法
+    // 在 BillDao 接口中新增以下方法
 
     /**
      * 同步查询某个账户下的所有账单（用于后台任务）
@@ -391,7 +391,7 @@ public interface BillDao {
     int setAccountIdToNull(String accountId);
 
     /**
-     * ⭐ 根据objectId同步查询账单（用于编辑模式）
+     * 根据objectId同步查询账单（用于编辑模式）
      * 注意：这是同步方法，必须在后台线程调用
      */
     @Query("SELECT * FROM bills WHERE object_id = :objectId AND sync_state != 'TO_DELETE' LIMIT 1")

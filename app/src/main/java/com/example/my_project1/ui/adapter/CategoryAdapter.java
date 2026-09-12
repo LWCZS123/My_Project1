@@ -8,6 +8,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
@@ -17,14 +19,21 @@ import com.example.my_project1.data.model.Category;
 import com.example.my_project1.data.model.SubCategory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.CategoryViewHolder> {
+/**
+ * 一级分类列表适配器
+ * 使用 ListAdapter 确保 UI 更新的性能和线程安全
+ */
+public class CategoryAdapter extends ListAdapter<Category, CategoryAdapter.CategoryViewHolder> {
 
     private final Context context;
-    private final List<Category> mList = new ArrayList<>();
     private OnCategoryClickListener listener;
 
+    /**
+     * 分类点击事件监听器
+     */
     public interface OnCategoryClickListener {
         void onCategoryClick(Category category);
         void onSubCategoryClick(SubCategory subCategory);
@@ -37,53 +46,34 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     }
 
     public CategoryAdapter(Context context) {
+        super(DIFF_CALLBACK);
         this.context = context;
     }
 
     /**
-     * 更新数据源。
-     * 使用同步更新，确保数据一致性。
-     */
-    public void submitList(List<Category> newList) {
-        mList.clear();
-        if (newList != null) {
-            mList.addAll(newList);
-        }
-        notifyDataSetChanged();
-    }
-
-    /**
-     * 拖拽排序位移。
-     * 核心：必须同步修改数据源 mList，否则会出现 item 重复或错乱。
+     * 处理拖拽排序时的逻辑位移
+     * 核心：必须创建新列表并提交，以符合 ListAdapter 的差异计算机制
      */
     public void moveItem(int fromPosition, int toPosition) {
-        if (fromPosition < 0 || toPosition < 0 || fromPosition >= mList.size() || toPosition >= mList.size()) {
+        List<Category> list = new ArrayList<>(getCurrentList());
+        if (fromPosition < 0 || toPosition < 0 || fromPosition >= list.size() || toPosition >= list.size()) {
             return;
         }
-        Category item = mList.remove(fromPosition);
-        mList.add(toPosition, item);
-        notifyItemMoved(fromPosition, toPosition);
+        Collections.swap(list, fromPosition, toPosition);
+        submitList(list);
     }
 
-    public List<Category> getCurrentList() {
-        return mList;
-    }
-
+    @NonNull
     @Override
-    public int getItemCount() {
-        return mList.size();
-    }
-
-    @Override
-    public CategoryViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_category, parent, false);
+    public CategoryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(context).inflate(R.layout.item_category, parent, false);
         return new CategoryViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
-        Category category = mList.get(position);
+        Category category = getItem(position);
+        if (category == null) return;
         
         holder.tvName.setText(category.getName());
 
@@ -94,12 +84,14 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
                 .into(holder.ivIcon);
 
         int subCount = category.getSubCategories() != null ? category.getSubCategories().size() : 0;
-        String typePrefix = "expense".equals(category.getType()) ? "支出" : "收入";
-        int indicatorColor = "expense".equals(category.getType()) ? 0xFF4169E1 : 0xFFFF8C00;
+        String type = category.getType();
+        String typePrefix = "expense".equals(type) ? "支出" : "收入";
+        int indicatorColor = "expense".equals(type) ? 0xFF4169E1 : 0xFFFF8C00;
         
         holder.tvSubCount.setText(String.format("%s%d类", typePrefix, subCount));
         holder.viewIndicator.setBackgroundColor(indicatorColor);
 
+        // 处理子分类预览
         if (subCount == 0) {
             holder.layoutPreviewContainer.setVisibility(View.GONE);
             holder.dividerTop.setVisibility(View.GONE);
@@ -133,6 +125,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
                 }
             });
 
+            // 仅展示前 4 个子分类
             List<SubCategory> previewList = new ArrayList<>();
             if (category.getSubCategories() != null) {
                 int count = Math.min(category.getSubCategories().size(), 4);
@@ -143,6 +136,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             subAdapter.submitList(previewList);
         }
 
+        // 处理备注显示
         String note = category.getNote();
         if (note != null && !note.isEmpty()) {
             holder.tvNote.setText(note);
@@ -151,6 +145,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             holder.tvNote.setVisibility(View.GONE);
         }
 
+        // 设置点击事件
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onCategoryClick(category);
         });
@@ -163,6 +158,18 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             if (listener != null) listener.onMoreOptionsClick(category, v);
         });
     }
+
+    private static final DiffUtil.ItemCallback<Category> DIFF_CALLBACK = new DiffUtil.ItemCallback<Category>() {
+        @Override
+        public boolean areItemsTheSame(@NonNull Category oldItem, @NonNull Category newItem) {
+            return oldItem.getId() == newItem.getId();
+        }
+
+        @Override
+        public boolean areContentsTheSame(@NonNull Category oldItem, @NonNull Category newItem) {
+            return oldItem.equals(newItem);
+        }
+    };
 
     static class CategoryViewHolder extends RecyclerView.ViewHolder {
         ImageView ivIcon, ivMore;
