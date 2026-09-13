@@ -3,10 +3,12 @@ package com.example.my_project1.ui.activity;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -16,14 +18,19 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.data.model.icon.IconItem;
+import com.example.my_project1.data.repository.icon.IconRepository;
 import com.example.my_project1.databinding.ActivityIconMarketBinding;
 import com.example.my_project1.ui.adapter.icon.CategoryAdapter;
+import com.example.my_project1.ui.adapter.icon.HotIconAdapter;
 import com.example.my_project1.ui.adapter.icon.IconGridAdapter;
 import com.example.my_project1.ui.fragment.IconDetailFragment;
+import com.example.my_project1.ui.fragment.IconSearchFilterBottomSheet;
 import com.example.my_project1.ui.fragment.SaveCategoryBottomSheet;
 import com.example.my_project1.ui.viewmodel.icon.IconMarketViewModel;
 import com.example.my_project1.ui.viewmodel.icon.SelectionManager;
+import com.example.my_project1.utils.AppExecutors;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,21 +41,20 @@ import io.reactivex.annotations.Nullable;
 
 /**
  * 图标市场页面
- * 包含分类展示、搜索、图标预览、多选保存功能
  */
 public class IconMarketActivity extends AppCompatActivity {
 
-    private static final String TAG = "IconMarketActivity";
     private static final long SEARCH_DEBOUNCE_MS = 300L;
+    private static final int HOME_CATEGORY_LIMIT = 50;
 
     private ActivityIconMarketBinding binding;
     private IconMarketViewModel viewModel;
 
     private CategoryAdapter categoryAdapter;
+    private HotIconAdapter hotIconAdapter;
     private IconGridAdapter searchAdapter;
     private List<IconItem> currentSearchResults = new ArrayList<>();
 
-    // 搜索防抖
     private final Runnable searchDebounceRunnable = () -> {
         String keyword = binding.etSearch.getText() == null ? "" : binding.etSearch.getText().toString().trim();
         viewModel.search(keyword);
@@ -56,7 +62,6 @@ public class IconMarketActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
         binding = ActivityIconMarketBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -64,27 +69,27 @@ public class IconMarketActivity extends AppCompatActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
-
             int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-
             v.setPadding(0, top, 0, 0);
-
             return insets;
         });
 
-        // 设置状态栏图标为深色（因为背景是浅色 #F0F4FF）
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
-
+        insetsController.setAppearanceLightNavigationBars(true);
+        getWindow().setNavigationBarColor(androidx.core.content.ContextCompat.getColor(this, R.color.market_page_bg));
 
         viewModel = new ViewModelProvider(this).get(IconMarketViewModel.class);
 
         initCategoryRecyclerView();
+        initHotIconsRecyclerView();
         initSearchRecyclerView();
         initSearchBar();
         initStyleSelector();
         initSearchMultiSelectToolbar();
+        initNavigation();
+
         observeViewModel();
         observeSearchMultiSelect();
 
@@ -99,9 +104,6 @@ public class IconMarketActivity extends AppCompatActivity {
         binding.etSearch.removeCallbacks(searchDebounceRunnable);
     }
 
-    /**
-     * 初始化分类列表
-     */
     private void initCategoryRecyclerView() {
         categoryAdapter = new CategoryAdapter(category -> {
             viewModel.openCategory(category);
@@ -109,134 +111,109 @@ public class IconMarketActivity extends AppCompatActivity {
             fragment.show(getSupportFragmentManager(), "IconDetail");
         });
 
-        GridLayoutManager layoutManager = new GridLayoutManager(this, 2);
-        binding.rvCategories.setLayoutManager(layoutManager);
+        binding.rvCategories.setLayoutManager(new GridLayoutManager(this, 1));
         binding.rvCategories.setAdapter(categoryAdapter);
 
-        // 滚动加载更多
         binding.rvCategories.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView rv, int dx, int dy) {
                 if (dy <= 0) return;
                 GridLayoutManager lm = (GridLayoutManager) rv.getLayoutManager();
-                if (lm == null) return;
-                if (lm.findLastVisibleItemPosition() >= lm.getItemCount() - 4) {
+                if (lm != null && lm.findLastVisibleItemPosition() >= lm.getItemCount() - 4) {
                     viewModel.loadMoreCategories();
                 }
             }
         });
     }
 
-    /**
-     * 初始化风格切换器
-     */
-    private void initStyleSelector() {
-        binding.tvStyleDefault.setOnClickListener(v ->
-                viewModel.switchStyle(IconMarketViewModel.IconStyle.DEFAULT));
-        binding.tvStyleLinear.setOnClickListener(v ->
-                viewModel.switchStyle(IconMarketViewModel.IconStyle.LINEAR));
-        binding.tvStyleColored.setOnClickListener(v ->
-                viewModel.switchStyle(IconMarketViewModel.IconStyle.COLORED));
+    private void initHotIconsRecyclerView() {
+        hotIconAdapter = new HotIconAdapter();
+        hotIconAdapter.setOnItemClickListener(item -> {
+            List<IconItem> list = new ArrayList<>();
+            list.add(item);
+            showSaveBottomSheet(list);
+        });
+        binding.rvHotIcons.setAdapter(hotIconAdapter);
     }
 
-    /**
-     * 更新风格切换器的 UI 状态
-     */
-    private void updateStyleUI(IconMarketViewModel.IconStyle style) {
-        // 重置所有状态
-        binding.tvStyleDefault.setBackgroundResource(0);
-        binding.tvStyleDefault.setTextColor(0xFF999999);
-        binding.tvStyleLinear.setBackgroundResource(0);
-        binding.tvStyleLinear.setTextColor(0xFF999999);
-        binding.tvStyleColored.setBackgroundResource(0);
-        binding.tvStyleColored.setTextColor(0xFF999999);
+    private void initStyleSelector() {
+        binding.tvStyleAll.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.ALL));
+        binding.tvStyleLinear.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.LINEAR));
+        binding.tvStyleColored.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.COLORED));
+        binding.tvStyleDefault.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.DEFAULT));
+    }
 
-        // 设置选中状态
+    private void updateStyleUI(IconMarketViewModel.IconStyle style) {
+        resetStyleTab(binding.tvStyleAll);
+        resetStyleTab(binding.tvStyleLinear);
+        resetStyleTab(binding.tvStyleColored);
+        resetStyleTab(binding.tvStyleDefault);
+
         switch (style) {
-            case DEFAULT:
-                binding.tvStyleDefault.setBackgroundResource(R.drawable.bg_white_rounded_pill);
-                binding.tvStyleDefault.setTextColor(0xFF333333);
-                break;
-            case LINEAR:
-                binding.tvStyleLinear.setBackgroundResource(R.drawable.bg_white_rounded_pill);
-                binding.tvStyleLinear.setTextColor(0xFF333333);
-                break;
-            case COLORED:
-                binding.tvStyleColored.setBackgroundResource(R.drawable.bg_white_rounded_pill);
-                binding.tvStyleColored.setTextColor(0xFF333333);
-                break;
+            case ALL: setSelectedTab(binding.tvStyleAll); break;
+            case LINEAR: setSelectedTab(binding.tvStyleLinear); break;
+            case COLORED: setSelectedTab(binding.tvStyleColored); break;
+            case DEFAULT: setSelectedTab(binding.tvStyleDefault); break;
         }
     }
 
-    /**
-     * 初始化搜索结果列表
-     * 处理单击、长按多选、选中切换事件
-     */
+    private void resetStyleTab(View v) {
+        if (v instanceof android.widget.TextView) {
+            v.setBackgroundResource(R.drawable.bg_pill_unselected_market);
+            ((android.widget.TextView) v).setTextColor(ContextCompat.getColor(this, R.color.market_text_secondary));
+        }
+    }
+
+    private void setSelectedTab(View v) {
+        if (v instanceof android.widget.TextView) {
+            v.setBackgroundResource(R.drawable.bg_pill_selected_market);
+            ((android.widget.TextView) v).setTextColor(ContextCompat.getColor(this, R.color.white));
+        }
+    }
+
     private void initSearchRecyclerView() {
         searchAdapter = new IconGridAdapter(false);
-
-        // 单击图标，直接打开保存面板
         searchAdapter.setOnIconClickListener(item -> {
-            if (Boolean.TRUE.equals(viewModel.selectionManager.multiSelectMode.getValue())) {
-                return;
-            }
-
-            // 从 thumb 字段处理真实图标 URL，去除 OSS 压缩参数
+            if (Boolean.TRUE.equals(viewModel.selectionManager.multiSelectMode.getValue())) return;
             if (item.getUrl() == null || item.getUrl().isEmpty()) {
                 String thumbUrl = item.getThumb();
                 if (thumbUrl != null && !thumbUrl.isEmpty()) {
                     int qIndex = thumbUrl.indexOf("?");
-                    if (qIndex > 0) {
-                        item.setUrl(thumbUrl.substring(0, qIndex));
-                    } else {
-                        item.setUrl(thumbUrl);
-                    }
+                    item.setUrl(qIndex > 0 ? thumbUrl.substring(0, qIndex) : thumbUrl);
                 }
             }
-
             List<IconItem> single = new ArrayList<>();
             single.add(item);
             showSaveBottomSheet(single);
         });
 
-        // 长按进入多选模式
         searchAdapter.setOnIconLongClickListener(item -> {
             viewModel.onIconLongClick(item.getId());
             return true;
         });
 
-        // 多选模式下点击切换选中状态
-        searchAdapter.setOnSelectionClickListener((item, isSelected) ->
-                viewModel.onIconClick(item.getId()));
+        searchAdapter.setOnSelectionClickListener((item, isSelected) -> viewModel.onIconClick(item.getId()));
 
-        GridLayoutManager layoutManager = new GridLayoutManager(this, 5);
-        binding.rvSearch.setLayoutManager(layoutManager);
+        binding.rvSearch.setLayoutManager(new GridLayoutManager(this, 5));
         binding.rvSearch.setItemAnimator(null);
         binding.rvSearch.setAdapter(searchAdapter);
 
-        // 搜索列表滚动加载更多
         binding.rvSearch.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView rv, int dx, int dy) {
                 if (dy <= 0) return;
                 GridLayoutManager lm = (GridLayoutManager) rv.getLayoutManager();
-                if (lm == null) return;
-                if (lm.findLastVisibleItemPosition() >= lm.getItemCount() - 6) {
+                if (lm != null && lm.findLastVisibleItemPosition() >= lm.getItemCount() - 6) {
                     viewModel.loadMoreSearchResults();
                 }
             }
         });
     }
 
-    /**
-     * 初始化搜索输入框
-     * 输入变化时触发搜索，清空时恢复分类视图
-     */
     private void initSearchBar() {
         binding.etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void afterTextChanged(Editable s) {}
-
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 String keyword = s.toString().trim();
@@ -252,33 +229,25 @@ public class IconMarketActivity extends AppCompatActivity {
             }
         });
 
-        // 清空搜索
         binding.ivClearSearch.setOnClickListener(v -> {
             binding.etSearch.setText("");
             viewModel.exitMultiSelectMode();
             showNormalToolbar();
             showCategoryView();
         });
+
+        binding.btnFilter.setOnClickListener(v -> {
+            IconSearchFilterBottomSheet fragment = new IconSearchFilterBottomSheet();
+            fragment.show(getSupportFragmentManager(), "IconSearchFilter");
+        });
     }
 
-    /**
-     * 初始化搜索页多选工具栏
-     * 全选、取消、确认保存
-     */
     private void initSearchMultiSelectToolbar() {
         binding.ivBack.setOnClickListener(v -> finish());
-
-        binding.searchBtnSelectAll.setOnClickListener(v -> {
-            List<String> allIds = getAllSearchResultIds();
-            viewModel.toggleSelectAll(allIds);
-        });
-
-        binding.searchBtnCancelSelect.setOnClickListener(v ->
-                viewModel.exitMultiSelectMode());
-
+        binding.searchBtnSelectAll.setOnClickListener(v -> viewModel.toggleSelectAll(getAllSearchResultIds()));
+        binding.searchBtnCancelSelect.setOnClickListener(v -> viewModel.exitMultiSelectMode());
         binding.searchBtnConfirmSelect.setOnClickListener(v -> {
-            int count = viewModel.selectionManager.getCount();
-            if (count == 0) {
+            if (viewModel.selectionManager.getCount() == 0) {
                 Toast.makeText(this, "请先选择图标", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -286,28 +255,30 @@ public class IconMarketActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * 观察多选状态变化
-     * 同步工具栏与列表选中状态
-     */
+    private void initNavigation() {
+        binding.tvHotAll.setOnClickListener(v -> openAllCollections());
+        binding.tvColAll.setOnClickListener(v -> openAllCollections());
+    }
+
+    private void openAllCollections() {
+        android.content.Intent intent = new android.content.Intent(this, AllCollectionsActivity.class);
+        IconMarketViewModel.IconStyle style = viewModel.currentStyle.getValue();
+        if (style != null) intent.putExtra("style", style.name());
+        startActivity(intent);
+    }
+
     private void observeSearchMultiSelect() {
         SelectionManager sm = viewModel.selectionManager;
-
         sm.multiSelectMode.observe(this, isMultiSelect -> {
             boolean active = Boolean.TRUE.equals(isMultiSelect);
             Set<String> ids = sm.selectedIds.getValue();
             if (ids == null) ids = Collections.emptySet();
 
-            boolean searchVisible = binding.rvSearch.getVisibility() == View.VISIBLE;
-            if (searchVisible) {
-                if (active) showMultiSelectToolbar();
-                else showNormalToolbar();
+            if (binding.rvSearch.getVisibility() == View.VISIBLE) {
+                if (active) showMultiSelectToolbar(); else showNormalToolbar();
             }
-
             searchAdapter.setMultiSelectMode(active, ids);
-            if (!active) {
-                binding.searchTvSelectCount.setText("选择图标");
-            }
+            if (!active) binding.searchTvSelectCount.setText("选择图标");
         });
 
         sm.selectedIds.observe(this, ids -> {
@@ -318,10 +289,7 @@ public class IconMarketActivity extends AppCompatActivity {
         sm.selectedCount.observe(this, count -> {
             int c = count != null ? count : 0;
             binding.searchTvSelectCount.setText(c > 0 ? "已选 " + c + " 个" : "选择图标");
-
-            boolean isAll = sm.isAllSelected(getAllSearchResultIds());
-            binding.searchBtnSelectAll.setText(isAll ? "取消全选" : "全选");
-
+            binding.searchBtnSelectAll.setText(sm.isAllSelected(getAllSearchResultIds()) ? "取消全选" : "全选");
             binding.searchBtnConfirmSelect.setEnabled(c > 0);
             binding.searchBtnConfirmSelect.setAlpha(c > 0 ? 1.0f : 0.4f);
         });
@@ -332,59 +300,106 @@ public class IconMarketActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * 观察页面数据
-     * 分类、搜索结果、加载状态、错误信息
-     */
     private void observeViewModel() {
         viewModel.currentStyle.observe(this, this::updateStyleUI);
-
         viewModel.categories.observe(this, categories -> {
             if (categories != null) {
-                categoryAdapter.submitList(new ArrayList<>(categories));
+                List<IconCategory> homeList = (categories.size() > HOME_CATEGORY_LIMIT)
+                        ? new ArrayList<>(categories.subList(0, HOME_CATEGORY_LIMIT))
+                        : categories;
+                categoryAdapter.submitList(homeList);
+
+                // 首页需展示 HOME_CATEGORY_LIMIT 个合集，但数据按页加载（每页约 30 个），
+                // 数量不足且未处于搜索状态时，自动继续加载下一页，直到填满或没有更多数据
+                String keyword = viewModel.currentKeyword.getValue();
+                boolean searching = keyword != null && !keyword.isEmpty();
+                if (!categories.isEmpty()
+                        && !searching
+                        && categories.size() < HOME_CATEGORY_LIMIT
+                        && Boolean.TRUE.equals(viewModel.categoryHasMore.getValue())) {
+                    viewModel.loadMoreCategories();
+                }
             }
         });
 
-        viewModel.categoryLoading.observe(this, loading ->
-                binding.progressCategory.setVisibility(loading ? View.VISIBLE : View.GONE));
+        viewModel.statistics.observe(this, stats -> {
+            binding.tvIconTotal.setText(String.format(java.util.Locale.getDefault(), "%,d+", stats.totalIcons));
+            binding.tvCollectionTotal.setText(String.format(java.util.Locale.getDefault(), "%d+", stats.totalCollections));
+            binding.tvNewTotal.setText(String.valueOf(stats.newThisWeek));
+        });
 
-        viewModel.categoryLoadingMore.observe(this, loading ->
-                binding.progressCategoryMore.setVisibility(loading ? View.VISIBLE : View.GONE));
+        viewModel.hotCategory.observe(this, this::bindHotCategory);
+
+        viewModel.categoryLoading.observe(this, loading -> {
+            List<IconCategory> current = viewModel.categories.getValue();
+            binding.progressCategory.setVisibility(loading && (current == null || current.isEmpty()) ? View.VISIBLE : View.GONE);
+        });
+
+        viewModel.categoryLoadingMore.observe(this, loading -> binding.progressCategoryMore.setVisibility(loading ? View.VISIBLE : View.GONE));
 
         viewModel.categoryError.observe(this, error -> {
-            if (error != null) {
-                Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
-                viewModel.clearCategoryError();
-            }
+            if (error != null) { Toast.makeText(this, error, Toast.LENGTH_SHORT).show(); viewModel.clearCategoryError(); }
         });
 
         viewModel.searchResults.observe(this, results -> {
             if (results != null) {
                 currentSearchResults = new ArrayList<>(results);
                 searchAdapter.submitList(currentSearchResults);
-
-                String keyword = binding.etSearch.getText() == null ? "" : binding.etSearch.getText().toString().trim();
+                String keyword = binding.etSearch.getText().toString().trim();
                 binding.tvSearchEmpty.setVisibility(!keyword.isEmpty() && results.isEmpty() ? View.VISIBLE : View.GONE);
             }
         });
 
-        viewModel.searchLoading.observe(this, loading ->
-                binding.progressSearch.setVisibility(loading ? View.VISIBLE : View.GONE));
-
-        viewModel.searchLoadingMore.observe(this, loading ->
-                binding.progressSearchMore.setVisibility(loading ? View.VISIBLE : View.GONE));
-
-        viewModel.searchError.observe(this, error -> {
-            if (error != null) {
-                Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
-                viewModel.clearSearchError();
+        viewModel.categorySearchResults.observe(this, results -> {
+            if (results != null) {
+                categoryAdapter.submitList(new ArrayList<>(results));
+                binding.tvSearchEmpty.setVisibility(results.isEmpty() ? View.VISIBLE : View.GONE);
             }
+        });
+
+        viewModel.searchScope.observe(this, scope -> {
+            if (scope == 0) {
+                binding.rvSearch.setVisibility(View.VISIBLE);
+                binding.rvCategories.setVisibility(View.GONE);
+            } else {
+                binding.rvSearch.setVisibility(View.GONE);
+                binding.rvCategories.setVisibility(View.VISIBLE);
+            }
+            String keyword = binding.etSearch.getText().toString().trim();
+            if (!keyword.isEmpty()) showSearchView();
+        });
+
+        viewModel.searchLoading.observe(this, loading -> binding.progressSearch.setVisibility(loading ? View.VISIBLE : View.GONE));
+        viewModel.searchLoadingMore.observe(this, loading -> binding.progressSearchMore.setVisibility(loading ? View.VISIBLE : View.GONE));
+        viewModel.searchError.observe(this, error -> {
+            if (error != null) { Toast.makeText(this, error, Toast.LENGTH_SHORT).show(); viewModel.clearSearchError(); }
         });
     }
 
-    /**
-     * 切换到分类展示视图
-     */
+    private void bindHotCategory(IconCategory category) {
+        if (category == null) { binding.mvCardHot.setVisibility(View.GONE); return; }
+        binding.mvCardHot.setVisibility(View.VISIBLE);
+        binding.tvHotLabel.setText("热门：" + category.getCategory());
+        hotIconAdapter.submitList(new ArrayList<>());
+        IconRepository.Callback<List<IconItem>> cb = new IconRepository.Callback<List<IconItem>>() {
+            @Override public void onSuccess(List<IconItem> data) {
+                if (data != null && !data.isEmpty()) {
+                    AppExecutors.get().mainThread().execute(() -> hotIconAdapter.submitList(data.size() > 10 ? data.subList(0, 10) : data));
+                }
+            }
+            @Override public void onError(String message) { Log.e("IconMarket", "Hot load fail: " + message); }
+        };
+        String style = category.getStyle();
+        if ("line".equals(style)) IconRepository.getInstance().getAssetCategoryDetail(getAssets(), "freeicon_line.json", category, 0, cb);
+        else if ("lineal-color".equals(style)) IconRepository.getInstance().getAssetCategoryDetail(getAssets(), "线性色.json", category, 0, cb);
+        else IconRepository.getInstance().getCategoryDetail(category, 0, cb);
+
+        binding.mvCardHot.setOnClickListener(v -> {
+            viewModel.openCategory(category);
+            new IconDetailFragment().show(getSupportFragmentManager(), "IconDetail");
+        });
+    }
+
     private void showCategoryView() {
         binding.rvCategories.setVisibility(View.VISIBLE);
         binding.rvSearch.setVisibility(View.GONE);
@@ -392,67 +407,41 @@ public class IconMarketActivity extends AppCompatActivity {
         binding.ivClearSearch.setVisibility(View.GONE);
     }
 
-    /**
-     * 切换到搜索结果视图
-     */
     private void showSearchView() {
-        binding.rvCategories.setVisibility(View.GONE);
-        binding.rvSearch.setVisibility(View.VISIBLE);
+        int scope = viewModel.searchScope.getValue() != null ? viewModel.searchScope.getValue() : 0;
+        binding.rvCategories.setVisibility(scope == 1 ? View.VISIBLE : View.GONE);
+        binding.rvSearch.setVisibility(scope == 0 ? View.VISIBLE : View.GONE);
         binding.ivClearSearch.setVisibility(View.VISIBLE);
     }
 
-    /**
-     * 显示普通工具栏
-     */
     private void showNormalToolbar() {
         binding.toolbarNormal.setVisibility(View.VISIBLE);
         binding.layoutStyleSelector.setVisibility(View.VISIBLE);
         binding.searchToolbarMultiSelect.setVisibility(View.GONE);
     }
 
-    /**
-     * 显示多选工具栏
-     */
     private void showMultiSelectToolbar() {
         binding.toolbarNormal.setVisibility(View.GONE);
         binding.layoutStyleSelector.setVisibility(View.GONE);
         binding.searchToolbarMultiSelect.setVisibility(View.VISIBLE);
     }
 
-    /**
-     * 获取当前搜索结果所有图标ID，用于全选操作
-     */
     private List<String> getAllSearchResultIds() {
         List<String> ids = new ArrayList<>();
-        for (IconItem item : currentSearchResults) {
-            ids.add(item.getId());
-        }
+        for (IconItem item : currentSearchResults) ids.add(item.getId());
         return ids;
     }
 
-    /**
-     * 从搜索结果中收集已选中的图标
-     * 处理URL，去除OSS参数，保证保存时图标正常显示
-     */
     private List<IconItem> collectSelectedSearchItems() {
         Set<String> selectedIds = viewModel.selectionManager.selectedIds.getValue();
-        if (selectedIds == null || selectedIds.isEmpty()) {
-            return new ArrayList<>();
-        }
-
+        if (selectedIds == null || selectedIds.isEmpty()) return new ArrayList<>();
         List<IconItem> selectedItems = new ArrayList<>();
         for (IconItem item : currentSearchResults) {
             if (selectedIds.contains(item.getId())) {
-                // 处理真实图标URL
                 String thumbUrl = item.getThumb();
                 if (thumbUrl != null && !thumbUrl.isEmpty()) {
-                    int questionIndex = thumbUrl.indexOf("?");
-                    if (questionIndex > 0) {
-                        String realUrl = thumbUrl.substring(0, questionIndex);
-                        item.setUrl(realUrl);
-                    } else {
-                        item.setUrl(thumbUrl);
-                    }
+                    int qIndex = thumbUrl.indexOf("?");
+                    item.setUrl(qIndex > 0 ? thumbUrl.substring(0, qIndex) : thumbUrl);
                 }
                 selectedItems.add(item);
             }
@@ -460,22 +449,14 @@ public class IconMarketActivity extends AppCompatActivity {
         return selectedItems;
     }
 
-    /**
-     * 显示图标保存分类面板
-     */
     private void showSaveBottomSheet(List<IconItem> items) {
-        if (items == null || items.isEmpty()) {
-            Toast.makeText(this, "请先选择图标", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        SaveCategoryBottomSheet sheet = SaveCategoryBottomSheet.newInstance(items);
-        sheet.show(getSupportFragmentManager(), "SaveCategory");
+        if (items == null || items.isEmpty()) { Toast.makeText(this, "请先选择图标", Toast.LENGTH_SHORT).show(); return; }
+        SaveCategoryBottomSheet.newInstance(items).show(getSupportFragmentManager(), "SaveCategory");
     }
 
     @Override
     public void finish() {
         super.finish();
-        // 退出动画
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
     }
 }

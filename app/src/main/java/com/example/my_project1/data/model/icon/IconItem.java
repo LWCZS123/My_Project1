@@ -22,6 +22,9 @@ public class IconItem {
     /** 所属分类名称，如 "NAS存储" */
     private String category;
 
+    /** 图标风格：line, filled, lineal-color */
+    private String style;
+
     /** 原图 URL，用于详情页展示 */
     private String url;
 
@@ -52,6 +55,9 @@ public class IconItem {
 
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
+
+    public String getStyle() { return style; }
+    public void setStyle(String style) { this.style = style; }
 
     public String getUrl() {
         if (url != null && !url.isEmpty()) return url;

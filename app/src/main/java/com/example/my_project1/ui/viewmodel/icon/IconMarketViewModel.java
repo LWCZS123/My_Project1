@@ -18,8 +18,6 @@ import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.data.model.icon.IconItem;
 import com.example.my_project1.data.remote.BmobApiImpl;
-import com.example.my_project1.data.remote.model.CloudCategory;
-import com.example.my_project1.data.remote.model.CloudSubCategory;
 import com.example.my_project1.data.repository.CategoryRepository;
 import com.example.my_project1.data.repository.SubCategoryRepository;
 import com.example.my_project1.data.repository.icon.IconRepository;
@@ -30,76 +28,67 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import cn.bmob.v3.BmobUser;
 import cn.bmob.v3.exception.BmobException;
 import cn.bmob.v3.listener.SaveListener;
 
-/**
- * IconMarketViewModel — 修复 + 优化版
- * ─────────────────────────────────────────────────────────────
- * 修复问题：
- *
- * ① 二级分类批量保存后清除 App 数据，重新登录无法同步
- *    根因：saveAsSecondLevelCategory 未写入 parentCloudId，
- *    SubCategorySyncWorker 检测到 parent_cloud_id 为空 → retry 无限循环 → 永不上传
- *    修复：保存子分类时，同步从本地 Category 查出 cloudId 填充 parentCloudId。
- *         若父分类尚未同步（cloudId=null），先触发父分类同步后再保存子分类。
- *
- * ② 批量上传走 WorkManager 逐条处理，HTTP 请求数 = 图标数，性能差
- *    优化：新增 batchUploadToCloud()，在 ViewModel 层直接并发调用 Bmob save，
- *    所有请求并行发出（CountDownLatch 等待），远少于 WorkManager 串行逐条处理的时间。
- *    WorkManager 仅作为失败兜底重试机制保留。
- *
- * ③ 一级分类保存缺少 syncState = TO_CREATE（原代码用 markUpdatedForSync 设置的是 TO_UPDATE）
- *    修复：显式设置 syncState = TO_CREATE.getValue()。
- *
- * ④ 其余所有逻辑（详情页分页、多选、搜索、首页分类加载）保持不变。
- */
 public class IconMarketViewModel extends AndroidViewModel {
 
     private static final String TAG = "IconMarketViewModel";
 
-    // ══════════════════════════════════════════════════════════
-    // PageState（保持不变）
-    // ══════════════════════════════════════════════════════════
-
     public enum PageStatus { IDLE, LOADING, LOADED, ERROR }
 
     public enum IconStyle {
-        DEFAULT, LINEAR, COLORED
+        ALL, DEFAULT, LINEAR, COLORED
     }
 
-    private final MutableLiveData<IconStyle> _currentStyle = new MutableLiveData<>(IconStyle.DEFAULT);
+    private final MutableLiveData<IconStyle> _currentStyle = new MutableLiveData<>(IconStyle.ALL);
     public  final LiveData<IconStyle>         currentStyle  = _currentStyle;
 
+    private final MutableLiveData<List<IconCategory>> _allLoadedCategories = new MutableLiveData<>(new ArrayList<>());
+    private final MutableLiveData<IconCategory> _hotCategory = new MutableLiveData<>();
+    public  final LiveData<IconCategory> hotCategory = _hotCategory;
+
+    private final MutableLiveData<Statistics> _statistics = new MutableLiveData<>(new Statistics(0, 0, 0));
+    public  final LiveData<Statistics> statistics = _statistics;
+
+    public static class Statistics {
+        public final int totalIcons;
+        public final int totalCollections;
+        public final int newThisWeek;
+
+        public Statistics(int totalIcons, int totalCollections, int newThisWeek) {
+            this.totalIcons = totalIcons;
+            this.totalCollections = totalCollections;
+            this.newThisWeek = newThisWeek;
+        }
+    }
+
     public static class PageState {
-        public final PageStatus     status;
+        public final PageStatus status;
         public final List<IconItem> items;
-        public final String         error;
+        public final String error;
 
         public PageState(PageStatus status, List<IconItem> items, String error) {
             this.status = status;
-            this.items  = items;
-            this.error  = error;
+            this.items = items;
+            this.error = error;
         }
 
-        public static PageState idle()    { return new PageState(PageStatus.IDLE,    null, null); }
+        public static PageState idle() { return new PageState(PageStatus.IDLE, null, null); }
         public static PageState loading() { return new PageState(PageStatus.LOADING, null, null); }
-        public static PageState loaded(List<IconItem> items) {
-            return new PageState(PageStatus.LOADED, items != null ? items : new ArrayList<>(), null);
-        }
-        public static PageState error(String msg) {
-            return new PageState(PageStatus.ERROR, null, msg);
-        }
+        public static PageState loaded(List<IconItem> items) { return new PageState(PageStatus.LOADED, items, null); }
+        public static PageState error(String error) { return new PageState(PageStatus.ERROR, null, error); }
     }
 
-    private final SparseArray<PageState> pageStates    = new SparseArray<>();
-    private final Set<Integer>           inflightPages = new HashSet<>();
+    private final SparseArray<PageState> pageStates = new SparseArray<>();
+    private final Set<Integer> inflightPages = new HashSet<>();
 
     private final MutableLiveData<SparseArray<PageState>> _detailPageStates = new MutableLiveData<>();
-    public  final LiveData<SparseArray<PageState>>         detailPageStates  = _detailPageStates;
+    public  final LiveData<SparseArray<PageState>> detailPageStates = _detailPageStates;
 
     private final MutableLiveData<Integer> _detailTotalPages = new MutableLiveData<>(0);
     public  final LiveData<Integer>         detailTotalPages  = _detailTotalPages;
@@ -111,33 +100,28 @@ public class IconMarketViewModel extends AndroidViewModel {
     public  final LiveData<String>          detailError  = _detailError;
 
     private final MutableLiveData<IconCategory> _selectedCategory = new MutableLiveData<>();
-    public  final LiveData<IconCategory>         selectedCategory  = _selectedCategory;
-
-    // ══════════════════════════════════════════════════════════
-    // 首页（保持不变）
-    // ══════════════════════════════════════════════════════════
+    public  final LiveData<IconCategory> selectedCategory = _selectedCategory;
 
     private final MutableLiveData<List<IconCategory>> _categories = new MutableLiveData<>(new ArrayList<>());
     public  final LiveData<List<IconCategory>>         categories  = _categories;
 
-    private final MutableLiveData<Boolean> _categoryLoading     = new MutableLiveData<>(false);
-    public  final LiveData<Boolean>         categoryLoading      = _categoryLoading;
+    private final MutableLiveData<List<IconCategory>> _categorySearchResults = new MutableLiveData<>(new ArrayList<>());
+    public  final LiveData<List<IconCategory>>         categorySearchResults  = _categorySearchResults;
+
+    private final MutableLiveData<Boolean> _categoryLoading = new MutableLiveData<>(false);
+    public  final LiveData<Boolean>         categoryLoading  = _categoryLoading;
 
     private final MutableLiveData<Boolean> _categoryLoadingMore = new MutableLiveData<>(false);
     public  final LiveData<Boolean>         categoryLoadingMore  = _categoryLoadingMore;
 
-    private final MutableLiveData<Boolean> _categoryHasMore     = new MutableLiveData<>(true);
+    private final MutableLiveData<Boolean> _categoryHasMore = new MutableLiveData<>(true);
     public  final LiveData<Boolean>         categoryHasMore      = _categoryHasMore;
 
     private final MutableLiveData<String>  _categoryError = new MutableLiveData<>();
     public  final LiveData<String>          categoryError  = _categoryError;
 
-    private int     categoryPage          = 0;
+    private int categoryPage = 0;
     private boolean isCategoryLoadingMore = false;
-
-    // ══════════════════════════════════════════════════════════
-    // 搜索（保持不变）
-    // ══════════════════════════════════════════════════════════
 
     private final MutableLiveData<List<IconItem>> _searchResults = new MutableLiveData<>(new ArrayList<>());
     public  final LiveData<List<IconItem>>         searchResults  = _searchResults;
@@ -157,19 +141,14 @@ public class IconMarketViewModel extends AndroidViewModel {
     private final MutableLiveData<String>  _searchError = new MutableLiveData<>();
     public  final LiveData<String>          searchError  = _searchError;
 
+    private final MutableLiveData<Integer> _searchScope = new MutableLiveData<>(1);
+    public  final LiveData<Integer>         searchScope  = _searchScope;
+
     private int     searchPage          = 0;
     private boolean isSearchLoadingMore = false;
     private String  lastKeyword         = "";
 
-    // ══════════════════════════════════════════════════════════
-    // 多选（保持不变）
-    // ══════════════════════════════════════════════════════════
-
     public final SelectionManager selectionManager = new SelectionManager();
-
-    // ══════════════════════════════════════════════════════════
-    // 保存结果
-    // ══════════════════════════════════════════════════════════
 
     public static class SaveResult {
         public final boolean success;
@@ -191,15 +170,10 @@ public class IconMarketViewModel extends AndroidViewModel {
     private final MutableLiveData<Boolean> _saving = new MutableLiveData<>(false);
     public  final LiveData<Boolean>         saving  = _saving;
 
-    // ══════════════════════════════════════════════════════════
-    // 依赖
-    // ══════════════════════════════════════════════════════════
-
     private final IconRepository        repository;
     private final CategoryRepository    categoryRepository;
     private final SubCategoryRepository subCategoryRepository;
 
-    /** 直接持有 DAO，用于批量上传时查询 cloudId（避免绕一圈 Repository） */
     private final CategoryDao    categoryDao;
     private final SubCategoryDao subCategoryDao;
     private final BmobApiImpl    bmobApi;
@@ -215,7 +189,7 @@ public class IconMarketViewModel extends AndroidViewModel {
         AppDatabase db = AppDatabase.getInstance(application);
         categoryDao    = db.categoryDao();
         subCategoryDao = db.subCategoryDao();
-        bmobApi        = new BmobApiImpl();
+        bmobApi        = new BmobApiImpl(application);
 
         initCurrentUserId();
     }
@@ -229,25 +203,55 @@ public class IconMarketViewModel extends AndroidViewModel {
         this.currentUserId = userId != null ? userId : "";
     }
 
-    // ══════════════════════════════════════════════════════════
-    // 风格切换
-    // ══════════════════════════════════════════════════════════
-
     public void switchStyle(IconStyle style) {
         if (_currentStyle.getValue() == style) return;
         _currentStyle.setValue(style);
-        
-        // 切换风格时清理仓库缓存，确保 DEFAULT 风格能正确重新聚合 INDEX_URL 和 FLATICON_URL
-        repository.clearCache();
-        
-        // 强制重新加载分类列表
-        loadCategoriesInternal(true);
-        
-        // 如果当前有搜索关键词，同步更新搜索结果
-        String keyword = _currentKeyword.getValue();
-        if (keyword != null && !keyword.isEmpty()) {
-            search(keyword);
+        applyFilters();
+    }
+
+    private void applyFilters() {
+        List<IconCategory> all = _allLoadedCategories.getValue();
+        if (all == null) {
+            _categories.setValue(new ArrayList<>());
+            return;
         }
+
+        String styleFilter = getStyleFilterString();
+        String keyword = _currentKeyword.getValue();
+        Integer scope = _searchScope.getValue();
+        if (scope == null) scope = 0;
+
+        List<IconCategory> filtered = new ArrayList<>();
+
+        for (IconCategory cat : all) {
+            boolean styleMatch = (styleFilter == null || styleFilter.equals(cat.getStyle()));
+            if (!styleMatch) continue;
+
+            if (scope == 1 && keyword != null && !keyword.isEmpty()) {
+                if (cat.getCategory() != null && cat.getCategory().toLowerCase().contains(keyword.toLowerCase())) {
+                    filtered.add(cat);
+                }
+            } else {
+                filtered.add(cat);
+            }
+        }
+
+        _categories.setValue(filtered);
+        _categorySearchResults.setValue(filtered);
+        _statistics.setValue(new Statistics(repository.getTotalIcons(), repository.getTotalPacks(), 38)); 
+        
+        if (!filtered.isEmpty() && _hotCategory.getValue() == null) {
+            int randomIndex = (int) (Math.random() * filtered.size());
+            _hotCategory.setValue(filtered.get(randomIndex));
+        }
+    }
+
+    private String getStyleFilterString() {
+        IconStyle style = _currentStyle.getValue();
+        if (style == IconStyle.LINEAR) return "line";
+        if (style == IconStyle.COLORED) return "lineal-color";
+        if (style == IconStyle.DEFAULT) return "filled";
+        return null;
     }
 
     private String getStyleFileName() {
@@ -257,9 +261,13 @@ public class IconMarketViewModel extends AndroidViewModel {
         return null;
     }
 
-    // ══════════════════════════════════════════════════════════
-    // 详情页（保持不变）
-    // ══════════════════════════════════════════════════════════
+    private String getCategoryFileName(IconCategory category) {
+        if (category == null) return null;
+        String style = category.getStyle();
+        if ("line".equals(style)) return "freeicon_line.json";
+        if ("lineal-color".equals(style)) return "线性色.json";
+        return null;
+    }
 
     public void openCategory(IconCategory category) {
         _selectedCategory.setValue(category);
@@ -269,19 +277,18 @@ public class IconMarketViewModel extends AndroidViewModel {
         _detailLoading.setValue(true);
         notifyPageStatesChanged();
 
-        String fileName = getStyleFileName();
+        String fileName = getCategoryFileName(category);
         if (fileName == null) {
             repository.getCategoryPageCount(category, new IconRepository.Callback<Integer>() {
                 @Override public void onSuccess(Integer totalPages) { _detailTotalPages.setValue(totalPages); }
-                @Override public void onError(String message)       { Log.e(TAG, "获取总页数失败: " + message); }
+                @Override public void onError(String message)       { Log.e(TAG, "Fail: " + message); }
             });
         } else {
             repository.getAssetCategoryPageCount(getApplication().getAssets(), fileName, category, new IconRepository.Callback<Integer>() {
                 @Override public void onSuccess(Integer totalPages) { _detailTotalPages.setValue(totalPages); }
-                @Override public void onError(String message)       { Log.e(TAG, "获取 Asset 总页数失败: " + message); }
+                @Override public void onError(String message)       { Log.e(TAG, "Fail: " + message); }
             });
         }
-
         loadDetailPage(category, 0);
     }
 
@@ -290,8 +297,7 @@ public class IconMarketViewModel extends AndroidViewModel {
         Integer total = _detailTotalPages.getValue();
         if (total != null && total > 0 && page >= total) return;
         PageState existing = pageStates.get(page);
-        if (existing != null &&
-                (existing.status == PageStatus.LOADING || existing.status == PageStatus.LOADED)) return;
+        if (existing != null && (existing.status == PageStatus.LOADING || existing.status == PageStatus.LOADED)) return;
         if (inflightPages.contains(page)) return;
 
         inflightPages.add(page);
@@ -299,7 +305,7 @@ public class IconMarketViewModel extends AndroidViewModel {
         notifyPageStatesChanged();
         refreshGlobalLoadingState();
 
-        String fileName = getStyleFileName();
+        String fileName = getCategoryFileName(category);
         if (fileName == null) {
             repository.getCategoryDetail(category, page, new IconRepository.Callback<List<IconItem>>() {
                 @Override public void onSuccess(List<IconItem> data) {
@@ -335,15 +341,6 @@ public class IconMarketViewModel extends AndroidViewModel {
         }
     }
 
-    public PageState getPageState(int page) {
-        PageState s = pageStates.get(page);
-        return s != null ? s : PageState.idle();
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // 多选操作（保持不变）
-    // ══════════════════════════════════════════════════════════
-
     public void onIconLongClick(String iconId)  { selectionManager.enterMultiSelectMode(iconId); }
     public void onIconClick(String iconId) {
         if (Boolean.TRUE.equals(selectionManager.multiSelectMode.getValue()))
@@ -352,544 +349,346 @@ public class IconMarketViewModel extends AndroidViewModel {
     public void toggleSelectAll(List<String> allIconIds) { selectionManager.toggleSelectAll(allIconIds); }
     public void exitMultiSelectMode()                    { selectionManager.exitMultiSelectMode(); }
 
-    // ══════════════════════════════════════════════════════════
-    // 分类列表（保持不变）
-    // ══════════════════════════════════════════════════════════
-
     public LiveData<List<CategoryWithSubCategories>> getCategoriesByType(String categoryType) {
-        if (currentUserId == null || currentUserId.isEmpty())
-            return new MutableLiveData<>(new ArrayList<>());
+        if (currentUserId == null || currentUserId.isEmpty()) return new MutableLiveData<>(new ArrayList<>());
         return categoryRepository.getCategoriesWithSubs(currentUserId, categoryType);
     }
 
-    // ══════════════════════════════════════════════════════════
-    // ★ 修复：批量保存为一级分类
-    // ══════════════════════════════════════════════════════════
-
-    /**
-     * 批量保存为一级分类。
-     *
-     * 修复点：
-     *  ① syncState 明确设置为 TO_CREATE（原代码 markUpdatedForSync 设的是 TO_UPDATE）
-     *  ② 写入本地后，立即发起并行批量云端上传（不再完全依赖 WorkManager）
-     *     - 并行上传：所有分类同时 save，N 个 HTTP 请求几乎并行，总耗时 ≈ 单次请求耗时
-     *     - 上传成功后立刻回写 cloudId + SyncState=SYNCED，避免 Worker 重复上传
-     *     - 失败的分类仍保留 TO_CREATE 状态，WorkManager 作为兜底稍后重试
-     */
     public void saveAsFirstLevelCategory(List<IconItem> selectedItems, String categoryType) {
         if (selectedItems == null || selectedItems.isEmpty()) {
             _saveResult.setValue(new SaveResult(false, 0, 0, "请先选择图标"));
             return;
         }
         if (Boolean.TRUE.equals(_saving.getValue())) return;
-
         _saving.setValue(true);
         final String type = (categoryType != null && !categoryType.isEmpty()) ? categoryType : "expense";
 
         AppExecutors.get().diskIO().execute(() -> {
             List<Category> toInsert = new ArrayList<>();
             int skipCount = 0;
-
             for (IconItem item : selectedItems) {
                 Category existing = categoryRepository.getCategoryByNameAndUser(item.getName(), currentUserId);
-                if (existing != null) {
-                    skipCount++;
-                    Log.d(TAG, "saveAsFirst - 跳过重复: " + item.getName());
-                    continue;
-                }
-
+                if (existing != null) { skipCount++; continue; }
                 Category cat = new Category();
                 cat.setName(item.getName());
                 cat.setIconUri(item.getUrl());
                 cat.setType(type);
                 cat.setOwnerId(currentUserId);
-                cat.setSortIndex(0);
-                cat.setSystemPreset(false);
-                cat.setUpdatedAt(System.currentTimeMillis());
-                // ★ 修复①：明确设置 TO_CREATE，不用 markUpdatedForSync
                 cat.setSyncState(SyncState.TO_CREATE.getValue());
                 toInsert.add(cat);
             }
-
             if (toInsert.isEmpty()) {
-                final int fs = 0, fsk = skipCount;
-                AppExecutors.get().mainThread().execute(() -> {
-                    _saving.setValue(false);
-                    _saveResult.setValue(new SaveResult(false, fs, fsk, "所选图标均已存在，无需重复保存"));
-                });
+                _saving.postValue(false);
+                _saveResult.postValue(new SaveResult(true, 0, skipCount, "全部分类已存在，已跳过"));
                 return;
             }
-
-            // Step 1：写入本地数据库，拿到自增 id
             long[] insertedIds = categoryDao.insertCategories(toInsert);
-            Log.d(TAG, "saveAsFirst - 本地写入 " + toInsert.size() + " 条");
-
-            // 将自增 id 回填到 category 对象（insertCategories 按顺序返回 rowId）
             for (int i = 0; i < insertedIds.length && i < toInsert.size(); i++) {
-                if (insertedIds[i] > 0) {
-                    toInsert.get(i).setId(insertedIds[i]);
-                }
+                toInsert.get(i).setId(insertedIds[i]);
             }
-
-            // Step 2：并行批量上传到云端（★ 性能优化核心）
             batchUploadCategoriesToCloud(toInsert);
-
-            final int finalSaved = toInsert.size();
-            final int finalSkip  = skipCount;
-            AppExecutors.get().mainThread().execute(() -> {
-                _saving.setValue(false);
-                String msg = "已保存 " + finalSaved + " 个分类" +
-                        (finalSkip > 0 ? "，跳过重复 " + finalSkip + " 个" : "") +
-                        "，同步中...";
-                _saveResult.setValue(new SaveResult(true, finalSaved, finalSkip, msg));
-                selectionManager.exitMultiSelectMode();
-            });
+            _saving.postValue(false);
+            _saveResult.postValue(new SaveResult(true, toInsert.size(), skipCount, "成功保存 " + toInsert.size() + " 个分类"));
         });
     }
 
-    // ══════════════════════════════════════════════════════════
-    // ★ 修复：批量保存为二级分类
-    // ══════════════════════════════════════════════════════════
-
-    /**
-     * 批量保存为指定父分类下的子分类。
-     *
-     * 修复点（★ 这是二级分类同步失败的根本原因）：
-     *  ① 保存时同步填充 parentCloudId
-     *     原代码只设置了 parentCategoryId（本地 id），未填充 parentCloudId，
-     *     导致 SubCategorySyncWorker 的 guardParentCloudId() 检测失败，
-     *     子分类永远无法上传到云端。
-     *  ② 若父分类还没有 cloudId（尚未同步），子分类记录仍写入本地，
-     *     但 parentCloudId 留空，由 WorkManager 在父分类同步后自动补全并上传。
-     *  ③ 若父分类已有 cloudId，立即并行上传子分类到云端。
-     */
     public void saveAsSecondLevelCategory(List<IconItem> selectedItems, long parentCategoryId) {
         if (selectedItems == null || selectedItems.isEmpty()) {
             _saveResult.setValue(new SaveResult(false, 0, 0, "请先选择图标"));
             return;
         }
         if (Boolean.TRUE.equals(_saving.getValue())) return;
-
         _saving.setValue(true);
 
         AppExecutors.get().diskIO().execute(() -> {
-            // ★ 修复①：查出父分类，获取 cloudId（这是子分类能否同步的关键）
-            Category parentCategory = categoryDao.getCategoryById(parentCategoryId);
-            String parentCloudId = (parentCategory != null) ? parentCategory.getCloudId() : null;
-
-            if (parentCloudId == null || parentCloudId.isEmpty()) {
-                Log.w(TAG, "saveAsSecond - 父分类 cloudId 为空（尚未同步），子分类将在父类同步后自动补全");
-                // 不阻塞用户操作，仍然保存到本地，WorkManager 的 propagateParentCloudIdToChildren 会补全
-            } else {
-                Log.d(TAG, "saveAsSecond - 父分类 cloudId=" + parentCloudId + "，子分类可直接上传");
+            Category parent = categoryDao.getCategoryById(parentCategoryId);
+            if (parent == null) {
+                _saving.postValue(false);
+                _saveResult.postValue(new SaveResult(false, 0, 0, "父分类不存在"));
+                return;
             }
-
             List<SubCategory> toInsert = new ArrayList<>();
             int skipCount = 0;
-
             for (IconItem item : selectedItems) {
-                SubCategory existing = subCategoryRepository.getSubCategoryByParentAndName(
-                        parentCategoryId, item.getName());
-                if (existing != null) {
-                    skipCount++;
-                    Log.d(TAG, "saveAsSecond - 跳过重复: " + item.getName());
-                    continue;
-                }
-
+                SubCategory existing = subCategoryRepository.getSubCategoryByParentAndName(parentCategoryId, item.getName());
+                if (existing != null) { skipCount++; continue; }
                 SubCategory sub = new SubCategory();
                 sub.setName(item.getName());
                 sub.setIconUri(item.getUrl());
                 sub.setParentCategoryId(parentCategoryId);
+                sub.setParentCloudId(parent.getCloudId());
                 sub.setOwnerId(currentUserId);
-                sub.setSortIndex(0);
-                sub.setUpdatedAt(System.currentTimeMillis());
-                // ★ 修复②：填充 parentCloudId，SubCategorySyncWorker 依赖此字段判断是否可上传
-                sub.setParentCloudId(parentCloudId); // 若父类未同步则为 null，Worker 稍后会补全
                 sub.setSyncState(SyncState.TO_CREATE.getValue());
                 toInsert.add(sub);
             }
-
             if (toInsert.isEmpty()) {
-                final int fsk = skipCount;
-                AppExecutors.get().mainThread().execute(() -> {
-                    _saving.setValue(false);
-                    _saveResult.setValue(new SaveResult(false, 0, fsk, "所选图标均已存在，无需重复保存"));
-                });
+                _saving.postValue(false);
+                _saveResult.postValue(new SaveResult(true, 0, skipCount, "全部子分类已存在，已跳过"));
                 return;
             }
-
-            // Step 1：写入本地数据库
-            long[] insertedIds = subCategoryDao.insertSubCategories(toInsert);
-            Log.d(TAG, "saveAsSecond - 本地写入 " + toInsert.size() + " 条 → parentId=" + parentCategoryId);
-
-            // 回填自增 id
-            for (int i = 0; i < insertedIds.length && i < toInsert.size(); i++) {
-                if (insertedIds[i] > 0) {
-                    toInsert.get(i).setId(insertedIds[i]);
-                }
-            }
-
-            // Step 2：若父分类已有 cloudId，立即并行上传（★ 性能优化）
-            if (parentCloudId != null && !parentCloudId.isEmpty()) {
-                batchUploadSubCategoriesToCloud(toInsert, parentCloudId);
-            } else {
-                // 父分类未同步，触发父分类 WorkManager 同步（它会在完成后 propagate parentCloudId）
-                com.example.my_project1.work.CategorySyncWorker.enqueue(getApplication());
-            }
-
-            final int finalSaved = toInsert.size();
-            final int finalSkip  = skipCount;
-            AppExecutors.get().mainThread().execute(() -> {
-                _saving.setValue(false);
-                String msg = "已保存 " + finalSaved + " 个子分类" +
-                        (finalSkip > 0 ? "，跳过重复 " + finalSkip + " 个" : "") +
-                        "，同步中...";
-                _saveResult.setValue(new SaveResult(true, finalSaved, finalSkip, msg));
-                selectionManager.exitMultiSelectMode();
-            });
+            subCategoryDao.insertAll(toInsert);
+            batchUploadSubCategoriesToCloud(toInsert, parent.getCloudId());
+            _saving.postValue(false);
+            _saveResult.postValue(new SaveResult(true, toInsert.size(), skipCount, "成功保存 " + toInsert.size() + " 个子分类"));
         });
     }
 
-    // ══════════════════════════════════════════════════════════
-    // ★ 性能优化：并行批量上传一级分类到云端
-    // ══════════════════════════════════════════════════════════
-
-    /**
-     * 并行批量上传一级分类到 Bmob。
-     *
-     * 优化原理：
-     *  - 旧方案：WorkManager 串行处理，N 个分类 → N 次串行 HTTP，总耗时 = N × 单次耗时
-     *  - 新方案：同时发起 N 个 Bmob save，HTTP 请求几乎并行，总耗时 ≈ 单次耗时
-     *  - CountDownLatch 等待所有请求完成后统一处理结果
-     *  - 成功：立即回写 cloudId + SYNCED，WorkManager 不会重复上传
-     *  - 失败：保留 TO_CREATE，WorkManager 兜底重试
-     *
-     * @param categories 已写入本地数据库的 Category 列表（id > 0）
-     */
     private void batchUploadCategoriesToCloud(List<Category> categories) {
-        if (categories == null || categories.isEmpty()) return;
-
-        AppExecutors.get().networkIO().execute(() -> {
-            CountDownLatch latch = new CountDownLatch(categories.size());
-            AtomicInteger successCount = new AtomicInteger(0);
-
-            for (Category category : categories) {
-                // 每个分类独立发起 Bmob 异步 save，不相互阻塞
-                CloudCategory cloud = CloudCategory.fromLocalCategory(category);
-                cloud.setOwnerId(currentUserId);
-
-                cloud.save(new SaveListener<String>() {
-                    @Override
-                    public void done(String objectId, BmobException e) {
-                        if (e == null && objectId != null) {
-                            // 立即持久化 cloudId，避免 WorkManager 重复上传
-                            AppExecutors.get().diskIO().execute(() -> {
-                                categoryDao.updateCloudIdById(
-                                        category.getId(), objectId, SyncState.SYNCED.getValue());
-                                Log.d(TAG, "✅ 一级分类上传成功: " + category.getName()
-                                        + " | cloudId=" + objectId);
-                            });
-                            successCount.incrementAndGet();
-                        } else {
-                            // 失败保留 TO_CREATE，WorkManager 兜底
-                            Log.w(TAG, "⚠️ 一级分类上传失败（WorkManager 将重试）: "
-                                    + category.getName()
-                                    + " | " + (e != null ? e.getMessage() : "unknown"));
-                        }
-                        latch.countDown();
+        final CountDownLatch latch = new CountDownLatch(categories.size());
+        final AtomicInteger successCount = new AtomicInteger(0);
+        for (Category cat : categories) {
+            bmobApi.uploadCategory(cat, new SaveListener<String>() {
+                @Override
+                public void done(String cloudId, BmobException e) {
+                    if (e == null) {
+                        cat.setCloudId(cloudId);
+                        cat.setSyncState(SyncState.SYNCED.getValue());
+                        categoryDao.update(cat);
+                        successCount.incrementAndGet();
                     }
-                });
-            }
-
-            try {
-                latch.await(); // 等待所有并行请求完成
-                Log.d(TAG, "batchUploadCategories 完成: 成功 " + successCount.get()
-                        + "/" + categories.size());
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                Log.w(TAG, "batchUploadCategories 被中断");
-            }
-        });
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // ★ 性能优化：并行批量上传子分类到云端
-    // ══════════════════════════════════════════════════════════
-
-    /**
-     * 并行批量上传子分类到 Bmob。
-     *
-     * 与 batchUploadCategoriesToCloud 逻辑相同，额外处理：
-     *  - 设置 parentCategory Pointer（Bmob 需要此字段建立父子关系）
-     *  - 上传成功后同时更新 cloudId 和 parentCloudId 到本地
-     *
-     * @param subCategories  已写入本地数据库的子分类列表（id > 0）
-     * @param parentCloudId  父分类的云端 objectId（调用前已确认非空）
-     */
-    private void batchUploadSubCategoriesToCloud(List<SubCategory> subCategories,
-                                                 String parentCloudId) {
-        if (subCategories == null || subCategories.isEmpty() ||
-                parentCloudId == null || parentCloudId.isEmpty()) return;
-
-        AppExecutors.get().networkIO().execute(() -> {
-            CountDownLatch latch = new CountDownLatch(subCategories.size());
-            AtomicInteger successCount = new AtomicInteger(0);
-
-            for (SubCategory sub : subCategories) {
-                // 构造云端对象
-                CloudSubCategory cloud = CloudSubCategory.fromLocalSubCategory(sub, parentCloudId);
-
-                // 设置用户 Pointer
-                if (currentUserId != null && !currentUserId.isEmpty()) {
-                    cn.bmob.v3.BmobUser userPointer = new cn.bmob.v3.BmobUser();
-                    userPointer.setObjectId(currentUserId);
-                    cloud.setOwnerId(userPointer);
-                }
-
-                cloud.save(new SaveListener<String>() {
-                    @Override
-                    public void done(String objectId, BmobException e) {
-                        if (e == null && objectId != null) {
-                            // 立即持久化 cloudId + parentCloudId，避免 WorkManager 重复上传
-                            AppExecutors.get().diskIO().execute(() -> {
-                                subCategoryDao.updateSubCloudIdById(
-                                        sub.getId(), objectId, SyncState.SYNCED.getValue());
-                                Log.d(TAG, "✅ 子分类上传成功: " + sub.getName()
-                                        + " | cloudId=" + objectId
-                                        + " | parentCloudId=" + parentCloudId);
-                            });
-                            successCount.incrementAndGet();
-                        } else {
-                            // 失败保留 TO_CREATE，WorkManager 兜底（parent_cloud_id 已写入，可正常重试）
-                            Log.w(TAG, "⚠️ 子分类上传失败（WorkManager 将重试）: "
-                                    + sub.getName()
-                                    + " | " + (e != null ? e.getMessage() : "unknown"));
-                        }
-                        latch.countDown();
-                    }
-                });
-            }
-
-            try {
-                latch.await();
-                Log.d(TAG, "batchUploadSubCategories 完成: 成功 " + successCount.get()
-                        + "/" + subCategories.size());
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                Log.w(TAG, "batchUploadSubCategories 被中断");
-            }
-        });
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // 首页分类加载（保持不变）
-    // ══════════════════════════════════════════════════════════
-
-    public void loadCategories() {
-        loadCategoriesInternal(false);
-    }
-
-    private void loadCategoriesInternal(boolean force) {
-        if (!force && Boolean.TRUE.equals(_categoryLoading.getValue())) return;
-        
-        categoryPage = 0;
-        _categoryLoading.setValue(true);
-        _categories.setValue(new ArrayList<>());
-        _categoryHasMore.setValue(true);
-
-        String fileName = getStyleFileName();
-        if (fileName == null) {
-            repository.getCategoryPage(categoryPage, new IconRepository.Callback<List<IconCategory>>() {
-                @Override public void onSuccess(List<IconCategory> data) {
-                    _categoryLoading.setValue(false);
-                    _categories.setValue(data);
-                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
-                    categoryPage = 1;
-                }
-                @Override public void onError(String message) {
-                    _categoryLoading.setValue(false);
-                    _categoryError.setValue(message);
-                }
-            });
-        } else {
-            repository.getAssetCategoryPage(getApplication().getAssets(), fileName, categoryPage, new IconRepository.Callback<List<IconCategory>>() {
-                @Override public void onSuccess(List<IconCategory> data) {
-                    _categoryLoading.setValue(false);
-                    _categories.setValue(data);
-                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
-                    categoryPage = 1;
-                }
-                @Override public void onError(String message) {
-                    _categoryLoading.setValue(false);
-                    _categoryError.setValue(message);
+                    latch.countDown();
                 }
             });
         }
+        try { latch.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+
+    private void batchUploadSubCategoriesToCloud(List<SubCategory> subCategories, String parentCloudId) {
+        final CountDownLatch latch = new CountDownLatch(subCategories.size());
+        for (SubCategory sub : subCategories) {
+            bmobApi.uploadSubCategory(sub, new SaveListener<String>() {
+                @Override
+                public void done(String cloudId, BmobException e) {
+                    if (e == null) {
+                        sub.setCloudId(cloudId);
+                        sub.setSyncState(SyncState.SYNCED.getValue());
+                        subCategoryDao.update(sub);
+                    }
+                    latch.countDown();
+                }
+            });
+        }
+        try { latch.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+
+    public void loadCategories() {
+        if (Boolean.TRUE.equals(_categoryLoading.getValue())) return;
+        _categoryLoading.setValue(true);
+        if (_allLoadedCategories.getValue() == null) _allLoadedCategories.setValue(new ArrayList<>());
+        // 每个数据源都会回调两次（一次列表数据、一次补缩略图），
+        // 因此不能按回调次数计数，改为按「源」计数，避免 loading 提前结束
+        final boolean[] done = new boolean[3];
+        final AtomicInteger remaining = new AtomicInteger(3);
+        final List<IconCategory> currentAll = new ArrayList<>();
+        final Runnable onAllDone = () ->
+                AppExecutors.get().mainThread().execute(() -> _categoryLoading.setValue(false));
+        repository.getCategoryPage(0, new IconRepository.Callback<List<IconCategory>>() {
+            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data, currentAll); markSourceDone(done, remaining, 0, onAllDone); }
+            @Override public void onError(String message) { markSourceDone(done, remaining, 0, onAllDone); }
+        });
+        repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", 0, new IconRepository.Callback<List<IconCategory>>() {
+            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data, currentAll); markSourceDone(done, remaining, 1, onAllDone); }
+            @Override public void onError(String message) { markSourceDone(done, remaining, 1, onAllDone); }
+        });
+        repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", 0, new IconRepository.Callback<List<IconCategory>>() {
+            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data, currentAll); markSourceDone(done, remaining, 2, onAllDone); }
+            @Override public void onError(String message) { markSourceDone(done, remaining, 2, onAllDone); }
+        });
+    }
+
+    private synchronized void mergeAndNotify(List<IconCategory> newData, List<IconCategory> currentAll) {
+        if (newData == null || newData.isEmpty()) return;
+        AppExecutors.get().mainThread().execute(() -> {
+            List<IconCategory> all = _allLoadedCategories.getValue();
+            if (all == null) all = new ArrayList<>();
+            List<IconCategory> updated = new ArrayList<>(all);
+            for (IconCategory cat : newData) {
+                boolean exists = false;
+                for (IconCategory old : updated) {
+                    if (cat.getFile().equals(old.getFile())) { exists = true; break; }
+                }
+                if (!exists) updated.add(cat);
+            }
+            List<IconCategory> coloredCategories = new ArrayList<>();
+            List<IconCategory> otherCategories = new ArrayList<>();
+            for (IconCategory c : updated) {
+                if ("lineal-color".equals(c.getStyle())) coloredCategories.add(c);
+                else otherCategories.add(c);
+            }
+            updated.clear();
+            updated.addAll(coloredCategories);
+            updated.addAll(otherCategories);
+            _allLoadedCategories.setValue(updated);
+            _statistics.setValue(new Statistics(repository.getTotalIcons(), repository.getTotalPacks(), 38));
+            applyFilters();
+        });
     }
 
     public void loadMoreCategories() {
         if (isCategoryLoadingMore) return;
         if (!Boolean.TRUE.equals(_categoryHasMore.getValue())) return;
+        IconStyle style = _currentStyle.getValue();
+        final IconStyle currentStyle = (style != null) ? style : IconStyle.ALL;
         isCategoryLoadingMore = true;
         _categoryLoadingMore.setValue(true);
+        final int currentPage = categoryPage + 1;
+        AppExecutors.get().networkIO().execute(() -> {
+            final List<IconCategory> mergedNew = new ArrayList<>();
+            // 各风格翻页对应自己的数据源；ALL 需同时翻 3 个源
+            final int sourceCount = (currentStyle == IconStyle.ALL) ? 3 : 1;
+            final boolean[] done = new boolean[sourceCount];
+            final AtomicInteger remaining = new AtomicInteger(sourceCount);
+            final Runnable onAllDone = () -> AppExecutors.get().mainThread().execute(() -> {
+                isCategoryLoadingMore = false;
+                _categoryLoadingMore.setValue(false);
+                if (mergedNew.isEmpty()) { _categoryHasMore.setValue(false); return; }
+                List<IconCategory> all = _allLoadedCategories.getValue();
+                if (all == null) all = new ArrayList<>();
+                List<IconCategory> updated = new ArrayList<>(all);
+                // 按 file 去重，避免跨源/跨页重复添加
+                for (IconCategory cat : mergedNew) {
+                    boolean exists = false;
+                    for (IconCategory old : updated) {
+                        if (cat.getFile().equals(old.getFile())) { exists = true; break; }
+                    }
+                    if (!exists) updated.add(cat);
+                }
+                List<IconCategory> coloredCategories = new ArrayList<>();
+                List<IconCategory> otherCategories = new ArrayList<>();
+                for (IconCategory c : updated) {
+                    if ("lineal-color".equals(c.getStyle())) coloredCategories.add(c);
+                    else otherCategories.add(c);
+                }
+                updated.clear();
+                updated.addAll(coloredCategories);
+                updated.addAll(otherCategories);
+                _allLoadedCategories.setValue(updated);
+                // 关键修复：重新应用过滤，把最新数据推送到 _categories，
+                // 否则 AllCollectionsActivity 观察的 categories 不会更新
+                applyFilters();
+                categoryPage = currentPage;
+            });
+            switch (currentStyle) {
+                case DEFAULT:
+                    repository.getCategoryPage(currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    break;
+                case LINEAR:
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    break;
+                case COLORED:
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    break;
+                case ALL:
+                default:
+                    repository.getCategoryPage(currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 1, onAllDone));
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 2, onAllDone));
+                    break;
+            }
+        });
+    }
 
-        String fileName = getStyleFileName();
-        if (fileName == null) {
-            repository.getCategoryPage(categoryPage, new IconRepository.Callback<List<IconCategory>>() {
-                @Override public void onSuccess(List<IconCategory> data) {
-                    isCategoryLoadingMore = false;
-                    _categoryLoadingMore.setValue(false);
-                    if (data.isEmpty()) { _categoryHasMore.setValue(false); return; }
-                    List<IconCategory> current = _categories.getValue();
-                    if (current == null) current = new ArrayList<>();
-                    List<IconCategory> merged = new ArrayList<>(current);
-                    merged.addAll(data);
-                    _categories.setValue(merged);
-                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
-                    categoryPage++;
-                }
-                @Override public void onError(String message) {
-                    isCategoryLoadingMore = false;
-                    _categoryLoadingMore.setValue(false);
-                    _categoryError.setValue(message);
-                }
-            });
-        } else {
-            repository.getAssetCategoryPage(getApplication().getAssets(), fileName, categoryPage, new IconRepository.Callback<List<IconCategory>>() {
-                @Override public void onSuccess(List<IconCategory> data) {
-                    isCategoryLoadingMore = false;
-                    _categoryLoadingMore.setValue(false);
-                    if (data.isEmpty()) { _categoryHasMore.setValue(false); return; }
-                    List<IconCategory> current = _categories.getValue();
-                    if (current == null) current = new ArrayList<>();
-                    List<IconCategory> merged = new ArrayList<>(current);
-                    merged.addAll(data);
-                    _categories.setValue(merged);
-                    _categoryHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_CATEGORY);
-                    categoryPage++;
-                }
-                @Override public void onError(String message) {
-                    isCategoryLoadingMore = false;
-                    _categoryLoadingMore.setValue(false);
-                    _categoryError.setValue(message);
-                }
-            });
+    // 每个数据源的回调（列表数据 + 缩略图）可能触发多次，但只应计数一次；
+    // 这里用 done[index] 保证「每个源完成一次即计数」，避免 loading 提前结束。
+    private static void markSourceDone(boolean[] done, AtomicInteger remaining, int index, Runnable onAllDone) {
+        boolean first;
+        synchronized (done) {
+            first = !done[index];
+            if (first) done[index] = true;
+        }
+        if (first && remaining.decrementAndGet() == 0) {
+            onAllDone.run();
         }
     }
 
-    // ══════════════════════════════════════════════════════════
-    // 搜索（保持不变）
-    // ══════════════════════════════════════════════════════════
+    private IconRepository.Callback<List<IconCategory>> newLoadMoreCategoryCallback(
+            List<IconCategory> sink, boolean[] done, AtomicInteger remaining, int index, Runnable onAllDone) {
+        return new IconRepository.Callback<List<IconCategory>>() {
+            @Override public void onSuccess(List<IconCategory> data) {
+                if (data != null) { synchronized (sink) { sink.addAll(data); } }
+                markSourceDone(done, remaining, index, onAllDone);
+            }
+            @Override public void onError(String message) { markSourceDone(done, remaining, index, onAllDone); }
+        };
+    }
 
     public void search(String keyword) {
         if (keyword == null) keyword = "";
-        String trimmed = keyword.trim();
-        if (trimmed.equals(lastKeyword) && searchPage > 0) return;
-
+        String trimmed = keyword.trim().toLowerCase();
+        Integer scope = _searchScope.getValue();
+        if (scope == null) scope = 0;
         lastKeyword = trimmed;
         _currentKeyword.setValue(trimmed);
-        searchPage = 0;
-        _searchResults.setValue(new ArrayList<>());
-        _searchHasMore.setValue(true);
-        if (trimmed.isEmpty()) { _searchLoading.setValue(false); return; }
+        if (trimmed.isEmpty()) {
+            _searchResults.setValue(new ArrayList<>());
+            applyFilters();
+            return;
+        }
+        if (scope == 0) {
+            searchIcons(trimmed);
+            applyFilters(); 
+        } else {
+            _searchResults.setValue(new ArrayList<>());
+            applyFilters(); 
+        }
+    }
 
+    private void searchIcons(String trimmed) {
         _searchLoading.setValue(true);
-        String fileName = getStyleFileName();
-        if (fileName == null) {
+        AppExecutors.get().networkIO().execute(() -> {
             repository.search(trimmed, 0, new IconRepository.Callback<List<IconItem>>() {
                 @Override public void onSuccess(List<IconItem> data) {
-                    _searchLoading.setValue(false);
-                    _searchResults.setValue(data);
-                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
-                    searchPage = 1;
+                    _searchLoading.postValue(false);
+                    _searchResults.postValue(data);
                 }
                 @Override public void onError(String message) {
-                    _searchLoading.setValue(false);
-                    _searchError.setValue(message);
+                    _searchLoading.postValue(false);
+                    _searchError.postValue(message);
                 }
             });
-        } else {
-            repository.searchAsset(getApplication().getAssets(), fileName, trimmed, 0, new IconRepository.Callback<List<IconItem>>() {
-                @Override public void onSuccess(List<IconItem> data) {
-                    _searchLoading.setValue(false);
-                    _searchResults.setValue(data);
-                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
-                    searchPage = 1;
-                }
-                @Override public void onError(String message) {
-                    _searchLoading.setValue(false);
-                    _searchError.setValue(message);
-                }
-            });
-        }
+        });
+    }
+
+    public void setSearchScope(int scope) {
+        _searchScope.setValue(scope);
+        String keyword = _currentKeyword.getValue();
+        if (keyword != null && !keyword.isEmpty()) search(keyword);
+        else applyFilters();
     }
 
     public void loadMoreSearchResults() {
         if (isSearchLoadingMore) return;
         if (!Boolean.TRUE.equals(_searchHasMore.getValue())) return;
-        if (lastKeyword.isEmpty()) return;
-
+        String keyword = _currentKeyword.getValue();
+        if (keyword == null || keyword.isEmpty()) return;
         isSearchLoadingMore = true;
         _searchLoadingMore.setValue(true);
-
-        String fileName = getStyleFileName();
-        if (fileName == null) {
-            repository.search(lastKeyword, searchPage, new IconRepository.Callback<List<IconItem>>() {
+        final int nextPage = searchPage + 1;
+        AppExecutors.get().networkIO().execute(() -> {
+            repository.search(keyword, nextPage, new IconRepository.Callback<List<IconItem>>() {
                 @Override public void onSuccess(List<IconItem> data) {
                     isSearchLoadingMore = false;
-                    _searchLoadingMore.setValue(false);
-                    if (data.isEmpty()) { _searchHasMore.setValue(false); return; }
+                    _searchLoadingMore.postValue(false);
+                    if (data == null || data.isEmpty()) { _searchHasMore.postValue(false); return; }
                     List<IconItem> current = _searchResults.getValue();
-                    if (current == null) current = new ArrayList<>();
-                    List<IconItem> merged = new ArrayList<>(current);
-                    merged.addAll(data);
-                    _searchResults.setValue(merged);
-                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
-                    searchPage++;
+                    List<IconItem> updated = new ArrayList<>(current != null ? current : new ArrayList<>());
+                    updated.addAll(data);
+                    _searchResults.postValue(updated);
+                    searchPage = nextPage;
                 }
                 @Override public void onError(String message) {
                     isSearchLoadingMore = false;
-                    _searchLoadingMore.setValue(false);
-                    _searchError.setValue(message);
+                    _searchLoadingMore.postValue(false);
+                    _searchError.postValue(message);
                 }
             });
-        } else {
-            repository.searchAsset(getApplication().getAssets(), fileName, lastKeyword, searchPage, new IconRepository.Callback<List<IconItem>>() {
-                @Override public void onSuccess(List<IconItem> data) {
-                    isSearchLoadingMore = false;
-                    _searchLoadingMore.setValue(false);
-                    if (data.isEmpty()) { _searchHasMore.setValue(false); return; }
-                    List<IconItem> current = _searchResults.getValue();
-                    if (current == null) current = new ArrayList<>();
-                    List<IconItem> merged = new ArrayList<>(current);
-                    merged.addAll(data);
-                    _searchResults.setValue(merged);
-                    _searchHasMore.setValue(data.size() >= IconRepository.PAGE_SIZE_SEARCH);
-                    searchPage++;
-                }
-                @Override public void onError(String message) {
-                    isSearchLoadingMore = false;
-                    _searchLoadingMore.setValue(false);
-                    _searchError.setValue(message);
-                }
-            });
-        }
+        });
     }
 
-    // ══════════════════════════════════════════════════════════
-    // 私有工具
-    // ══════════════════════════════════════════════════════════
-
-    private void notifyPageStatesChanged() {
-        _detailPageStates.setValue(pageStates.clone());
-    }
-
-    private void refreshGlobalLoadingState() {
-        _detailLoading.setValue(!inflightPages.isEmpty());
-    }
-
+    public void clearDetailError() { _detailError.setValue(null); }
+    private void notifyPageStatesChanged() { _detailPageStates.setValue(pageStates); }
+    private void refreshGlobalLoadingState() { _detailLoading.setValue(!inflightPages.isEmpty()); }
     public void clearCategoryError() { _categoryError.setValue(null); }
-    public void clearSearchError()   { _searchError.setValue(null);   }
-    public void clearDetailError()   { _detailError.setValue(null);   }
-    public void clearSaveResult()    { _saveResult.setValue(null);    }
+    public void clearSearchError() { _searchError.setValue(null); }
+    public void clearSaveResult() { _saveResult.setValue(null); }
 }

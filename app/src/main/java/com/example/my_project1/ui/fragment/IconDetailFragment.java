@@ -206,6 +206,7 @@ public class IconDetailFragment extends BottomSheetDialogFragment {
         viewModel.selectedCategory.observe(getViewLifecycleOwner(), category -> {
             if (category != null) {
                 currentCategory = category;
+                binding.tvIconCount.setText(category.getCount() + " 枚图标");
             }
         });
 
@@ -232,9 +233,9 @@ public class IconDetailFragment extends BottomSheetDialogFragment {
         });
 
         // 进度条
-        viewModel.detailLoading.observe(getViewLifecycleOwner(), loading ->
-                binding.progressDetail.setVisibility(
-                        Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE));
+        viewModel.detailLoading.observe(getViewLifecycleOwner(), loading -> {
+            binding.progressDetail.setVisibility(Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE);
+        });
 
         // 错误 Toast
         viewModel.detailError.observe(getViewLifecycleOwner(), error -> {

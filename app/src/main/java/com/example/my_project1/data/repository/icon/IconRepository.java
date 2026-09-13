@@ -69,6 +69,9 @@ public class IconRepository {
     private final ConcurrentHashMap<String, List<IconItem>> assetSearchCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ConcurrentHashMap<String, List<IconItem>>> assetCategoryDetailCache = new ConcurrentHashMap<>();
 
+    private int totalPacks = 0;
+    private int totalIcons = 0;
+
     private volatile JSONObject flaticonJsonCache = null;
     private volatile List<IconCategory> flaticonCategoryCache = null;
     private final ConcurrentHashMap<String, List<IconItem>> flaticonCategoryDetailCache = new ConcurrentHashMap<>();
@@ -111,6 +114,8 @@ public class IconRepository {
             flaticonCategoryCache = null;
             flaticonSearchCache = null;
         }
+        totalPacks = 0;
+        totalIcons = 0;
         categoryCache.clear();
         assetJsonCache.clear();
         assetCategoryCache.clear();
@@ -119,6 +124,9 @@ public class IconRepository {
         flaticonCategoryDetailCache.clear();
         Log.d(TAG, "clearCache: 内存缓存已全部清空");
     }
+
+    public int getTotalPacks() { return totalPacks; }
+    public int getTotalIcons() { return totalIcons; }
 
     // ==================== 核心业务：分类市集首页 ====================
 
@@ -402,6 +410,10 @@ public class IconRepository {
         synchronized (flaticonLock) {
             if (flaticonCategoryCache != null) return flaticonCategoryCache;
             JSONObject root = getFlaticonJsonObject();
+            
+            totalPacks += root.optInt("total_packs", 0);
+            totalIcons += root.optInt("total_icons", 0);
+
             JSONObject packs = root.getJSONObject("packs");
             List<IconCategory> list = new ArrayList<>();
             Iterator<String> keys = packs.keys();
@@ -412,6 +424,7 @@ public class IconRepository {
                 cat.setCategory(pack.optString("title_zh", pack.optString("title")));
                 cat.setCount(pack.optInt("icon_count"));
                 cat.setFile("flaticon:" + key);
+                cat.setStyle("filled");
                 list.add(cat);
             }
             flaticonCategoryCache = list;
@@ -458,16 +471,25 @@ public class IconRepository {
 
     private List<IconItem> loadCategoryItems(IconCategory category) throws Exception {
         String key = category.getFile();
-        if (key != null && key.startsWith("flaticon:")) {
+        if (key == null || key.isEmpty()) {
+            throw new Exception("分类数据文件路径为空");
+        }
+        if (key.startsWith("flaticon:")) {
             return loadFlaticonCategoryItemsInternal(key);
         }
         List<IconItem> cached = categoryCache.get(key);
         if (cached != null) return cached;
 
-        String json = fetchUrl(OSS_BASE + "json/" + key);
-        List<IconItem> items = parseIconItems(json);
-        categoryCache.put(key, items);
-        return items;
+        String url = OSS_BASE + "json/" + key;
+        try {
+            String json = fetchUrl(url);
+            List<IconItem> items = parseIconItems(json);
+            categoryCache.put(key, items);
+            return items;
+        } catch (Exception e) {
+            Log.e(TAG, "loadCategoryItems 失败: " + url, e);
+            throw e;
+        }
     }
 
     private List<IconCategory> loadAssetCategories(AssetManager assets, String fileName) throws Exception {
@@ -475,6 +497,11 @@ public class IconRepository {
         if (cached != null) return cached;
 
         JSONObject root = getAssetJsonObject(assets, fileName);
+        
+        totalPacks += root.optInt("total_packs", 0);
+        totalIcons += root.optInt("total_icons", 0);
+
+        String rootStyle = root.optString("style", "filled");
         JSONObject packs = root.getJSONObject("packs");
         List<IconCategory> list = new ArrayList<>();
         Iterator<String> keys = packs.keys();
@@ -485,6 +512,7 @@ public class IconRepository {
             cat.setCategory(pack.optString("title"));
             cat.setCount(pack.optInt("icon_count"));
             cat.setFile(key);
+            cat.setStyle(pack.optString("style", rootStyle));
             list.add(cat);
         }
         assetCategoryCache.put(fileName, list);
@@ -492,6 +520,9 @@ public class IconRepository {
     }
 
     private List<IconItem> loadAssetCategoryItems(AssetManager assets, String fileName, String packKey) throws Exception {
+        if (packKey == null || packKey.isEmpty()) {
+            throw new Exception("Asset PackKey 为空");
+        }
         ConcurrentHashMap<String, List<IconItem>> packCache = assetCategoryDetailCache.get(fileName);
         if (packCache == null) {
             packCache = new ConcurrentHashMap<>();
@@ -502,7 +533,11 @@ public class IconRepository {
         if (cached != null) return cached;
 
         JSONObject root = getAssetJsonObject(assets, fileName);
-        JSONObject pack = root.getJSONObject("packs").getJSONObject(packKey);
+        JSONObject packs = root.getJSONObject("packs");
+        if (!packs.has(packKey)) {
+            throw new Exception("Asset 中找不到 Pack: " + packKey);
+        }
+        JSONObject pack = packs.getJSONObject(packKey);
         JSONArray icons = pack.getJSONArray("icons");
         List<IconItem> list = new ArrayList<>();
         for (int i = 0; i < icons.length(); i++) {
@@ -598,6 +633,10 @@ public class IconRepository {
     private List<IconCategory> parseIndex(String json) throws Exception {
         List<IconCategory> list = new ArrayList<>();
         JSONArray arr = new JSONArray(json);
+        
+        // OSS index.json 暂时没有 root 统计字段，按实际列表估算
+        totalPacks += arr.length();
+
         for (int i = 0; i < arr.length(); i++) {
             JSONObject obj = arr.getJSONObject(i);
             String name = obj.optString("category");
@@ -605,8 +644,11 @@ public class IconRepository {
 
             IconCategory cat = new IconCategory();
             cat.setCategory(name);
-            cat.setCount(obj.optInt("count"));
+            int count = obj.optInt("count");
+            cat.setCount(count);
+            totalIcons += count;
             cat.setFile(obj.optString("file"));
+            cat.setStyle("filled"); // OSS index 默认为 filled
             list.add(cat);
         }
         return list;

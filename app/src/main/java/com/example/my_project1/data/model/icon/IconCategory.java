@@ -20,6 +20,9 @@ public class IconCategory {
     /** 分类详情 JSON 文件名，如 "nas.json" */
     private String file;
 
+    /** 图标风格：line, filled, lineal-color */
+    private String style;
+
     // ==================== UI 辅助字段 ====================
 
     /**
@@ -48,6 +51,9 @@ public class IconCategory {
 
     public String getFile() { return file; }
     public void setFile(String file) { this.file = file; }
+
+    public String getStyle() { return style; }
+    public void setStyle(String style) { this.style = style; }
 
     public List<String> getThumbUrls() { return thumbUrls; }
     public void setThumbUrls(List<String> thumbUrls) { this.thumbUrls = thumbUrls; }

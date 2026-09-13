@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    fragment_icon_detail.xml（改造版）
-    ────────────────────────────────────────────────────
-    ✔ 进度条改为居中转圈 ProgressBar
-    ✔ 使用 FrameLayout 覆盖 ViewPager
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -90,22 +85,20 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- ViewPager2 - 左右滑动分页 -->
-
-        <!-- ★ 居中转圈 ProgressBar -->
-
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/view_pager"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <ProgressBar
+        <com.airbnb.lottie.LottieAnimationView
             android:id="@+id/progress_detail"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
             android:layout_gravity="center"
-            android:indeterminate="true"
-            android:visibility="gone" />
+            android:visibility="gone"
+            app:lottie_autoPlay="true"
+            app:lottie_loop="true"
+            app:lottie_rawRes="@raw/loading" />
 
     </FrameLayout>
 

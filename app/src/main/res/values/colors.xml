@@ -137,4 +137,24 @@
     <color name="budget_card_bg">#FFFFFF</color>
     <color name="budget_light_theme_bg">#EBEDFF</color>
     <color name="budget_divider">#EEEEEE</color>
+
+    <!-- Icon Market Refactor Colors -->
+    <color name="market_page_bg">#F6F7FB</color>
+    <color name="market_primary">#5969F5</color>
+    <color name="market_text_main">#303449</color>
+    <color name="market_text_secondary">#9298AA</color>
+    <color name="market_stat_blue_bg">#E9EFFF</color>
+    <color name="market_stat_blue_text">#5969F5</color>
+    <color name="market_stat_red_bg">#FFF0F0</color>
+    <color name="market_stat_red_text">#FF6B6B</color>
+    <color name="market_stat_green_bg">#EFFFF5</color>
+    <color name="market_stat_green_text">#00C48C</color>
+    <color name="market_icon_container_bg">#F8FAFF</color>
+    <color name="market_pill_unselected_bg">#FFFFFF</color>
+    <color name="market_pill_unselected_stroke">#E2E8F0</color>
+
+    <!-- Icon Style Colors -->
+    <color name="icon_style_line">#5B6AF5</color>
+    <color name="icon_style_color">#FF6B6B</color>
+    <color name="icon_style_filled">#4CBA87</color>
 </resources>

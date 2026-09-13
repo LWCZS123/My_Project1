@@ -62,7 +62,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_icon_category, parent, false);
+                .inflate(R.layout.item_icon_collection, parent, false);
         return new ViewHolder(v);
     }
 
@@ -74,61 +74,80 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
     class ViewHolder extends RecyclerView.ViewHolder {
 
         private final TextView tvName;
-        private final TextView tvCount;
-        private final ImageView[] thumbViews = new ImageView[9];
+        private final TextView tvStyleTag;
+        private final TextView tvRating;
+        private final TextView tvDescription;
+        private final TextView tvDownloadCount;
+        private final TextView tvIconCount;
+        private final com.google.android.material.button.MaterialButton btnDownload;
+        private final ImageView[] thumbViews = new ImageView[6];
 
         ViewHolder(View itemView) {
             super(itemView);
-            tvName  = itemView.findViewById(R.id.tv_category_name);
-            tvCount = itemView.findViewById(R.id.tv_category_count);
+            tvName          = itemView.findViewById(R.id.tv_collection_name);
+            tvStyleTag      = itemView.findViewById(R.id.tv_style_tag);
+            tvRating        = itemView.findViewById(R.id.tv_rating);
+            tvDescription   = itemView.findViewById(R.id.tv_description);
+            tvDownloadCount = itemView.findViewById(R.id.tv_download_count);
+            tvIconCount     = itemView.findViewById(R.id.tv_icon_count);
+            btnDownload     = itemView.findViewById(R.id.btn_download);
 
-            // 9 个缩略图 ImageView（xml 中 id 为 iv_thumb_0 ~ iv_thumb_8）
-            thumbViews[0] = itemView.findViewById(R.id.iv_thumb_0);
-            thumbViews[1] = itemView.findViewById(R.id.iv_thumb_1);
-            thumbViews[2] = itemView.findViewById(R.id.iv_thumb_2);
-            thumbViews[3] = itemView.findViewById(R.id.iv_thumb_3);
-            thumbViews[4] = itemView.findViewById(R.id.iv_thumb_4);
-            thumbViews[5] = itemView.findViewById(R.id.iv_thumb_5);
-            thumbViews[6] = itemView.findViewById(R.id.iv_thumb_6);
-            thumbViews[7] = itemView.findViewById(R.id.iv_thumb_7);
-            thumbViews[8] = itemView.findViewById(R.id.iv_thumb_8);
+            ViewGroup layoutPreviews = itemView.findViewById(R.id.layout_previews);
+            for (int i = 0; i < 6; i++) {
+                ViewGroup container = (ViewGroup) layoutPreviews.getChildAt(i);
+                thumbViews[i] = (ImageView) container.getChildAt(0);
+            }
         }
 
         void bind(IconCategory category) {
             tvName.setText(category.getCategory());
-            tvCount.setText(category.getCount() + " 个");
+            
+            String style = category.getStyle();
+            tvStyleTag.setText(getStyleDisplayName(style));
+            
+            // 设置下载按钮颜色
+            int colorRes = R.color.icon_style_filled;
+            if ("line".equals(style)) colorRes = R.color.icon_style_line;
+            else if ("lineal-color".equals(style)) colorRes = R.color.icon_style_color;
+            btnDownload.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                    itemView.getContext().getResources().getColor(colorRes)));
+
+            tvIconCount.setText("· " + category.getCount() + " 枚图标");
+            
+            // 演示用数据，实际应从 Model 获取
+            tvRating.setText("4.9");
+            tvDownloadCount.setText((category.getCount() * 3) + " 下载");
+            tvDescription.setText("精选 " + category.getCategory() + " 风格图标集合");
 
             itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onCategoryClick(category);
             });
 
             List<String> thumbUrls = category.getThumbUrls();
-            // 识别是否需要 Padding：原有 INDEX_URL 的分类以 .json 结尾且自带边距，
-            // 其他（Flaticon, LINEAR, COLORED）则占满画布，需要增加 Padding 以对齐
-            String file = category.getFile();
-            boolean needsPadding = file != null && !file.endsWith(".json");
-            int padding = needsPadding ? (int) (4 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f) : 0;
+            int padding = (int) (1 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f);
 
-            for (int i = 0; i < 9; i++) {
+            for (int i = 0; i < 6; i++) {
                 ImageView iv = thumbViews[i];
-                if (iv == null) continue;
-
                 iv.setPadding(padding, padding, padding, padding);
                 Glide.with(itemView.getContext()).clear(iv);
 
                 if (thumbUrls != null && i < thumbUrls.size()) {
                     String url = thumbUrls.get(i);
                     String thumbUrl = url.contains("?") ? url : url + "?x-oss-process=image/resize,w_100";
-
-                    GlideImageLoader.loadThumbnail(
-                            itemView.getContext(),
-                            thumbUrl,
-                            iv
-                    );
+                    GlideImageLoader.loadThumbnail(itemView.getContext(), thumbUrl, iv);
+                    iv.setVisibility(View.VISIBLE);
+                    ((View)iv.getParent()).setVisibility(View.VISIBLE);
                 } else {
-                    iv.setImageResource(android.R.color.darker_gray);
+                    iv.setVisibility(View.INVISIBLE);
+                    ((View)iv.getParent()).setVisibility(View.INVISIBLE);
                 }
             }
+        }
+
+        private String getStyleDisplayName(String style) {
+            if ("line".equals(style)) return "线性";
+            if ("lineal-color".equals(style)) return "彩色";
+            return "默认";
         }
     }
 }
