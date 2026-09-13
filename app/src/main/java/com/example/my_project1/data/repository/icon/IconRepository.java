@@ -131,6 +131,32 @@ public class IconRepository {
     // ==================== 核心业务：分类市集首页 ====================
 
     public void getCategoryPage(int page, Callback<List<IconCategory>> callback) {
+        // Re-entry fast path: the index is process-cached, so do not enqueue a
+        // network worker or rebuild the merged source list.
+        List<IconCategory> cachedIndex = categoryIndexCache;
+        if (cachedIndex != null) {
+            List<IconCategory> pageData = paginate(cachedIndex, page, PAGE_SIZE_CATEGORY);
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>(pageData)));
+            
+            // 即使命中缓存，也要确保这页的缩略图是加载过的
+            executors.computation().execute(() -> {
+                boolean updated = false;
+                for (IconCategory cat : pageData) {
+                    if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                        if (cat.getFile() != null && cat.getFile().startsWith("flaticon:")) {
+                            fillFlaticonCategoryThumbs(cat);
+                        } else {
+                            fillCategoryThumbs(cat);
+                        }
+                        updated = true;
+                    }
+                }
+                if (updated) {
+                    executors.mainThread().execute(() -> callback.onSuccess(new ArrayList<>(pageData)));
+                }
+            });
+            return;
+        }
         executors.networkIO().execute(() -> {
             try {
                 if (categoryIndexCache == null) {
@@ -208,6 +234,29 @@ public class IconRepository {
     // ==================== 核心业务：Asset 数据源支持 ====================
 
     public void getAssetCategoryPage(AssetManager assets, String fileName, int page, Callback<List<IconCategory>> callback) {
+        Log.d(TAG, "getAssetCategoryPage: " + fileName + ", Page: " + page);
+        List<IconCategory> cached = assetCategoryCache.get(fileName);
+        if (cached != null) {
+            List<IconCategory> pageData = paginate(cached, page, PAGE_SIZE_CATEGORY);
+            Log.d(TAG, "getAssetCategoryPage Cache Hit: " + fileName + ", Items: " + pageData.size());
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>(pageData)));
+            
+            // 即使命中缓存，也要确保这页的缩略图是加载过的
+            executors.computation().execute(() -> {
+                boolean updated = false;
+                for (IconCategory cat : pageData) {
+                    if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                        fillAssetCategoryThumbs(assets, fileName, cat);
+                        updated = true;
+                    }
+                }
+                if (updated) {
+                    Log.d(TAG, "getAssetCategoryPage Thumbs Updated for: " + fileName + ", Page: " + page);
+                    executors.mainThread().execute(() -> callback.onSuccess(new ArrayList<>(pageData)));
+                }
+            });
+            return;
+        }
         executors.networkIO().execute(() -> {
             try {
                 List<IconCategory> all = loadAssetCategories(assets, fileName);
@@ -290,6 +339,24 @@ public class IconRepository {
     // ==================== 核心业务：Flaticon 独立源支持 ====================
 
     public void getFlaticonCategoryPage(int page, Callback<List<IconCategory>> callback) {
+        if (flaticonCategoryCache != null) {
+            List<IconCategory> pageData = paginate(flaticonCategoryCache, page, PAGE_SIZE_CATEGORY);
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>(pageData)));
+            
+            executors.computation().execute(() -> {
+                boolean updated = false;
+                for (IconCategory cat : pageData) {
+                    if (cat.getThumbUrls() == null || cat.getThumbUrls().isEmpty()) {
+                        fillFlaticonCategoryThumbs(cat);
+                        updated = true;
+                    }
+                }
+                if (updated) {
+                    executors.mainThread().execute(() -> callback.onSuccess(new ArrayList<>(pageData)));
+                }
+            });
+            return;
+        }
         executors.networkIO().execute(() -> {
             try {
                 List<IconCategory> all = loadFlaticonCategoriesInternal();
@@ -449,7 +516,7 @@ public class IconRepository {
             item.setCategory(pack.optString("title_zh", pack.optString("title")));
             String cdnUrl = obj.optString("cdn_url");
             item.setUrl(cdnUrl);
-            item.setThumb(cdnUrl + THUMB_SUFFIX);
+            item.setThumb(cdnUrl); // 缩略图由 Glide 在客户端动态缩放，不在此处强加 OSS 参数
             list.add(item);
         }
         flaticonCategoryDetailCache.put(realKey, list);
@@ -523,6 +590,7 @@ public class IconRepository {
         if (packKey == null || packKey.isEmpty()) {
             throw new Exception("Asset PackKey 为空");
         }
+        Log.d(TAG, "loadAssetCategoryItems: File=" + fileName + ", PackKey=" + packKey);
         ConcurrentHashMap<String, List<IconItem>> packCache = assetCategoryDetailCache.get(fileName);
         if (packCache == null) {
             packCache = new ConcurrentHashMap<>();
@@ -530,11 +598,20 @@ public class IconRepository {
             packCache = assetCategoryDetailCache.get(fileName);
         }
         List<IconItem> cached = packCache.get(packKey);
-        if (cached != null) return cached;
+        if (cached != null) {
+            Log.d(TAG, "loadAssetCategoryItems Cache Hit: " + packKey + ", Icons: " + cached.size());
+            return cached;
+        }
 
         JSONObject root = getAssetJsonObject(assets, fileName);
         JSONObject packs = root.getJSONObject("packs");
         if (!packs.has(packKey)) {
+            Log.e(TAG, "Asset 中找不到 Pack: " + packKey + " in file: " + fileName);
+            // 打印出前几个 key 帮助调试
+            Iterator<String> keys = packs.keys();
+            StringBuilder sb = new StringBuilder("Available keys: ");
+            for(int i=0; i<5 && keys.hasNext(); i++) sb.append(keys.next()).append(", ");
+            Log.e(TAG, sb.toString());
             throw new Exception("Asset 中找不到 Pack: " + packKey);
         }
         JSONObject pack = packs.getJSONObject(packKey);
@@ -551,6 +628,7 @@ public class IconRepository {
             list.add(item);
         }
         packCache.put(packKey, list);
+        Log.d(TAG, "loadAssetCategoryItems Loaded: " + packKey + ", Icons: " + list.size());
         return list;
     }
 
@@ -602,6 +680,7 @@ public class IconRepository {
 
     private void fillAssetCategoryThumbs(AssetManager assets, String fileName, IconCategory category) {
         try {
+            Log.d(TAG, "Filling thumbs for asset category: " + category.getCategory() + " from file: " + fileName);
             List<IconItem> items = loadAssetCategoryItems(assets, fileName, category.getFile());
             List<String> thumbs = new ArrayList<>();
             int count = Math.min(9, items.size());
@@ -609,6 +688,7 @@ public class IconRepository {
                 thumbs.add(items.get(i).getThumbUrl());
             }
             category.setThumbUrls(thumbs);
+            Log.d(TAG, "Filled " + thumbs.size() + " thumbs for " + category.getCategory() + ". First URL: " + (thumbs.isEmpty() ? "none" : thumbs.get(0)));
         } catch (Exception e) {
             Log.e(TAG, "fillAssetCategoryThumbs 异常", e);
         }
@@ -664,11 +744,13 @@ public class IconRepository {
             item.setName(obj.optString("name"));
             item.setCategory(obj.optString("category"));
 
-            String url = obj.optString("url");
+            // Category payloads are not fully uniform: CDN-backed packs use
+            // cdn_url while the search index uses url/thumb.
+            String url = obj.optString("url", obj.optString("cdn_url"));
             if (!url.isEmpty() && !url.startsWith("http")) url = OSS_BASE + url;
             item.setUrl(url);
 
-            String thumb = obj.optString("thumb");
+            String thumb = obj.optString("thumb", obj.optString("cdn_url"));
             if (!thumb.isEmpty() && !thumb.startsWith("http")) thumb = OSS_BASE + thumb;
             item.setThumb(thumb);
 

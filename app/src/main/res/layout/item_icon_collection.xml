@@ -32,6 +32,15 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <ImageView
+            android:id="@+id/iv_collection_loading_bar"
+            android:layout_width="36dp"
+            android:layout_height="24dp"
+            android:contentDescription="@null"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <!-- 风格标签 -->
         <TextView
             android:id="@+id/tv_style_tag"
@@ -121,7 +130,7 @@
                 android:background="@drawable/bg_icon_item_container">
 
                 <ImageView
-                    android:layout_width="34dp"
+                    android:layout_width="33dp"
                     android:layout_height="34dp"
                     android:layout_gravity="center"
                     android:contentDescription="Icon"

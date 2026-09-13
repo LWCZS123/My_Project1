@@ -10,7 +10,6 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.utils.GlideImageLoader;
@@ -35,6 +34,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
     }
 
     private final OnCategoryClickListener listener;
+    private volatile boolean metadataLoading;
 
     public CategoryAdapter(OnCategoryClickListener listener) {
         super(DIFF_CALLBACK);
@@ -46,14 +46,15 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                 @Override
                 public boolean areItemsTheSame(@NonNull IconCategory a, @NonNull IconCategory b) {
                     // 同时校验名称和所属文件（pack key），确保不同风格下同名分类能正确刷新
-                    return a.getCategory().equals(b.getCategory())
-                            && a.getFile().equals(b.getFile());
+                    return java.util.Objects.equals(a.getCategory(), b.getCategory())
+                            && java.util.Objects.equals(a.getFile(), b.getFile());
                 }
 
                 @Override
                 public boolean areContentsTheSame(@NonNull IconCategory a, @NonNull IconCategory b) {
                     return a.getCount() == b.getCount()
-                            && a.getCategory().equals(b.getCategory())
+                            && java.util.Objects.equals(a.getCategory(), b.getCategory())
+                            && java.util.Objects.equals(a.getStyle(), b.getStyle())
                             && java.util.Objects.equals(a.getThumbUrls(), b.getThumbUrls());
                 }
             };
@@ -71,6 +72,27 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
         holder.bind(getItem(position));
     }
 
+    @Override
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position, @NonNull List<Object> payloads) {
+        if (!payloads.isEmpty()) {
+            // "thumbnail" 或 "metadata" 负载刷新
+            holder.bind(getItem(position));
+        } else {
+            super.onBindViewHolder(holder, position, payloads);
+        }
+    }
+
+    /** Thumbnail URLs are enriched on the same model instance after DiffUtil ran. */
+    public void refreshThumbnailContent() {
+        if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "thumbnail");
+    }
+
+    public void setMetadataLoading(boolean loading) {
+        if (metadataLoading == loading) return;
+        metadataLoading = loading;
+        if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "metadata");
+    }
+
     class ViewHolder extends RecyclerView.ViewHolder {
 
         private final TextView tvName;
@@ -79,6 +101,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
         private final TextView tvDescription;
         private final TextView tvDownloadCount;
         private final TextView tvIconCount;
+        private final ImageView metadataLoadingView;
         private final com.google.android.material.button.MaterialButton btnDownload;
         private final ImageView[] thumbViews = new ImageView[6];
 
@@ -90,6 +113,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             tvDescription   = itemView.findViewById(R.id.tv_description);
             tvDownloadCount = itemView.findViewById(R.id.tv_download_count);
             tvIconCount     = itemView.findViewById(R.id.tv_icon_count);
+            metadataLoadingView = itemView.findViewById(R.id.iv_collection_loading_bar);
             btnDownload     = itemView.findViewById(R.id.btn_download);
 
             ViewGroup layoutPreviews = itemView.findViewById(R.id.layout_previews);
@@ -100,7 +124,31 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
         }
 
         void bind(IconCategory category) {
-            tvName.setText(category.getCategory());
+            if (category == null) return;
+            List<String> thumbUrls = category.getThumbUrls();
+            android.util.Log.d("CategoryAdapter", "Binding category: " + category.getCategory() 
+                + ", Style: " + category.getStyle() 
+                + ", File: " + category.getFile()
+                + ", ThumbsCount: " + (thumbUrls != null ? thumbUrls.size() : "null"));
+
+            boolean missingMetadata = category.getCategory() == null
+                    || category.getCategory().trim().isEmpty();
+            boolean showMetadataLoader = metadataLoading || missingMetadata;
+            if (showMetadataLoader) {
+                tvName.setVisibility(View.INVISIBLE);
+                if (metadataLoadingView != null) {
+                    metadataLoadingView.setVisibility(View.VISIBLE);
+                    GlideImageLoader.showMetadataLoading(itemView.getContext(), metadataLoadingView);
+                }
+            } else {
+                tvName.setVisibility(View.VISIBLE);
+                if (metadataLoadingView != null) {
+                    com.bumptech.glide.Glide.with(metadataLoadingView).clear(metadataLoadingView);
+                    metadataLoadingView.setVisibility(View.GONE);
+                }
+                tvName.setText(category.getCategory());
+            }
+            if (category == null) return;
             
             String style = category.getStyle();
             tvStyleTag.setText(getStyleDisplayName(style));
@@ -123,23 +171,37 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                 if (listener != null) listener.onCategoryClick(category);
             });
 
-            List<String> thumbUrls = category.getThumbUrls();
+            thumbUrls = category.getThumbUrls();
             int padding = (int) (1 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f);
 
-            for (int i = 0; i < 6; i++) {
-                ImageView iv = thumbViews[i];
+            for (int index = 0; index < 6; index++) {
+                ImageView iv = thumbViews[index];
                 iv.setPadding(padding, padding, padding, padding);
-                Glide.with(itemView.getContext()).clear(iv);
-
-                if (thumbUrls != null && i < thumbUrls.size()) {
-                    String url = thumbUrls.get(i);
-                    String thumbUrl = url.contains("?") ? url : url + "?x-oss-process=image/resize,w_100";
-                    GlideImageLoader.loadThumbnail(itemView.getContext(), thumbUrl, iv);
+                if (thumbUrls != null && index < thumbUrls.size()) {
+                    String url = thumbUrls.get(index);
+                    // 仅对阿里云 OSS 资源添加缩略图参数，避免损坏其他源（如 freeicon）的 URL
+                    String thumbUrl = url;
+                    if (!url.contains("?") && url.contains("aliyuncs.com")) {
+                        thumbUrl += "?x-oss-process=image/resize,w_100";
+                    }
+                    android.util.Log.d("CategoryAdapter", "Position: " + getBindingAdapterPosition() + ", ViewIndex: " + index + ", URL: " + thumbUrl);
+                    Object previousUrl = iv.getTag(R.id.tag_icon_thumb_url);
+                    if (!thumbUrl.equals(previousUrl)) {
+                        iv.setTag(R.id.tag_icon_thumb_url, thumbUrl);
+                        com.bumptech.glide.Glide.with(iv).clear(iv);
+                        GlideImageLoader.loadThumbnail(itemView.getContext(), thumbUrl, iv);
+                    }
+                    iv.setAlpha(1f);
                     iv.setVisibility(View.VISIBLE);
                     ((View)iv.getParent()).setVisibility(View.VISIBLE);
                 } else {
-                    iv.setVisibility(View.INVISIBLE);
-                    ((View)iv.getParent()).setVisibility(View.INVISIBLE);
+                    // Keep a stable preview slot while remote thumbnails are fetched.
+                    // The name/count/style fields are already usable from the JSON payload.
+                    iv.setTag(R.id.tag_icon_thumb_url, null);
+                    GlideImageLoader.showThumbnailLoading(itemView.getContext(), iv);
+                    iv.setAlpha(1f);
+                    iv.setVisibility(View.VISIBLE);
+                    ((View)iv.getParent()).setVisibility(View.VISIBLE);
                 }
             }
         }

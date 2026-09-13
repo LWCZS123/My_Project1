@@ -54,8 +54,12 @@ public class IconMarketActivity extends AppCompatActivity {
     private HotIconAdapter hotIconAdapter;
     private IconGridAdapter searchAdapter;
     private List<IconItem> currentSearchResults = new ArrayList<>();
+    private boolean categoryLoading, categoryLoadingMore, searchLoading, searchLoadingMore;
+    private boolean destroyed;
+    private boolean styleSwitching;
 
     private final Runnable searchDebounceRunnable = () -> {
+        if (destroyed || binding == null || viewModel == null) return;
         String keyword = binding.etSearch.getText() == null ? "" : binding.etSearch.getText().toString().trim();
         viewModel.search(keyword);
     };
@@ -100,8 +104,12 @@ public class IconMarketActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        destroyed = true;
+        if (binding != null) {
+            binding.etSearch.removeCallbacks(searchDebounceRunnable);
+        }
+        binding = null;
         super.onDestroy();
-        binding.etSearch.removeCallbacks(searchDebounceRunnable);
     }
 
     private void initCategoryRecyclerView() {
@@ -112,6 +120,9 @@ public class IconMarketActivity extends AppCompatActivity {
         });
 
         binding.rvCategories.setLayoutManager(new GridLayoutManager(this, 1));
+        // Metadata and thumbnails arrive incrementally; suppress change animations
+        // so an existing card is updated in place instead of flashing.
+        binding.rvCategories.setItemAnimator(null);
         binding.rvCategories.setAdapter(categoryAdapter);
 
         binding.rvCategories.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -137,10 +148,17 @@ public class IconMarketActivity extends AppCompatActivity {
     }
 
     private void initStyleSelector() {
-        binding.tvStyleAll.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.ALL));
-        binding.tvStyleLinear.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.LINEAR));
-        binding.tvStyleColored.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.COLORED));
-        binding.tvStyleDefault.setOnClickListener(v -> viewModel.switchStyle(IconMarketViewModel.IconStyle.DEFAULT));
+        binding.tvStyleAll.setOnClickListener(v -> switchStyle(IconMarketViewModel.IconStyle.ALL));
+        binding.tvStyleLinear.setOnClickListener(v -> switchStyle(IconMarketViewModel.IconStyle.LINEAR));
+        binding.tvStyleColored.setOnClickListener(v -> switchStyle(IconMarketViewModel.IconStyle.COLORED));
+        binding.tvStyleDefault.setOnClickListener(v -> switchStyle(IconMarketViewModel.IconStyle.DEFAULT));
+    }
+
+    private void switchStyle(IconMarketViewModel.IconStyle style) {
+        if (viewModel.currentStyle.getValue() == style) return;
+        styleSwitching = true;
+        categoryAdapter.setMetadataLoading(true);
+        viewModel.switchStyle(style);
     }
 
     private void updateStyleUI(IconMarketViewModel.IconStyle style) {
@@ -307,7 +325,20 @@ public class IconMarketActivity extends AppCompatActivity {
                 List<IconCategory> homeList = (categories.size() > HOME_CATEGORY_LIMIT)
                         ? new ArrayList<>(categories.subList(0, HOME_CATEGORY_LIMIT))
                         : categories;
-                categoryAdapter.submitList(homeList);
+                categoryAdapter.submitList(homeList, categoryAdapter::refreshThumbnailContent);
+                if (styleSwitching && binding != null) {
+                    binding.getRoot().postDelayed(() -> {
+                        if (!destroyed && categoryAdapter != null) {
+                            styleSwitching = false;
+                            categoryAdapter.setMetadataLoading(false);
+                        }
+                    }, 180L);
+                } else {
+                    categoryAdapter.setMetadataLoading(false);
+                }
+                // Hide the full-page loader as soon as static JSON metadata arrives;
+                // thumbnail enrichment continues in-place without blocking the list.
+                updateLoadingIndicator();
 
                 // 首页需展示 HOME_CATEGORY_LIMIT 个合集，但数据按页加载（每页约 30 个），
                 // 数量不足且未处于搜索状态时，自动继续加载下一页，直到填满或没有更多数据
@@ -331,11 +362,15 @@ public class IconMarketActivity extends AppCompatActivity {
         viewModel.hotCategory.observe(this, this::bindHotCategory);
 
         viewModel.categoryLoading.observe(this, loading -> {
-            List<IconCategory> current = viewModel.categories.getValue();
-            binding.progressCategory.setVisibility(loading && (current == null || current.isEmpty()) ? View.VISIBLE : View.GONE);
+            categoryLoading = Boolean.TRUE.equals(loading);
+            categoryAdapter.setMetadataLoading(categoryLoading && isCategoryListEmpty());
+            updateLoadingIndicator();
         });
 
-        viewModel.categoryLoadingMore.observe(this, loading -> binding.progressCategoryMore.setVisibility(loading ? View.VISIBLE : View.GONE));
+        viewModel.categoryLoadingMore.observe(this, loading -> {
+            categoryLoadingMore = Boolean.TRUE.equals(loading);
+            updateLoadingIndicator();
+        });
 
         viewModel.categoryError.observe(this, error -> {
             if (error != null) { Toast.makeText(this, error, Toast.LENGTH_SHORT).show(); viewModel.clearCategoryError(); }
@@ -369,11 +404,35 @@ public class IconMarketActivity extends AppCompatActivity {
             if (!keyword.isEmpty()) showSearchView();
         });
 
-        viewModel.searchLoading.observe(this, loading -> binding.progressSearch.setVisibility(loading ? View.VISIBLE : View.GONE));
-        viewModel.searchLoadingMore.observe(this, loading -> binding.progressSearchMore.setVisibility(loading ? View.VISIBLE : View.GONE));
+        viewModel.searchLoading.observe(this, loading -> {
+            searchLoading = Boolean.TRUE.equals(loading);
+            updateLoadingIndicator();
+        });
+        viewModel.searchLoadingMore.observe(this, loading -> {
+            searchLoadingMore = Boolean.TRUE.equals(loading);
+            updateLoadingIndicator();
+        });
         viewModel.searchError.observe(this, error -> {
             if (error != null) { Toast.makeText(this, error, Toast.LENGTH_SHORT).show(); viewModel.clearSearchError(); }
         });
+    }
+
+    private boolean isCategoryListEmpty() {
+        List<IconCategory> current = viewModel.categories.getValue();
+        return current == null || current.isEmpty();
+    }
+
+    /** A single animation is shared by category/search and initial/pagination loading. */
+    private void updateLoadingIndicator() {
+        if (binding == null) return;
+        boolean visible = (categoryLoading && isCategoryListEmpty())
+                || categoryLoadingMore || searchLoading || searchLoadingMore;
+        binding.progressLoading.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (visible) {
+            if (!binding.progressLoading.isAnimating()) binding.progressLoading.playAnimation();
+        } else {
+            binding.progressLoading.pauseAnimation();
+        }
     }
 
     private void bindHotCategory(IconCategory category) {

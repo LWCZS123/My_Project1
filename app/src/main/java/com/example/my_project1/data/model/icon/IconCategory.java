@@ -57,4 +57,16 @@ public class IconCategory {
 
     public List<String> getThumbUrls() { return thumbUrls; }
     public void setThumbUrls(List<String> thumbUrls) { this.thumbUrls = thumbUrls; }
+
+    public IconCategory copy() {
+        IconCategory c = new IconCategory();
+        c.category = this.category;
+        c.count = this.count;
+        c.file = this.file;
+        c.style = this.style;
+        if (this.thumbUrls != null) {
+            c.thumbUrls = new java.util.ArrayList<>(this.thumbUrls);
+        }
+        return c;
+    }
 }

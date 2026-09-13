@@ -479,35 +479,38 @@ public class IconMarketViewModel extends AndroidViewModel {
         // 因此不能按回调次数计数，改为按「源」计数，避免 loading 提前结束
         final boolean[] done = new boolean[3];
         final AtomicInteger remaining = new AtomicInteger(3);
-        final List<IconCategory> currentAll = new ArrayList<>();
         final Runnable onAllDone = () ->
                 AppExecutors.get().mainThread().execute(() -> _categoryLoading.setValue(false));
         repository.getCategoryPage(0, new IconRepository.Callback<List<IconCategory>>() {
-            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data, currentAll); markSourceDone(done, remaining, 0, onAllDone); }
+            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data); markSourceDone(done, remaining, 0, onAllDone); }
             @Override public void onError(String message) { markSourceDone(done, remaining, 0, onAllDone); }
         });
         repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", 0, new IconRepository.Callback<List<IconCategory>>() {
-            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data, currentAll); markSourceDone(done, remaining, 1, onAllDone); }
+            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data); markSourceDone(done, remaining, 1, onAllDone); }
             @Override public void onError(String message) { markSourceDone(done, remaining, 1, onAllDone); }
         });
         repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", 0, new IconRepository.Callback<List<IconCategory>>() {
-            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data, currentAll); markSourceDone(done, remaining, 2, onAllDone); }
+            @Override public void onSuccess(List<IconCategory> data) { mergeAndNotify(data); markSourceDone(done, remaining, 2, onAllDone); }
             @Override public void onError(String message) { markSourceDone(done, remaining, 2, onAllDone); }
         });
     }
 
-    private synchronized void mergeAndNotify(List<IconCategory> newData, List<IconCategory> currentAll) {
+    private synchronized void mergeAndNotify(List<IconCategory> newData) {
         if (newData == null || newData.isEmpty()) return;
         AppExecutors.get().mainThread().execute(() -> {
             List<IconCategory> all = _allLoadedCategories.getValue();
             if (all == null) all = new ArrayList<>();
             List<IconCategory> updated = new ArrayList<>(all);
             for (IconCategory cat : newData) {
-                boolean exists = false;
-                for (IconCategory old : updated) {
-                    if (cat.getFile().equals(old.getFile())) { exists = true; break; }
+                boolean found = false;
+                for (int i = 0; i < updated.size(); i++) {
+                    if (cat.getFile().equals(updated.get(i).getFile())) {
+                        updated.set(i, cat.copy());
+                        found = true;
+                        break;
+                    }
                 }
-                if (!exists) updated.add(cat);
+                if (!found) updated.add(cat.copy());
             }
             List<IconCategory> coloredCategories = new ArrayList<>();
             List<IconCategory> otherCategories = new ArrayList<>();
@@ -533,7 +536,6 @@ public class IconMarketViewModel extends AndroidViewModel {
         _categoryLoadingMore.setValue(true);
         final int currentPage = categoryPage + 1;
         AppExecutors.get().networkIO().execute(() -> {
-            final List<IconCategory> mergedNew = new ArrayList<>();
             // 各风格翻页对应自己的数据源；ALL 需同时翻 3 个源
             final int sourceCount = (currentStyle == IconStyle.ALL) ? 3 : 1;
             final boolean[] done = new boolean[sourceCount];
@@ -541,48 +543,24 @@ public class IconMarketViewModel extends AndroidViewModel {
             final Runnable onAllDone = () -> AppExecutors.get().mainThread().execute(() -> {
                 isCategoryLoadingMore = false;
                 _categoryLoadingMore.setValue(false);
-                if (mergedNew.isEmpty()) { _categoryHasMore.setValue(false); return; }
-                List<IconCategory> all = _allLoadedCategories.getValue();
-                if (all == null) all = new ArrayList<>();
-                List<IconCategory> updated = new ArrayList<>(all);
-                // 按 file 去重，避免跨源/跨页重复添加
-                for (IconCategory cat : mergedNew) {
-                    boolean exists = false;
-                    for (IconCategory old : updated) {
-                        if (cat.getFile().equals(old.getFile())) { exists = true; break; }
-                    }
-                    if (!exists) updated.add(cat);
-                }
-                List<IconCategory> coloredCategories = new ArrayList<>();
-                List<IconCategory> otherCategories = new ArrayList<>();
-                for (IconCategory c : updated) {
-                    if ("lineal-color".equals(c.getStyle())) coloredCategories.add(c);
-                    else otherCategories.add(c);
-                }
-                updated.clear();
-                updated.addAll(coloredCategories);
-                updated.addAll(otherCategories);
-                _allLoadedCategories.setValue(updated);
-                // 关键修复：重新应用过滤，把最新数据推送到 _categories，
-                // 否则 AllCollectionsActivity 观察的 categories 不会更新
-                applyFilters();
                 categoryPage = currentPage;
+                // 注意：由于 IconRepository 分批回调，缩略图会在回调后通过 mergeAndNotify 异步更新
             });
             switch (currentStyle) {
                 case DEFAULT:
-                    repository.getCategoryPage(currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    repository.getCategoryPage(currentPage, newLoadMoreCategoryCallback(done, remaining, 0, onAllDone));
                     break;
                 case LINEAR:
-                    repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", currentPage, newLoadMoreCategoryCallback(done, remaining, 0, onAllDone));
                     break;
                 case COLORED:
-                    repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", currentPage, newLoadMoreCategoryCallback(done, remaining, 0, onAllDone));
                     break;
                 case ALL:
                 default:
-                    repository.getCategoryPage(currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 0, onAllDone));
-                    repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 1, onAllDone));
-                    repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", currentPage, newLoadMoreCategoryCallback(mergedNew, done, remaining, 2, onAllDone));
+                    repository.getCategoryPage(currentPage, newLoadMoreCategoryCallback(done, remaining, 0, onAllDone));
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "freeicon_line.json", currentPage, newLoadMoreCategoryCallback(done, remaining, 1, onAllDone));
+                    repository.getAssetCategoryPage(getApplication().getAssets(), "线性色.json", currentPage, newLoadMoreCategoryCallback(done, remaining, 2, onAllDone));
                     break;
             }
         });
@@ -602,13 +580,15 @@ public class IconMarketViewModel extends AndroidViewModel {
     }
 
     private IconRepository.Callback<List<IconCategory>> newLoadMoreCategoryCallback(
-            List<IconCategory> sink, boolean[] done, AtomicInteger remaining, int index, Runnable onAllDone) {
+            boolean[] done, AtomicInteger remaining, int index, Runnable onAllDone) {
         return new IconRepository.Callback<List<IconCategory>>() {
             @Override public void onSuccess(List<IconCategory> data) {
-                if (data != null) { synchronized (sink) { sink.addAll(data); } }
+                mergeAndNotify(data);
                 markSourceDone(done, remaining, index, onAllDone);
             }
-            @Override public void onError(String message) { markSourceDone(done, remaining, index, onAllDone); }
+            @Override public void onError(String message) {
+                markSourceDone(done, remaining, index, onAllDone);
+            }
         };
     }
 

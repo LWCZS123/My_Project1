@@ -277,6 +277,7 @@
                         android:textColor="@color/market_text_secondary"
                         android:textSize="13sp" />
 
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -535,19 +536,9 @@
                     tools:listitem="@layout/item_icon_collection" />
 
                 <com.airbnb.lottie.LottieAnimationView
-                    android:id="@+id/progress_category"
-                    android:layout_width="180dp"
-                    android:layout_height="180dp"
-                    android:layout_gravity="center"
-                    android:visibility="gone"
-                    app:lottie_autoPlay="true"
-                    app:lottie_loop="true"
-                    app:lottie_rawRes="@raw/loading" />
-
-                <com.airbnb.lottie.LottieAnimationView
-                    android:id="@+id/progress_search"
-                    android:layout_width="60dp"
-                    android:layout_height="60dp"
+                    android:id="@+id/progress_loading"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
                     android:layout_gravity="center"
                     android:visibility="gone"
                     app:lottie_autoPlay="true"
@@ -565,28 +556,6 @@
                     android:textSize="14sp"
                     android:visibility="gone" />
             </LinearLayout>
-
-            <com.airbnb.lottie.LottieAnimationView
-                android:id="@+id/progress_category_more"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="8dp"
-                android:visibility="gone"
-                app:lottie_autoPlay="true"
-                app:lottie_loop="true"
-                app:lottie_rawRes="@raw/loading" />
-
-            <com.airbnb.lottie.LottieAnimationView
-                android:id="@+id/progress_search_more"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="8dp"
-                android:visibility="gone"
-                app:lottie_autoPlay="true"
-                app:lottie_loop="true"
-                app:lottie_rawRes="@raw/loading" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

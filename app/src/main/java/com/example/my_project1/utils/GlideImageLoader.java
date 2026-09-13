@@ -119,12 +119,48 @@ public class GlideImageLoader {
      * 原有代码保持不变，此处仅占位提示。
      */
     public static void loadThumbnail(Context context, String url, ImageView imageView) {
-        // 保留你原有的实现，不改动
-        Glide.with(context)
+        if (context == null || imageView == null) return;
+        android.util.Log.d("GlideImageLoader", "Loading thumbnail: " + url);
+        Glide.with(context.getApplicationContext())
                 .load(url)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .placeholder(android.R.drawable.ic_menu_report_image)
+                .placeholder(R.drawable.ic_loading)
                 .error(android.R.drawable.ic_menu_report_image)
+                .dontAnimate()
+                .override(100, 100)
+                .thumbnail(Glide.with(context.getApplicationContext())
+                        .load(R.drawable.ic_loading))
+                .listener(new com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@androidx.annotation.Nullable com.bumptech.glide.load.engine.GlideException e, Object model, com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable> target, boolean isFirstResource) {
+                        android.util.Log.e("GlideImageLoader", "Load failed for: " + url);
+                        if (e != null) e.logRootCauses("GlideImageLoader");
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(android.graphics.drawable.Drawable resource, Object model, com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable> target, com.bumptech.glide.load.DataSource dataSource, boolean isFirstResource) {
+                        android.util.Log.d("GlideImageLoader", "Resource ready for: " + url);
+                        return false;
+                    }
+                })
+                .into(imageView);
+    }
+
+    /** Shows the animated loading asset until a thumbnail URL is available. */
+    public static void showThumbnailLoading(Context context, ImageView imageView) {
+        if (context == null || imageView == null) return;
+        Glide.with(imageView)
+                .asGif()
+                .load(R.drawable.ic_loading)
+                .into(imageView);
+    }
+
+    public static void showMetadataLoading(Context context, ImageView imageView) {
+        if (context == null || imageView == null) return;
+        Glide.with(imageView)
+                .asGif()
+                .load(R.drawable.ic_loading_bar)
                 .into(imageView);
     }
 
