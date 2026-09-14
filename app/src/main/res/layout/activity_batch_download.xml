@@ -64,7 +64,7 @@
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_gravity="center"
-                android:src="@drawable/ic_close"
+                android:src="@drawable/ic_close1"
                 app:tint="#8790A8" />
         </com.google.android.material.card.MaterialCardView>
     </androidx.constraintlayout.widget.ConstraintLayout>

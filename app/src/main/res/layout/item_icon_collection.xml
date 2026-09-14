@@ -73,7 +73,7 @@
                 android:layout_width="18dp"
                 android:layout_height="18dp"
                 android:contentDescription="Rating"
-                android:src="@drawable/ic_star"
+                android:src="@drawable/ic_star1"
                 />
 
             <TextView
