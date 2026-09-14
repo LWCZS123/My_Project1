@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="14dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        app:cardBackgroundColor="#F0F2FF"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="0dp">
+        <ImageView
+            android:id="@+id/iv_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:src="@drawable/ic_placeholder_camera"
+            app:tint="@color/batch_download_primary_blue" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/tv_icon_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Camera 相机"
+            android:textColor="@color/batch_download_text_icon_list"
+            android:textSize="@dimen/batch_download_text_size_list_item" />
+        <TextView
+            android:id="@+id/tv_icon_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="已完成"
+            android:textColor="#A0A8B8"
+            android:textSize="@dimen/batch_download_text_size_mini" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/iv_status_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:background="@drawable/bg_circle_success"
+        android:padding="4dp"
+        android:src="@drawable/ic_accept"
+         />
+
+</LinearLayout>

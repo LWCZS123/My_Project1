@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Glow/Shadow -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/batch_download_success_green_glow" />
+            <size android:width="84dp" android:height="84dp" />
+        </shape>
+    </item>
+    <!-- Main Circle -->
+    <item android:bottom="6dp" android:left="6dp" android:right="6dp" android:top="6dp">
+        <shape android:shape="oval">
+            <gradient
+                android:startColor="#4BD89E"
+                android:centerColor="@color/batch_download_success_green"
+                android:endColor="#3AA37B"
+                android:type="linear"
+                android:angle="270"/>
+        </shape>
+    </item>
+</layer-list>

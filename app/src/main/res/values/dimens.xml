@@ -27,4 +27,18 @@
     <dimen name="fab_margin">16dp</dimen>
 
     <dimen name="card_corner_radius_large">24dp</dimen>
+
+    <!-- 批量下载页面尺寸 -->
+    <dimen name="batch_download_margin_page">16dp</dimen>
+    <dimen name="batch_download_card_radius">18dp</dimen>
+    <dimen name="batch_download_stat_card_radius">14dp</dimen>
+    <dimen name="batch_download_btn_radius">14dp</dimen>
+
+    <dimen name="batch_download_text_size_title">15sp</dimen>
+    <dimen name="batch_download_text_size_card_title">14sp</dimen>
+    <dimen name="batch_download_text_size_body">12sp</dimen>
+    <dimen name="batch_download_text_size_list_item">11sp</dimen>
+    <dimen name="batch_download_text_size_small">10sp</dimen>
+    <dimen name="batch_download_text_size_mini">9sp</dimen>
+    <dimen name="batch_download_text_size_percent">20sp</dimen>
 </resources>

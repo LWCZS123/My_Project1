@@ -80,6 +80,35 @@
     <color name="expense_color">#F44336</color>
     <color name="income_color">#4CAF50</color>
 
+    <!-- 批量下载页面颜色 -->
+    <color name="batch_download_page_background">#F5F7FC</color>
+    <color name="batch_download_primary_blue">#6675F5</color>
+    <color name="batch_download_text_main">#303544</color>
+    <color name="batch_download_text_secondary">#8992A8</color>
+    <color name="batch_download_text_helper">#8B94A9</color>
+    <color name="batch_download_text_label">#566078</color>
+    <color name="batch_download_text_icon_list">#3E4557</color>
+    <color name="batch_download_status_dot">#6675F5</color>
+    <color name="batch_download_success_green">#43B88A</color>
+    <color name="batch_download_success_bg">#EAF9F3</color>
+    <color name="batch_download_error_red">#FF7777</color>
+    <color name="batch_download_tag_text_red">#FF6D78</color>
+    <color name="batch_download_tag_bg_red">#FFF0F2</color>
+    <color name="batch_download_stat_bg_blue">#EEF1FF</color>
+    <color name="batch_download_stat_bg_red">#FFF0F0</color>
+    <color name="batch_download_stat_bg_green">#ECF9F4</color>
+    <color name="batch_download_divider_gray">#EEF0F5</color>
+    <color name="batch_download_stroke_gray">#E1E5EF</color>
+    <color name="batch_download_progress_bg">#E9ECF5</color>
+    <color name="batch_download_progress_circular_track">#E7EAF2</color>
+    <color name="batch_download_btn_cancel_bg">#F7F8FC</color>
+    <color name="batch_download_icon_bg_light">#F5F7FF</color>
+    <color name="batch_download_rating_yellow">#FFB400</color>
+    <color name="batch_download_orange_start">#FFB02E</color>
+    <color name="batch_download_orange_end">#F28200</color>
+    <color name="batch_download_path_card_bg">#F6F8FE</color>
+    <color name="batch_download_success_green_glow">#4043B88A</color>
+
     <!-- 橙色系 -->
     <color name="orange_500">#FF9800</color>
 
