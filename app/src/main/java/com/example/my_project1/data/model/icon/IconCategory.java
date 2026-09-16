@@ -1,5 +1,6 @@
 package com.example.my_project1.data.model.icon;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -7,7 +8,9 @@ import java.util.List;
  * 对应 index.json 中每条分类元数据
  * 以及每个分类 JSON 文件解析后的完整数据
  */
-public class IconCategory {
+public class IconCategory implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     // ==================== index.json 字段 ====================
 

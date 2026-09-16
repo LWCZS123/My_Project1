@@ -30,6 +30,10 @@
         android:theme="@style/Theme.My_Project1"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".ui.activity.IconDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
             android:name=".ui.activity.BatchDownloadActivity"
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar" />

@@ -14,7 +14,6 @@ import com.airbnb.lottie.LottieAnimationView;
 import com.example.my_project1.R;
 import com.example.my_project1.databinding.ActivityAllCollectionsBinding;
 import com.example.my_project1.ui.adapter.icon.CategoryAdapter;
-import com.example.my_project1.ui.fragment.IconDetailFragment;
 import com.example.my_project1.ui.viewmodel.icon.IconMarketViewModel;
 
 import java.util.ArrayList;
@@ -86,9 +85,9 @@ public class AllCollectionsActivity extends AppCompatActivity {
 
     private void setupRecyclerView() {
         adapter = new CategoryAdapter(category -> {
-            viewModel.openCategory(category);
-            IconDetailFragment fragment = new IconDetailFragment();
-            fragment.show(getSupportFragmentManager(), "IconDetail");
+            android.content.Intent intent = new android.content.Intent(this, IconDetailActivity.class);
+            intent.putExtra("category", category);
+            startActivity(intent);
         });
 
         binding.rvAllCategories.setLayoutManager(new LinearLayoutManager(this));

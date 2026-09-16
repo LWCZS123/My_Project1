@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 基础渐变层 -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#7B88FF"
+                android:endColor="#5B6AF5"
+                android:angle="45"
+                android:type="linear" />
+        </shape>
+    </item>
+
+    <!-- 右上角装饰圆 (增加尺寸并优化偏移，避免在某些设备上显示为矩形) -->
+    <item
+        android:width="220dp"
+        android:height="220dp"
+        android:gravity="top|end"
+        android:top="-60dp"
+        android:right="-60dp">
+        <shape android:shape="oval">
+            <solid android:color="#1AFFFFFF" />
+        </shape>
+    </item>
+
+    <!-- 中左侧装饰圆 -->
+    <item
+        android:width="140dp"
+        android:height="140dp"
+        android:gravity="top|start"
+        android:top="100dp"
+        android:left="-40dp">
+        <shape android:shape="oval">
+            <solid android:color="#1AFFFFFF" />
+        </shape>
+    </item>
+</layer-list>

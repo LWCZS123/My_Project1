@@ -12,9 +12,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.icon.IconCategory;
+import com.example.my_project1.data.model.icon.IconItem;
+import com.example.my_project1.data.repository.icon.IconRepository;
 import com.example.my_project1.utils.GlideImageLoader;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import io.reactivex.annotations.NonNull;
 
@@ -28,6 +32,10 @@ import io.reactivex.annotations.NonNull;
  *   - 3×3 九宫格缩略图预览
  */
 public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.ViewHolder> {
+
+    private static final List<String> AVATAR_URLS = new ArrayList<>();
+    private static boolean avatarsLoading = false;
+    private final Random random = new Random();
 
     public interface OnCategoryClickListener {
         void onCategoryClick(IconCategory category);
@@ -93,6 +101,35 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
         if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "metadata");
     }
 
+    private void loadAvatars(android.content.Context context) {
+        if (!AVATAR_URLS.isEmpty() || avatarsLoading) return;
+        avatarsLoading = true;
+        IconCategory sciFiCategory = new IconCategory();
+        sciFiCategory.setFile("science-fiction-avatars-ur");
+        
+        IconRepository.getInstance().getAssetCategoryDetail(
+                context.getAssets(),
+                "freeicon_line.json",
+                sciFiCategory,
+                0,
+                new IconRepository.Callback<List<IconItem>>() {
+                    @Override
+                    public void onSuccess(List<IconItem> data) {
+                        for (IconItem item : data) {
+                            AVATAR_URLS.add(item.getUrl());
+                        }
+                        avatarsLoading = false;
+                        notifyDataSetChanged();
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        avatarsLoading = false;
+                    }
+                }
+        );
+    }
+
     class ViewHolder extends RecyclerView.ViewHolder {
 
         private final TextView tvName;
@@ -101,6 +138,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
         private final TextView tvDescription;
         private final TextView tvDownloadCount;
         private final TextView tvIconCount;
+        private final ImageView ivAuthorAvatar;
         private final ImageView metadataLoadingView;
         private final com.google.android.material.button.MaterialButton btnDownload;
         private final ImageView[] thumbViews = new ImageView[6];
@@ -113,6 +151,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             tvDescription   = itemView.findViewById(R.id.tv_description);
             tvDownloadCount = itemView.findViewById(R.id.tv_download_count);
             tvIconCount     = itemView.findViewById(R.id.tv_icon_count);
+            ivAuthorAvatar  = itemView.findViewById(R.id.iv_author_avatar);
             metadataLoadingView = itemView.findViewById(R.id.iv_collection_loading_bar);
             btnDownload     = itemView.findViewById(R.id.btn_download);
 
@@ -166,6 +205,16 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             tvRating.setText("4.9");
             tvDownloadCount.setText((category.getCount() * 3) + " 下载");
             tvDescription.setText("精选 " + category.getCategory() + " 风格图标集合");
+
+            // 加载并随机设置作者头像
+            loadAvatars(itemView.getContext());
+            if (!AVATAR_URLS.isEmpty()) {
+                String avatarUrl = AVATAR_URLS.get(random.nextInt(AVATAR_URLS.size()));
+                com.bumptech.glide.Glide.with(ivAuthorAvatar)
+                        .load(avatarUrl)
+                        .circleCrop()
+                        .into(ivAuthorAvatar);
+            }
 
             itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onCategoryClick(category);

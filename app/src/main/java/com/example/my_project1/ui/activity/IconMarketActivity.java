@@ -114,9 +114,9 @@ public class IconMarketActivity extends AppCompatActivity {
 
     private void initCategoryRecyclerView() {
         categoryAdapter = new CategoryAdapter(category -> {
-            viewModel.openCategory(category);
-            IconDetailFragment fragment = new IconDetailFragment();
-            fragment.show(getSupportFragmentManager(), "IconDetail");
+            android.content.Intent intent = new android.content.Intent(this, IconDetailActivity.class);
+            intent.putExtra("category", category);
+            startActivity(intent);
         });
 
         binding.rvCategories.setLayoutManager(new GridLayoutManager(this, 1));
