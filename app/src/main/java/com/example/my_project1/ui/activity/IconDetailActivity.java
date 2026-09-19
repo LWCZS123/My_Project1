@@ -20,8 +20,10 @@ import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.data.model.icon.IconItem;
 import com.example.my_project1.databinding.ActivityIconDetailBinding;
 import com.example.my_project1.ui.adapter.icon.IconRowAdapter;
+import com.example.my_project1.ui.fragment.SaveCategoryBottomSheet;
 import com.example.my_project1.ui.viewmodel.icon.IconMarketViewModel;
 import com.example.my_project1.utils.GlideImageLoader;
+import com.example.my_project1.data.repository.icon.DownloadRepository;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +35,7 @@ public class IconDetailActivity extends AppCompatActivity {
     private IconMarketViewModel viewModel;
     private IconRowAdapter adapter;
     private boolean hasUpdatedPreview = false;
+    private boolean isMultiSelectMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +53,17 @@ public class IconDetailActivity extends AppCompatActivity {
         IconCategory category = (IconCategory) getIntent().getSerializableExtra("category");
         if (category != null) {
             viewModel.openCategory(category);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (adapter != null && adapter.isSelectionMode()) {
+            adapter.exitSelectionMode();
+            binding.btnBatchDownload.setText("批量下载合集");
+            isMultiSelectMode = false;
+        } else {
+            super.onBackPressed();
         }
     }
 
@@ -81,8 +95,30 @@ public class IconDetailActivity extends AppCompatActivity {
 
     private void setupRecyclerView() {
         binding.rvIcons.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new IconRowAdapter(item -> {
-            Toast.makeText(this, "开始下载 " + item.getName(), Toast.LENGTH_SHORT).show();
+        adapter = new IconRowAdapter(new IconRowAdapter.OnIconActionListener() {
+            @Override
+            public void onDownloadClick(IconItem item) {
+                DownloadRepository.getInstance(IconDetailActivity.this).startIconDownload(item);
+                Toast.makeText(IconDetailActivity.this, "已加入下载队列: " + item.getName(), Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onItemClick(IconItem item) {
+                List<IconItem> list = new ArrayList<>();
+                list.add(item);
+                SaveCategoryBottomSheet.newInstance(list)
+                        .show(getSupportFragmentManager(), "SaveCategory");
+            }
+
+            @Override
+            public void onSelectionChanged(int selectedCount) {
+                isMultiSelectMode = selectedCount > 0;
+                if (isMultiSelectMode) {
+                    binding.btnBatchDownload.setText("下载选中图标 (" + selectedCount + ")");
+                } else {
+                    binding.btnBatchDownload.setText("批量下载合集");
+                }
+            }
         });
         binding.rvIcons.setAdapter(adapter);
         // NestedScrollView 嵌套 RecyclerView 需禁用滑动冲突
@@ -140,10 +176,59 @@ public class IconDetailActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        binding.ivBack.setOnClickListener(v -> finish());
+        binding.ivBack.setOnClickListener(v -> {
+            if (adapter != null && adapter.isSelectionMode()) {
+                adapter.exitSelectionMode();
+                binding.btnBatchDownload.setText("批量下载合集");
+                isMultiSelectMode = false;
+            } else {
+                finish();
+            }
+        });
         binding.ivHeart.setOnClickListener(v -> Toast.makeText(this, "已加入收藏", Toast.LENGTH_SHORT).show());
         binding.ivShare.setOnClickListener(v -> Toast.makeText(this, "分享链接已复制", Toast.LENGTH_SHORT).show());
-        binding.btnBatchDownload.setOnClickListener(v -> Toast.makeText(this, "准备批量下载...", Toast.LENGTH_SHORT).show());
+        binding.btnBatchDownload.setOnClickListener(v -> {
+            List<IconItem> itemsToDownload;
+            if (isMultiSelectMode) {
+                itemsToDownload = adapter.getSelectedItems();
+            } else {
+                itemsToDownload = adapter.getAllItems();
+            }
+
+            if (itemsToDownload.isEmpty()) {
+                Toast.makeText(this, "没有可下载的图标", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            for (IconItem item : itemsToDownload) {
+                DownloadRepository.getInstance(this).startIconDownload(item);
+            }
+            Toast.makeText(this, "正在批量下载 " + itemsToDownload.size() + " 枚图标...", Toast.LENGTH_SHORT).show();
+            
+            if (isMultiSelectMode) {
+                adapter.exitSelectionMode();
+            }
+        });
+
+        // 预览图点击事件
+        for (int i = 0; i < binding.glPreview.getChildCount(); i++) {
+            View child = binding.glPreview.getChildAt(i);
+            child.setOnClickListener(v -> {
+                // 获取当前显示的图标数据（如果有的话）
+                // 这里简单起见，如果预览图有显示内容，则点击弹出 BottomSheet
+                // 在 updatePreviewGrid 中我们给 ImageView 设置了图片
+                // 我们可以通过 Tag 或者从 ViewModel 获取数据
+                IconCategory category = viewModel.selectedCategory.getValue();
+                if (category != null) {
+                    // 获取全部图标
+                    List<IconItem> allItems = adapter.getAllItems();
+                    if (!allItems.isEmpty()) {
+                        SaveCategoryBottomSheet.newInstance(allItems)
+                                .show(getSupportFragmentManager(), "SaveCategory");
+                    }
+                }
+            });
+        }
 
         binding.nestedScrollView.setOnScrollChangeListener((View.OnScrollChangeListener) (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
             // 阈值设为 180dp 左右开始完全变白，根据布局调整

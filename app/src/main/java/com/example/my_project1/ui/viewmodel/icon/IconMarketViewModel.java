@@ -45,6 +45,24 @@ public class IconMarketViewModel extends AndroidViewModel {
         ALL, DEFAULT, LINEAR, COLORED
     }
 
+    public enum SortType { DEFAULT, NAME, COUNT }
+    public enum DownloadFilterType { ALL, DOWNLOADED, NOT_DOWNLOADED }
+
+    private final MutableLiveData<SortType> _currentSort = new MutableLiveData<>(SortType.DEFAULT);
+    public  final LiveData<SortType>         currentSort  = _currentSort;
+
+    private final MutableLiveData<DownloadFilterType> _currentDownloadFilter = new MutableLiveData<>(DownloadFilterType.ALL);
+    public  final LiveData<DownloadFilterType>         currentDownloadFilter  = _currentDownloadFilter;
+
+    private List<com.example.my_project1.data.model.icon.DownloadRecord> allDownloadRecords = new ArrayList<>();
+
+    private final androidx.lifecycle.Observer<List<com.example.my_project1.data.model.icon.DownloadRecord>> downloadObserver = records -> {
+        if (records != null) {
+            this.allDownloadRecords = records;
+            applyFilters();
+        }
+    };
+
     private final MutableLiveData<IconStyle> _currentStyle = new MutableLiveData<>(IconStyle.ALL);
     public  final LiveData<IconStyle>         currentStyle  = _currentStyle;
 
@@ -192,6 +210,26 @@ public class IconMarketViewModel extends AndroidViewModel {
         bmobApi        = new BmobApiImpl(application);
 
         initCurrentUserId();
+        
+        com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(application).getAllRecords().observeForever(downloadObserver);
+    }
+
+    public void setSortType(SortType type) {
+        if (_currentSort.getValue() == type) return;
+        _currentSort.setValue(type);
+        applyFilters();
+    }
+
+    public void setDownloadFilterType(DownloadFilterType type) {
+        if (_currentDownloadFilter.getValue() == type) return;
+        _currentDownloadFilter.setValue(type);
+        applyFilters();
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(getApplication()).getAllRecords().removeObserver(downloadObserver);
     }
 
     private void initCurrentUserId() {
@@ -236,10 +274,44 @@ public class IconMarketViewModel extends AndroidViewModel {
             }
         }
 
+        // Filter by Download Status
+        DownloadFilterType downloadFilter = _currentDownloadFilter.getValue();
+        if (downloadFilter != null && downloadFilter != DownloadFilterType.ALL) {
+            java.util.Set<String> downloadedCategories = new java.util.HashSet<>();
+            for (com.example.my_project1.data.model.icon.DownloadRecord record : allDownloadRecords) {
+                if (com.example.my_project1.data.model.icon.DownloadRecord.STATUS_SUCCESS.equals(record.getStatus())) {
+                    downloadedCategories.add(record.getCategoryName());
+                }
+            }
+
+            List<IconCategory> temp = new ArrayList<>();
+            for (IconCategory cat : filtered) {
+                boolean isDownloaded = downloadedCategories.contains(cat.getCategory());
+                if (downloadFilter == DownloadFilterType.DOWNLOADED && isDownloaded) {
+                    temp.add(cat);
+                } else if (downloadFilter == DownloadFilterType.NOT_DOWNLOADED && !isDownloaded) {
+                    temp.add(cat);
+                }
+            }
+            filtered = temp;
+        }
+
+        // Sort the list
+        SortType sortType = _currentSort.getValue();
+        if (sortType == SortType.NAME) {
+            java.util.Collections.sort(filtered, (c1, c2) -> {
+                if (c1.getCategory() == null) return 1;
+                if (c2.getCategory() == null) return -1;
+                return c1.getCategory().compareToIgnoreCase(c2.getCategory());
+            });
+        } else if (sortType == SortType.COUNT) {
+            java.util.Collections.sort(filtered, (c1, c2) -> Integer.compare(c2.getCount(), c1.getCount()));
+        }
+
         _categories.setValue(filtered);
         _categorySearchResults.setValue(filtered);
-        _statistics.setValue(new Statistics(repository.getTotalIcons(), repository.getTotalPacks(), 38)); 
-        
+        _statistics.setValue(new Statistics(repository.getTotalIcons(), repository.getTotalPacks(), 38));
+
         if (!filtered.isEmpty() && _hotCategory.getValue() == null) {
             int randomIndex = (int) (Math.random() * filtered.size());
             _hotCategory.setValue(filtered.get(randomIndex));

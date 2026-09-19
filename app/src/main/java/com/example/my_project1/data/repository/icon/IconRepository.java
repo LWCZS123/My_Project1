@@ -470,6 +470,22 @@ public class IconRepository {
         });
     }
 
+    public List<IconItem> getAllCategoryItemsSync(android.content.res.AssetManager assets, IconCategory category) throws Exception {
+        if (category.getFile() != null && category.getFile().startsWith("flaticon:")) {
+            return loadFlaticonCategoryItemsInternal(category.getFile());
+        }
+        String style = category.getStyle();
+        String assetFile = null;
+        if ("line".equals(style)) assetFile = "freeicon_line.json";
+        else if ("lineal-color".equals(style)) assetFile = "线性色.json";
+
+        if (assetFile != null) {
+            return loadAssetCategoryItems(assets, assetFile, category.getFile());
+        } else {
+            return loadCategoryItems(category);
+        }
+    }
+
     // ==================== 内部实现：高内聚底层子源加载器 ====================
 
     private List<IconCategory> loadFlaticonCategoriesInternal() throws Exception {

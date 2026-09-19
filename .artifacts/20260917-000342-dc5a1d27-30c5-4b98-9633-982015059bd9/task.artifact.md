@@ -1,0 +1,26 @@
+# Task Management
+
+- [x] Researching Existing Architecture
+- [x] Creating Implementation Plan
+- [x] Implement Data Layer (Room & Repository)
+    - [x] Create `DownloadRecord` Entity
+    - [x] Create `DownloadDao`
+    - [x] Update `AppDatabase`
+    - [x] Create `DownloadRepository`
+- [x] Implement Background Tasks (WorkManager)
+    - [x] Create `IconDownloadWorker` (Merged into `BatchDownloadWorker`)
+    - [x] Create `BatchDownloadWorker`
+- [x] Implement Filtering & Sorting in ViewModel
+    - [x] Update `IconMarketViewModel` with sort/filter logic
+- [x] Enhance UI Components
+    - [x] Add filter button to `AllCollectionsActivity`
+    - [x] Update `CategoryAdapter` for collection downloads
+    - [x] Update `IconDetailFragment` for single downloads (via `SaveCategoryBottomSheet`)
+    - [x] Update `BatchDownloadActivity` (Download Page)
+    - [x] Implement `DownloadCompleteFragment` logic
+- [x] Implement SAF & Settings
+    - [x] Create `DownloadSettings` utility
+    - [x] Handle SAF directory picker flow
+- [x] Verification & Testing
+    - [x] Manual verification of all flows
+    - [x] Fix any bugs or UI inconsistencies

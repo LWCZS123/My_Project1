@@ -113,10 +113,27 @@ public class IconMarketActivity extends AppCompatActivity {
     }
 
     private void initCategoryRecyclerView() {
-        categoryAdapter = new CategoryAdapter(category -> {
-            android.content.Intent intent = new android.content.Intent(this, IconDetailActivity.class);
-            intent.putExtra("category", category);
-            startActivity(intent);
+        categoryAdapter = new CategoryAdapter(new CategoryAdapter.OnCategoryClickListener() {
+            @Override
+            public void onCategoryClick(IconCategory category) {
+                android.content.Intent intent = new android.content.Intent(IconMarketActivity.this, IconDetailActivity.class);
+                intent.putExtra("category", category);
+                startActivity(intent);
+            }
+
+            @Override
+            public void onPreviewClick(IconCategory category) {
+                // 加载该合集的所有图标并弹出保存面板
+                AppExecutors.get().networkIO().execute(() -> {
+                    try {
+                        List<IconItem> allItems = IconRepository.getInstance().getAllCategoryItemsSync(getAssets(), category);
+                        AppExecutors.get().mainThread().execute(() -> showSaveBottomSheet(allItems));
+                    } catch (Exception e) {
+                        AppExecutors.get().mainThread().execute(() -> 
+                            Toast.makeText(IconMarketActivity.this, "加载失败: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                    }
+                });
+            }
         });
 
         binding.rvCategories.setLayoutManager(new GridLayoutManager(this, 1));
@@ -276,6 +293,12 @@ public class IconMarketActivity extends AppCompatActivity {
     private void initNavigation() {
         binding.tvHotAll.setOnClickListener(v -> openAllCollections());
         binding.tvColAll.setOnClickListener(v -> openAllCollections());
+        if (binding.btnNotification != null) {
+            binding.btnNotification.setOnClickListener(v -> {
+                android.content.Intent intent = new android.content.Intent(this, BatchDownloadActivity.class);
+                startActivity(intent);
+            });
+        }
     }
 
     private void openAllCollections() {

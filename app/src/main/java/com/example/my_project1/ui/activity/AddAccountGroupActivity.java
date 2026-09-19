@@ -78,7 +78,8 @@ public class AddAccountGroupActivity extends AppCompatActivity {
 
         AccountGroup group = new AccountGroup();
         group.setName(name);
-        group.setUserId(BmobUser.getCurrentUser().getObjectId());
+        BmobUser user = BmobUser.getCurrentUser();
+        group.setUserId(user != null ? user.getObjectId() : "");
         group.setIconUrl(selectedIcon);
 
         if (editGroupId != null) {

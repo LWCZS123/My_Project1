@@ -66,6 +66,7 @@ public class SaveCategoryBottomSheet extends BottomSheetDialogFragment {
         setupSelectedIconsPreview();
         setupParentCategoryGrid();
         setupConfirmButton();
+        setupDownloadButton();
         observeSaveResult();
 
         showPanel(true);
@@ -209,6 +210,22 @@ public class SaveCategoryBottomSheet extends BottomSheetDialogFragment {
 
             // 5. 给个即时提示
             Toast.makeText(requireContext(), "已保存 " + selectedItems.size() + " 个分类", Toast.LENGTH_SHORT).show();        });
+    }
+
+    private void setupDownloadButton() {
+        binding.btnDownloadIcons.setOnClickListener(v -> {
+            if (selectedItems.isEmpty()) {
+                Toast.makeText(requireContext(), "请先选择图标", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            for (IconItem item : selectedItems) {
+                com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(requireContext()).startIconDownload(item);
+            }
+            dismiss();
+            Toast.makeText(requireContext(), "开始后台下载选中的图标...", Toast.LENGTH_SHORT).show();
+            android.content.Intent intent = new android.content.Intent(requireContext(), com.example.my_project1.ui.activity.BatchDownloadActivity.class);
+            startActivity(intent);
+        });
     }
 
     // ======================== 监听结果（只用来提示，不控制关闭） ========================

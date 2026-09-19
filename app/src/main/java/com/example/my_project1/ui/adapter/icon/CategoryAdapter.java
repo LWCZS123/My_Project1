@@ -39,6 +39,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
 
     public interface OnCategoryClickListener {
         void onCategoryClick(IconCategory category);
+        void onPreviewClick(IconCategory category);
     }
 
     private final OnCategoryClickListener listener;
@@ -119,7 +120,6 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                             AVATAR_URLS.add(item.getUrl());
                         }
                         avatarsLoading = false;
-                        notifyDataSetChanged();
                     }
 
                     @Override
@@ -159,14 +159,20 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             for (int i = 0; i < 6; i++) {
                 ViewGroup container = (ViewGroup) layoutPreviews.getChildAt(i);
                 thumbViews[i] = (ImageView) container.getChildAt(0);
+                container.setOnClickListener(v -> {
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION && listener != null) {
+                        listener.onPreviewClick(getItem(pos));
+                    }
+                });
             }
         }
 
         void bind(IconCategory category) {
             if (category == null) return;
             List<String> thumbUrls = category.getThumbUrls();
-            android.util.Log.d("CategoryAdapter", "Binding category: " + category.getCategory() 
-                + ", Style: " + category.getStyle() 
+            android.util.Log.d("CategoryAdapter", "Binding category: " + category.getCategory()
+                + ", Style: " + category.getStyle()
                 + ", File: " + category.getFile()
                 + ", ThumbsCount: " + (thumbUrls != null ? thumbUrls.size() : "null"));
 
@@ -200,7 +206,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                     itemView.getContext().getResources().getColor(colorRes)));
 
             tvIconCount.setText("· " + category.getCount() + " 枚图标");
-            
+
             // 演示用数据，实际应从 Model 获取
             tvRating.setText("4.9");
             tvDownloadCount.setText((category.getCount() * 3) + " 下载");
@@ -220,9 +226,14 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                 if (listener != null) listener.onCategoryClick(category);
             });
 
-            thumbUrls = category.getThumbUrls();
-            int padding = (int) (1 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f);
+            btnDownload.setOnClickListener(v -> {
+                android.widget.Toast.makeText(v.getContext(), "开始后台批量下载合集...", android.widget.Toast.LENGTH_SHORT).show();
+                com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(v.getContext()).startCollectionDownload(category);
+                android.content.Intent intent = new android.content.Intent(v.getContext(), com.example.my_project1.ui.activity.BatchDownloadActivity.class);
+                v.getContext().startActivity(intent);
+            });
 
+            int padding = (int) (1 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f);
             for (int index = 0; index < 6; index++) {
                 ImageView iv = thumbViews[index];
                 iv.setPadding(padding, padding, padding, padding);

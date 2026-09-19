@@ -99,7 +99,8 @@ public class AccountViewModel extends AndroidViewModel {
     public AccountViewModel(@NonNull Application application) {
         super(application);
         repository = new AccountRepository(application);
-        String userId = BmobUser.getCurrentUser().getObjectId();
+        BmobUser user = BmobUser.getCurrentUser();
+        String userId = (user != null) ? user.getObjectId() : "";
         allGroups = repository.getAccountGroups(userId);
     }
 
@@ -144,7 +145,9 @@ public class AccountViewModel extends AndroidViewModel {
     public LiveData<List<AccountGroup>> getAccountGroups() {
         if (allGroups == null) {
             Log.d(TAG,"首次进入无数据 → 自动加载账户组");
-            loadAccountGroups(BmobUser.getCurrentUser().getObjectId());
+            BmobUser user = BmobUser.getCurrentUser();
+            String userId = (user != null) ? user.getObjectId() : "";
+            loadAccountGroups(userId);
         }
         return allGroups;
     }
@@ -211,7 +214,8 @@ public class AccountViewModel extends AndroidViewModel {
      * 获取用户所有账户（LiveData）
      */
     public LiveData<List<Account>> getAllAccounts() {
-        String userId = BmobUser.getCurrentUser().getObjectId();
+        BmobUser user = BmobUser.getCurrentUser();
+        String userId = (user != null) ? user.getObjectId() : "";
         return repository.getAccountsByUser(userId);
     }
 
@@ -418,7 +422,8 @@ public class AccountViewModel extends AndroidViewModel {
 
         AppExecutors.get().diskIO().execute(() -> {
             try {
-                String userId = BmobUser.getCurrentUser().getObjectId();
+                BmobUser user = BmobUser.getCurrentUser();
+                String userId = (user != null) ? user.getObjectId() : "";
                 // 1. 获取所有分组，用于寻找默认组
                 List<AccountGroup> allGroupsList = repository.getAccountGroupsSync(userId);
                 if (allGroupsList == null || allGroupsList.isEmpty()) {

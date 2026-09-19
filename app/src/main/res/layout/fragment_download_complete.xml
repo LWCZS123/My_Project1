@@ -245,7 +245,7 @@
         app:backgroundTint="@null"
         android:insetTop="0dp"
         android:insetBottom="0dp"
-        android:text="打开文件"
+        android:text="查看下载详情"
         android:textAllCaps="false"
         android:textColor="@color/white"
         android:textSize="15sp"

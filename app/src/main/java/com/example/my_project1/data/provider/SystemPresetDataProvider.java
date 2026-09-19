@@ -15,7 +15,7 @@ public class SystemPresetDataProvider {
 
     public static List<Category> getExpensePresets(Context context, String userId) {
         List<Category> list = new ArrayList<>();
-        Log.d("SystemPresetDataProvider", "当前用户"+userId.toString());
+        Log.d("SystemPresetDataProvider", "当前用户" + (userId != null ? userId : "null"));
 
         // 购物
         list.add(createCategory(context, "CHI", R.drawable.ic_expense_shopping, userId, "expense",
