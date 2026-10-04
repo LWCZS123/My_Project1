@@ -586,8 +586,9 @@
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/rv_icon_list"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:nestedScrollingEnabled="false"
+                        android:layout_height="420dp"
+                        android:nestedScrollingEnabled="true"
+                        android:overScrollMode="never"
                         tools:itemCount="3"
                         tools:listitem="@layout/item_icon_download" />
                 </LinearLayout>

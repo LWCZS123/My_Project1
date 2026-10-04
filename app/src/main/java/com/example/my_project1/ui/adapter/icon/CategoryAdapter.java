@@ -13,12 +13,17 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.icon.IconCategory;
 import com.example.my_project1.data.model.icon.IconItem;
+import com.example.my_project1.data.model.icon.DownloadRecord;
 import com.example.my_project1.data.repository.icon.IconRepository;
 import com.example.my_project1.utils.GlideImageLoader;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import io.reactivex.annotations.NonNull;
 
@@ -44,10 +49,82 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
 
     private final OnCategoryClickListener listener;
     private volatile boolean metadataLoading;
+    private boolean flatStyle;
+    private final Map<String, String> collectionDownloadStates = new HashMap<>();
+
+    private static final String DOWNLOAD_ACTIVE = "active";
+    private static final String DOWNLOAD_SUCCESS = "success";
 
     public CategoryAdapter(OnCategoryClickListener listener) {
         super(DIFF_CALLBACK);
         this.listener = listener;
+    }
+
+    /** Search results reuse the home card layout but do not add any elevation/shadow. */
+    public void setFlatStyle(boolean flatStyle) {
+        this.flatStyle = flatStyle;
+        if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "flat_style");
+    }
+
+    public void updateDownloadRecords(List<DownloadRecord> records) {
+        Map<String, String> latestBatchByCategory = new HashMap<>();
+        Map<String, int[]> counters = new HashMap<>();
+        if (records != null) {
+            // Records are timestamp-descending, so the first batch seen is the latest attempt.
+            for (DownloadRecord record : records) {
+                String batchId = record.getBatchId();
+                if (batchId == null || batchId.startsWith("single_")) continue;
+                String key = collectionKey(record.getStyle(), record.getCategoryName());
+                String latestBatch = latestBatchByCategory.get(key);
+                if (latestBatch == null) {
+                    latestBatchByCategory.put(key, batchId);
+                } else if (!latestBatch.equals(batchId)) {
+                    continue;
+                }
+                int[] counts = counters.get(key);
+                if (counts == null) {
+                    counts = new int[3]; // total, success, active
+                    counters.put(key, counts);
+                }
+                counts[0]++;
+                if (DownloadRecord.STATUS_SUCCESS.equals(record.getStatus())) counts[1]++;
+                if (DownloadRecord.STATUS_PENDING.equals(record.getStatus())
+                        || DownloadRecord.STATUS_DOWNLOADING.equals(record.getStatus())) counts[2]++;
+            }
+        }
+
+        Map<String, String> nextStates = new HashMap<>();
+        for (Map.Entry<String, int[]> entry : counters.entrySet()) {
+            int[] counts = entry.getValue();
+            if (counts[0] > 0 && counts[0] == counts[1]) {
+                nextStates.put(entry.getKey(), DOWNLOAD_SUCCESS);
+            } else if (counts[2] > 0) {
+                nextStates.put(entry.getKey(), DOWNLOAD_ACTIVE);
+            }
+        }
+        Set<String> changed = new HashSet<>(collectionDownloadStates.keySet());
+        changed.addAll(nextStates.keySet());
+        changed.removeIf(key -> java.util.Objects.equals(
+                collectionDownloadStates.get(key), nextStates.get(key)));
+        collectionDownloadStates.clear();
+        collectionDownloadStates.putAll(nextStates);
+        for (int i = 0; i < getItemCount(); i++) {
+            IconCategory category = getItem(i);
+            if (changed.contains(collectionKey(category.getStyle(), category.getCategory()))) {
+                notifyItemChanged(i, "collection_download_state");
+            }
+        }
+    }
+
+    public void markDownloadQueued(IconCategory category) {
+        collectionDownloadStates.put(
+                collectionKey(category.getStyle(), category.getCategory()), DOWNLOAD_ACTIVE);
+        int position = getCurrentList().indexOf(category);
+        if (position >= 0) notifyItemChanged(position, "collection_download_state");
+    }
+
+    private static String collectionKey(String style, String name) {
+        return String.valueOf(style) + '|' + String.valueOf(name);
     }
 
     private static final DiffUtil.ItemCallback<IconCategory> DIFF_CALLBACK =
@@ -83,7 +160,9 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position, @NonNull List<Object> payloads) {
-        if (!payloads.isEmpty()) {
+        if (payloads.contains("collection_download_state")) {
+            holder.bindDownloadState(getItem(position));
+        } else if (!payloads.isEmpty()) {
             // "thumbnail" 或 "metadata" 负载刷新
             holder.bind(getItem(position));
         } else {
@@ -170,6 +249,16 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
 
         void bind(IconCategory category) {
             if (category == null) return;
+            if (itemView instanceof com.google.android.material.card.MaterialCardView) {
+                com.google.android.material.card.MaterialCardView card =
+                        (com.google.android.material.card.MaterialCardView) itemView;
+                card.setCardElevation(0f);
+                card.setStateListAnimator(null);
+                if (flatStyle) {
+                    card.setStrokeWidth(0);
+                    card.setRadius(12f);
+                }
+            }
             List<String> thumbUrls = category.getThumbUrls();
             android.util.Log.d("CategoryAdapter", "Binding category: " + category.getCategory()
                 + ", Style: " + category.getStyle()
@@ -204,6 +293,7 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             else if ("lineal-color".equals(style)) colorRes = R.color.icon_style_color;
             btnDownload.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                     itemView.getContext().getResources().getColor(colorRes)));
+            bindDownloadState(category);
 
             tvIconCount.setText("· " + category.getCount() + " 枚图标");
 
@@ -227,10 +317,16 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
             });
 
             btnDownload.setOnClickListener(v -> {
-                android.widget.Toast.makeText(v.getContext(), "开始后台批量下载合集...", android.widget.Toast.LENGTH_SHORT).show();
-                com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(v.getContext()).startCollectionDownload(category);
-                android.content.Intent intent = new android.content.Intent(v.getContext(), com.example.my_project1.ui.activity.BatchDownloadActivity.class);
-                v.getContext().startActivity(intent);
+                String state = collectionDownloadStates.get(
+                        collectionKey(category.getStyle(), category.getCategory()));
+                if (DOWNLOAD_SUCCESS.equals(state) || DOWNLOAD_ACTIVE.equals(state)) return;
+                com.example.my_project1.data.repository.icon.DownloadRepository
+                        .getInstance(v.getContext())
+                        .startCollectionDownload(category, (enqueued, message) -> {
+                            if (enqueued) markDownloadQueued(category);
+                            android.widget.Toast.makeText(v.getContext(), message,
+                                    android.widget.Toast.LENGTH_SHORT).show();
+                        });
             });
 
             int padding = (int) (1 * itemView.getContext().getResources().getDisplayMetrics().density + 0.5f);
@@ -263,6 +359,27 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                     iv.setVisibility(View.VISIBLE);
                     ((View)iv.getParent()).setVisibility(View.VISIBLE);
                 }
+            }
+        }
+
+        private void bindDownloadState(IconCategory category) {
+            String state = collectionDownloadStates.get(
+                    collectionKey(category.getStyle(), category.getCategory()));
+            if (DOWNLOAD_SUCCESS.equals(state)) {
+                btnDownload.setText("已下载");
+                btnDownload.setIconResource(R.drawable.ic_accept);
+                btnDownload.setEnabled(false);
+                btnDownload.setAlpha(0.65f);
+            } else if (DOWNLOAD_ACTIVE.equals(state)) {
+                btnDownload.setText("下载中");
+                btnDownload.setIconResource(R.drawable.ic_download);
+                btnDownload.setEnabled(false);
+                btnDownload.setAlpha(0.65f);
+            } else {
+                btnDownload.setText("批量下载");
+                btnDownload.setIconResource(R.drawable.ic_download);
+                btnDownload.setEnabled(true);
+                btnDownload.setAlpha(1f);
             }
         }
 

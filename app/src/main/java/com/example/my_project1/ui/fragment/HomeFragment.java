@@ -33,6 +33,7 @@ import com.example.my_project1.ui.adapter.bill.HeaderAdapter;
 import com.example.my_project1.ui.adapter.bill.HomeBillAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
+import com.example.my_project1.ui.viewmodel.billvm.HeaderUiModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
@@ -62,7 +63,6 @@ public class HomeFragment extends Fragment {
 
     private String currentUserId;
     private boolean isFirstLoad = true;
-    private boolean hasResumedOnce;
 
     @Nullable
     @Override
@@ -99,11 +99,6 @@ public class HomeFragment extends Fragment {
         super.onResume();
         // 检查用户登录状态切换
         checkUserSession();
-        // 从编辑页返回时立即创建新的分页代际，确保首页显示最新的本地账单。
-        if (hasResumedOnce && billViewModel != null) {
-            billViewModel.refreshData();
-        }
-        hasResumedOnce = true;
     }
 
     @Override
@@ -124,7 +119,6 @@ public class HomeFragment extends Fragment {
         if (binding != null) {
             binding.rvBills.clearOnScrollListeners();
         }
-        hasResumedOnce = false;
         binding = null;
     }
 
@@ -143,6 +137,10 @@ public class HomeFragment extends Fragment {
 
     private void setupRecyclerView() {
         headerAdapter = new HeaderAdapter();
+        HeaderUiModel cachedHeader = billViewModel.headerData.getValue();
+        if (cachedHeader != null) {
+            headerAdapter.setHeader(cachedHeader);
+        }
         headerAdapter.setRefreshClickListener(() -> {
             showSnackbar("正在强制同步云端数据...");
             billViewModel.forceSyncFromCloud();
@@ -243,6 +241,7 @@ public class HomeFragment extends Fragment {
 
         binding.rvBills.setLayoutManager(layoutManager);
         binding.rvBills.setAdapter(concatAdapter);
+        binding.rvBills.setItemAnimator(null);
         binding.rvBills.setHasFixedSize(false); 
         binding.rvBills.setItemViewCacheSize(10); // 增加缓存池，平衡内存与流畅度
     }

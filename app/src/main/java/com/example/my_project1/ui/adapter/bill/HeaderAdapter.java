@@ -11,6 +11,7 @@ import com.example.my_project1.databinding.ItemHomeHeaderBinding;
 import com.example.my_project1.ui.viewmodel.billvm.HeaderUiModel;
 
 import java.util.List;
+import java.util.Objects;
 
 import io.reactivex.annotations.NonNull;
 
@@ -28,17 +29,7 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
     private static final String PAYLOAD_MODE = "payload_mode";
     private static final String PAYLOAD_DATA = "payload_data";
 
-    private HeaderUiModel data = new HeaderUiModel(
-            "¥0.00",
-            "¥0.00",
-            "¥0.00",
-            "¥0.00",
-            "¥0.00",
-            "¥0.00",
-            "¥0.00",
-            "¥0.00",
-            "¥0.00"
-    );
+    private HeaderUiModel data = HeaderUiModel.empty();
 
     private int currentMode = 0; // 0: 净资产, 1: 总收入, 2: 总支出, 3: 周结余
 
@@ -53,6 +44,7 @@ public class HeaderAdapter extends RecyclerView.Adapter<HeaderAdapter.HeaderVH> 
 
     /** 更新数据并局部刷新 */
     public void setHeader(HeaderUiModel model) {
+        if (model == null || Objects.equals(this.data, model)) return;
         this.data = model;
         notifyItemChanged(0, PAYLOAD_DATA);
     }

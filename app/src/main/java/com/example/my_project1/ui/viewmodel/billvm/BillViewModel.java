@@ -13,6 +13,7 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.Transformations;
 import androidx.paging.PagingData;
+import androidx.room.InvalidationTracker;
 
 import com.example.my_project1.data.dao.AccountDao;
 import com.example.my_project1.data.database.AppDatabase;
@@ -36,7 +37,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
@@ -58,6 +61,7 @@ public class BillViewModel extends AndroidViewModel {
     // 分页常量
     private static final int PAGE_SIZE = 50;
     private static final long SNAPSHOT_PROTECT_MS = 500L;
+    private static final long DATABASE_REFRESH_DEBOUNCE_MS = 120L;
 
     // 辅助工具类
     private final HeaderCalculator headerCalculator = new HeaderCalculator();
@@ -66,6 +70,7 @@ public class BillViewModel extends AndroidViewModel {
     private final AppExecutors executors;
 
     // 数据库与仓库
+    private final AppDatabase database;
     private final AccountDao accountDao;
     private final AccountRepository accountRepository;
     private final BillRepository repository;
@@ -73,11 +78,22 @@ public class BillViewModel extends AndroidViewModel {
 
     // 主线程 Handler
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final AtomicInteger headerCalculationGeneration = new AtomicInteger();
+    private final InvalidationTracker.Observer billsInvalidationObserver;
+    private final Runnable billsInvalidationRunnable = this::handleBillsInvalidation;
+
+    private void handleBillsInvalidation() {
+        if (isCleared) return;
+        _refreshTrigger.setValue(System.currentTimeMillis());
+        invalidateHomeBillsPaging();
+    }
 
     // 性能优化与缓存控制
     private volatile Map<String, List<Bill>> dailyBillsCache = Collections.emptyMap();
     private volatile boolean dailyBillsCacheReady = false;
     private volatile boolean isCleared = false;
+    /** Last successful first page, kept while the activity-scoped ViewModel lives. */
+    private volatile List<HomeBillUiModel> homeBillSnapshot = Collections.emptyList();
 
     private final long viewModelStartTime;
     private boolean isSnapshotLoaded = false;
@@ -99,9 +115,8 @@ public class BillViewModel extends AndroidViewModel {
     private volatile HomeBillsPagingSource homeBillsPagingSource;
 
     // Header 数据
-    private final MutableLiveData<HeaderUiModel> _headerData = new MutableLiveData<>(
-            new HeaderUiModel("¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00")
-    );
+    private final MutableLiveData<HeaderUiModel> _headerData =
+            new MutableLiveData<>(HeaderUiModel.empty());
     public final LiveData<HeaderUiModel> headerData = _headerData;
 
     // 统计数据
@@ -159,11 +174,19 @@ public class BillViewModel extends AndroidViewModel {
         executors = AppExecutors.get();
         snapshotManager = new BillSnapshotManager(application);
 
-        AppDatabase db = AppDatabase.getInstance(application);
-        accountDao = db.accountDao();
+        database = AppDatabase.getInstance(application);
+        accountDao = database.accountDao();
         accountRepository = new AccountRepository(application);
         repository = new BillRepository(application);
         userProfileRepository = UserProfileRepository.getInstance(application);
+        billsInvalidationObserver = new InvalidationTracker.Observer("bills") {
+            @Override
+            public void onInvalidated(@androidx.annotation.NonNull Set<String> tables) {
+                if (isCleared) return;
+                mainHandler.removeCallbacks(billsInvalidationRunnable);
+                mainHandler.postDelayed(billsInvalidationRunnable, DATABASE_REFRESH_DEBOUNCE_MS);
+            }
+        };
 
         viewModelStartTime = System.currentTimeMillis();
 
@@ -203,39 +226,80 @@ public class BillViewModel extends AndroidViewModel {
                 return new MutableLiveData<>(PagingData.from(new ArrayList<>()));
             }
 
+            String pagerUserId = currentUserId;
+            // Keep the snapshot reusable: a Fragment view can be recreated without
+            // recreating this ViewModel, and must render immediately in that case.
+            List<HomeBillUiModel> startupSnapshot = homeBillSnapshot;
             Date[] range = headerCalculator.getCurrentMonthRange();
             androidx.paging.Pager<Integer, HomeBillUiModel> pager = new androidx.paging.Pager<>(
-                    new androidx.paging.PagingConfig(PAGE_SIZE, 10, false, PAGE_SIZE, PAGE_SIZE * 3),
+                    // 首页只分页当月账单：保留已加载页，避免快速反向滑动时页面被回收后短暂缺失。
+                    new androidx.paging.PagingConfig(PAGE_SIZE, 20, false, PAGE_SIZE, Integer.MAX_VALUE),
                     () -> {
                         homeBillsPagingSource = new HomeBillsPagingSource(
                                 getApplication(),
                                 repository,
                                 accountDao,
-                                currentUserId,
+                                pagerUserId,
                                 range[0],
-                                range[1]
+                                range[1],
+                                (source, items) -> {
+                                    // The Paging source may be invalidated immediately after its
+                                    // first load (for example when a sync writes Room). Its first
+                                    // page is still a valid warm-start snapshot, so do not discard
+                                    // it merely because another source has already been installed.
+                                    if (Objects.equals(pagerUserId, currentUserId)) {
+                                        homeBillSnapshot = items == null || items.isEmpty()
+                                                ? Collections.emptyList()
+                                                : Collections.unmodifiableList(new ArrayList<>(items));
+                                        snapshotManager.saveBillItemsSnapshot(
+                                                pagerUserId, homeBillSnapshot, executors);
+                                    }
+                                }
                         );
                         return homeBillsPagingSource;
                     }
             );
 
             LiveData<PagingData<HomeBillUiModel>> pagedLiveData = androidx.paging.PagingLiveData.getLiveData(pager);
-            return androidx.paging.PagingLiveData.cachedIn(pagedLiveData, androidx.lifecycle.ViewModelKt.getViewModelScope(this));
+            LiveData<PagingData<HomeBillUiModel>> cachedLiveData = androidx.paging.PagingLiveData.cachedIn(
+                    pagedLiveData, androidx.lifecycle.ViewModelKt.getViewModelScope(this));
+            if (startupSnapshot == null || startupSnapshot.isEmpty()) {
+                return cachedLiveData;
+            }
+
+            MediatorLiveData<PagingData<HomeBillUiModel>> result = new MediatorLiveData<>();
+            result.setValue(PagingData.from(new ArrayList<>(startupSnapshot)));
+            // Paging emits its generation immediately, before Room has produced the first
+            // page. If that emission replaces the snapshot synchronously, the RecyclerView
+            // briefly becomes empty again. Give the cached PagingData one frame to render,
+            // then let the database result take over and remain the source of truth.
+            mainHandler.postDelayed(() -> result.addSource(cachedLiveData, result::setValue), 180L);
+            return result;
         });
 
         // 5. 监听统计与 Header 变更
         observeAllBillsForStats();
         observeStatsForSync();
         observeHeaderDataUpdate();
+        database.getInvalidationTracker().addObserver(billsInvalidationObserver);
     }
 
     /**
      * 加载本地快照
      */
     private void loadSnapshot() {
+        if (currentUserId == null) {
+            _headerData.setValue(HeaderUiModel.empty());
+            homeBillSnapshot = Collections.emptyList();
+            isSnapshotLoaded = false;
+            return;
+        }
+
         HeaderUiModel header = snapshotManager.loadHeaderSnapshot(currentUserId);
         if (header != null) {
             _headerData.setValue(header);
+        } else {
+            _headerData.setValue(HeaderUiModel.empty());
         }
 
         Map<String, DailyStat> calendarStats = snapshotManager.loadCalendarSnapshot(currentUserId);
@@ -243,8 +307,12 @@ public class BillViewModel extends AndroidViewModel {
             _dailyStatsMap.setValue(calendarStats);
         }
 
-        snapshotManager.preloadSnapshotIcons(currentUserId);
-        isSnapshotLoaded = true;
+        List<HomeBillUiModel> snapshot = snapshotManager.loadBillItemsSnapshot(currentUserId);
+        homeBillSnapshot = snapshot == null || snapshot.isEmpty()
+                ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(snapshot));
+        snapshotManager.preloadSnapshotIcons(homeBillSnapshot);
+        isSnapshotLoaded = header != null;
     }
 
     /**
@@ -252,7 +320,7 @@ public class BillViewModel extends AndroidViewModel {
      */
     private void saveSnapshot(HeaderUiModel header) {
         if (isCleared) return;
-        snapshotManager.saveSnapshot(currentUserId, header, _dailyStatsMap.getValue(), new ArrayList<>(), executors);
+        snapshotManager.saveSnapshot(currentUserId, header, _dailyStatsMap.getValue(), executors);
     }
 
     /**
@@ -318,29 +386,30 @@ public class BillViewModel extends AndroidViewModel {
         Runnable updateAction = () -> {
             if (isCleared || currentUserId == null) return;
 
+            int generation = headerCalculationGeneration.incrementAndGet();
+            String userId = currentUserId;
+            List<Account> currentAccounts = allAccountsLive.getValue();
+            List<Account> accounts = currentAccounts == null
+                    ? Collections.emptyList()
+                    : new ArrayList<>(currentAccounts);
+
             executors.computation().execute(() -> {
                 if (isCleared) return;
-
-                List<Account> accounts = allAccountsLive.getValue();
-                SearchSummary totalSum = repository.getUserBillSummarySync(currentUserId);
-                Date[] monthRange = headerCalculator.getCurrentMonthRange();
-                SearchSummary monthSum = repository.getBillSummaryInRangeSync(currentUserId, monthRange[0], monthRange[1]);
-
-                // 检查数据指纹，避免重复刷新
-                if (headerCalculator.isHeaderDataUnchanged(accounts, totalSum, monthSum)) {
-                    return;
-                }
-
-                HeaderUiModel header = headerCalculator.calculateHeader(currentUserId, repository, accounts);
+                HeaderUiModel header = headerCalculator.calculateHeader(userId, repository, accounts);
 
                 long elapsed = System.currentTimeMillis() - viewModelStartTime;
                 long delay = isSnapshotLoaded ? Math.max(0, SNAPSHOT_PROTECT_MS - elapsed) : 0;
 
                 mainHandler.postDelayed(() -> {
-                    if (isCleared) return;
+                    if (isCleared
+                            || generation != headerCalculationGeneration.get()
+                            || !Objects.equals(userId, currentUserId)) {
+                        return;
+                    }
+                    isSnapshotLoaded = false;
+                    if (header.equals(_headerData.getValue())) return;
                     _headerData.setValue(header);
                     saveSnapshot(header);
-                    isSnapshotLoaded = false;
                 }, delay);
             });
         };
@@ -515,7 +584,6 @@ public class BillViewModel extends AndroidViewModel {
         Runnable refreshAction = () -> {
             if (isCleared) return;
             _refreshTrigger.setValue(System.currentTimeMillis());
-            rebuildHomeBillsPager();
             invalidateHomeBillsPaging();
         };
 
@@ -784,8 +852,6 @@ public class BillViewModel extends AndroidViewModel {
         checkUserSwitch();
         if (currentUserId == null) return;
 
-        refreshData();
-
         long now = System.currentTimeMillis();
         if (isFirstInit || (now - lastSyncTime > SYNC_THROTTLE_MS)) {
             isFirstInit = false;
@@ -823,6 +889,7 @@ public class BillViewModel extends AndroidViewModel {
     protected void onCleared() {
         isCleared = true;
 
+        database.getInvalidationTracker().removeObserver(billsInvalidationObserver);
         mainHandler.removeCallbacksAndMessages(null);
         statsDebounceHandler.removeCallbacksAndMessages(null);
 

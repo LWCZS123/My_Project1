@@ -87,7 +87,6 @@ public class HomeBillAdapter extends PagingDataAdapter<HomeBillUiModel, Recycler
             return;
         }
         if (holder instanceof HeaderVH) {
-            android.util.Log.d("HomeBillAdapter", "Binding header at pos " + position + ": " + item.dateText);
             ((HeaderVH) holder).bind(item);
         } else if (holder instanceof BillVH) {
             ((BillVH) holder).bind(item.billItem, item.isLastInDay);
@@ -98,7 +97,15 @@ public class HomeBillAdapter extends PagingDataAdapter<HomeBillUiModel, Recycler
         if (v.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
             ViewGroup.MarginLayoutParams p = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
             Context context = v.getContext();
-            p.setMargins(dp2px(context, l), dp2px(context, t), dp2px(context, r), dp2px(context, b));
+            int left = dp2px(context, l);
+            int top = dp2px(context, t);
+            int right = dp2px(context, r);
+            int bottom = dp2px(context, b);
+            if (p.leftMargin == left && p.topMargin == top
+                    && p.rightMargin == right && p.bottomMargin == bottom) {
+                return;
+            }
+            p.setMargins(left, top, right, bottom);
             v.requestLayout();
         }
     }
@@ -147,6 +154,9 @@ public class HomeBillAdapter extends PagingDataAdapter<HomeBillUiModel, Recycler
 
         void bind(BillUiModel bill, boolean isLast) {
             if (bill == null) return;
+
+            // ViewHolder 复用时不能继承上一条账单的侧滑位移，否则内容会移出可视区域。
+            b.swipeLayout.quickClose();
 
             // 🚀 优化：边距设置在 Wrapper 上，SwipeMenuLayout 内部保持铺满，解决侧滑露底问题
             setMargins(itemViewWrapper, 16, 0, 16, isLast ? 12 : 0);

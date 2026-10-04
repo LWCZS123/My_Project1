@@ -175,6 +175,8 @@ public class BatchDownloadActivity extends AppCompatActivity {
             }
         });
         binding.rvIconList.setLayoutManager(new LinearLayoutManager(this));
+        binding.rvIconList.setItemViewCacheSize(8);
+        binding.rvIconList.setHasFixedSize(false);
         binding.rvIconList.setAdapter(adapter);
     }
 

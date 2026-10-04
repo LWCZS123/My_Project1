@@ -207,10 +207,12 @@ public class DownloadViewModel extends AndroidViewModel {
         private final long intervalMillis;
         private long lastUpdateTime = 0;
         private T pendingValue = null;
+        private boolean dispatchScheduled;
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final Runnable dispatchRunnable = new Runnable() {
             @Override
             public void run() {
+                dispatchScheduled = false;
                 lastUpdateTime = System.currentTimeMillis();
                 setValue(pendingValue);
             }
@@ -223,9 +225,10 @@ public class DownloadViewModel extends AndroidViewModel {
                 long currentTime = System.currentTimeMillis();
                 if (currentTime - lastUpdateTime >= intervalMillis) {
                     handler.removeCallbacks(dispatchRunnable);
+                    dispatchScheduled = false;
                     dispatchRunnable.run();
-                } else if (!handler.hasMessages(0)) { // 简化版消息检查
-                    handler.removeCallbacks(dispatchRunnable);
+                } else if (!dispatchScheduled) {
+                    dispatchScheduled = true;
                     handler.postDelayed(dispatchRunnable, intervalMillis - (currentTime - lastUpdateTime));
                 }
             });

@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:iTools="http://schemas.android.com/apk/res-auto">
+    <style name="IconSearchStyleChip">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@drawable/bg_pill_unselected_market</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/market_text_secondary</item>
+        <item name="android:textSize">12sp</item>
+    </style>
     <style name="MyButtonStyle" parent="Widget.MaterialComponents.Button">
         <item name="android:background">@drawable/login_button_background</item>
         <item name="backgroundTint">@null</item>
@@ -182,6 +192,7 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowActivityTransitions">true</item>
     </style>
 
     <style name="Theme.TransparentStatusBar1" parent="Theme.MaterialComponents.DayNight.NoActionBar">

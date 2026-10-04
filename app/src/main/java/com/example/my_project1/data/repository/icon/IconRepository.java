@@ -16,8 +16,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import okhttp3.OkHttpClient;
@@ -470,6 +472,88 @@ public class IconRepository {
         });
     }
 
+    /**
+     * Searches every icon source and returns the complete matching set. RecyclerView handles UI
+     * virtualization; this method deliberately does not truncate results into repository pages.
+     */
+    public void searchAllIcons(AssetManager assets, String keyword, String style,
+                               Callback<List<IconItem>> callback) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>()));
+            return;
+        }
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconItem> sources = new ArrayList<>();
+                if (style == null || "filled".equals(style)) {
+                    ensureGlobalSearchCacheBuilt();
+                    sources.addAll(searchCache);
+                }
+                if (style == null || "line".equals(style)) {
+                    sources.addAll(getAssetSearchItems(assets, "freeicon_line.json"));
+                }
+                if (style == null || "lineal-color".equals(style)) {
+                    sources.addAll(getAssetSearchItems(assets, "线性色.json"));
+                }
+
+                String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
+                Map<String, IconItem> uniqueMatches = new LinkedHashMap<>();
+                for (IconItem item : sources) {
+                    if (matchKeyword(item, lowerKeyword)) {
+                        String key = String.valueOf(item.getStyle()) + '|'
+                                + String.valueOf(item.getId()) + '|'
+                                + String.valueOf(item.getUrl());
+                        uniqueMatches.put(key, item);
+                    }
+                }
+                dispatchResult(callback, ApiResponse.success(
+                        new ArrayList<>(uniqueMatches.values())));
+            } catch (Exception e) {
+                Log.e(TAG, "全量图标搜索失败", e);
+                dispatchResult(callback, ApiResponse.error("搜索图标失败，请检查网络后重试"));
+            }
+        });
+    }
+
+    /** Returns all matching collections across filled, linear and colored sources. */
+    public void searchAllCategories(AssetManager assets, String keyword, String style,
+                                    Callback<List<IconCategory>> callback) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            dispatchResult(callback, ApiResponse.success(new ArrayList<>()));
+            return;
+        }
+        executors.networkIO().execute(() -> {
+            try {
+                List<IconCategory> sources = new ArrayList<>();
+                if (style == null || "filled".equals(style)) {
+                    sources.addAll(ensureCategoryIndexBuilt());
+                }
+                if (style == null || "line".equals(style)) {
+                    sources.addAll(loadAssetCategories(assets, "freeicon_line.json"));
+                }
+                if (style == null || "lineal-color".equals(style)) {
+                    sources.addAll(loadAssetCategories(assets, "线性色.json"));
+                }
+
+                String lowerKeyword = keyword.trim().toLowerCase(Locale.CHINA);
+                Map<String, IconCategory> uniqueMatches = new LinkedHashMap<>();
+                for (IconCategory category : sources) {
+                    String name = category.getCategory();
+                    if (name != null && name.toLowerCase(Locale.CHINA).contains(lowerKeyword)) {
+                        String key = String.valueOf(category.getStyle()) + '|'
+                                + String.valueOf(category.getFile());
+                        uniqueMatches.put(key, category.copy());
+                    }
+                }
+                dispatchResult(callback, ApiResponse.success(
+                        new ArrayList<>(uniqueMatches.values())));
+            } catch (Exception e) {
+                Log.e(TAG, "全量合集搜索失败", e);
+                dispatchResult(callback, ApiResponse.error("搜索合集失败，请检查网络后重试"));
+            }
+        });
+    }
+
     public List<IconItem> getAllCategoryItemsSync(android.content.res.AssetManager assets, IconCategory category) throws Exception {
         if (category.getFile() != null && category.getFile().startsWith("flaticon:")) {
             return loadFlaticonCategoryItemsInternal(category.getFile());
@@ -530,6 +614,7 @@ public class IconRepository {
             item.setId("flaticon_" + realKey + "_" + obj.optString("id", String.valueOf(i)));
             item.setName(obj.optString("name_zh", obj.optString("name")));
             item.setCategory(pack.optString("title_zh", pack.optString("title")));
+            item.setStyle("filled");
             String cdnUrl = obj.optString("cdn_url");
             item.setUrl(cdnUrl);
             item.setThumb(cdnUrl); // 缩略图由 Glide 在客户端动态缩放，不在此处强加 OSS 参数
@@ -549,6 +634,60 @@ public class IconRepository {
                 allItems.addAll(loadFlaticonCategoryItemsInternal(cat.getFile()));
             }
             flaticonSearchCache = allItems;
+        }
+    }
+
+    private void ensureGlobalSearchCacheBuilt() throws Exception {
+        if (searchCache != null) return;
+        synchronized (searchLock) {
+            if (searchCache != null) return;
+            List<IconItem> merged = new ArrayList<>();
+            try {
+                merged.addAll(parseIconItems(fetchUrl(SEARCH_URL)));
+            } catch (Exception e) {
+                Log.e(TAG, "加载填充图标搜索索引失败", e);
+            }
+            try {
+                ensureFlaticonSearchCacheBuilt();
+                merged.addAll(flaticonSearchCache);
+            } catch (Exception e) {
+                Log.e(TAG, "加载 Flaticon 搜索索引失败", e);
+            }
+            if (merged.isEmpty()) throw new IOException("填充图标索引不可用");
+            searchCache = merged;
+        }
+    }
+
+    private List<IconItem> getAssetSearchItems(AssetManager assets, String fileName)
+            throws Exception {
+        List<IconItem> cached = assetSearchCache.get(fileName);
+        if (cached != null) return cached;
+        List<IconItem> allItems = new ArrayList<>();
+        for (IconCategory category : loadAssetCategories(assets, fileName)) {
+            allItems.addAll(loadAssetCategoryItems(assets, fileName, category.getFile()));
+        }
+        assetSearchCache.put(fileName, allItems);
+        return allItems;
+    }
+
+    private List<IconCategory> ensureCategoryIndexBuilt() throws Exception {
+        if (categoryIndexCache != null) return categoryIndexCache;
+        synchronized (indexLock) {
+            if (categoryIndexCache != null) return categoryIndexCache;
+            List<IconCategory> merged = new ArrayList<>();
+            try {
+                merged.addAll(parseIndex(fetchUrl(INDEX_URL)));
+            } catch (Exception e) {
+                Log.e(TAG, "加载填充合集索引失败", e);
+            }
+            try {
+                merged.addAll(loadFlaticonCategoriesInternal());
+            } catch (Exception e) {
+                Log.e(TAG, "加载 Flaticon 合集索引失败", e);
+            }
+            if (merged.isEmpty()) throw new IOException("填充合集索引不可用");
+            categoryIndexCache = merged;
+            return categoryIndexCache;
         }
     }
 
@@ -636,9 +775,10 @@ public class IconRepository {
         for (int i = 0; i < icons.length(); i++) {
             JSONObject obj = icons.getJSONObject(i);
             IconItem item = new IconItem();
-            item.setId(packKey + "_" + i);
+            item.setId(fileName + ":" + packKey + "_" + i);
             item.setName(obj.optString("name"));
             item.setCategory(pack.optString("title"));
+            item.setStyle(pack.optString("style", root.optString("style", "filled")));
             item.setUrl(obj.optString("cdn_url"));
             item.setThumb(obj.optString("cdn_url"));
             list.add(item);
@@ -759,6 +899,7 @@ public class IconRepository {
             item.setId(obj.optString("id"));
             item.setName(obj.optString("name"));
             item.setCategory(obj.optString("category"));
+            item.setStyle(obj.optString("style", "filled"));
 
             // Category payloads are not fully uniform: CDN-backed packs use
             // cdn_url while the search index uses url/thumb.

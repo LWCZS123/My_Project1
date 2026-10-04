@@ -77,6 +77,11 @@
             android:theme="@style/Theme.TransparentStatusBar"
             />
         <activity
+            android:name=".ui.activity.IconMarketSearchActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.TransparentStatusBar" />
+        <activity
             android:name=".ui.activity.AllCollectionsActivity"
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar"

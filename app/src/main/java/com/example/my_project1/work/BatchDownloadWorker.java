@@ -24,7 +24,10 @@ import okhttp3.Response;
 public class BatchDownloadWorker extends Worker {
 
     private static final String TAG = "BatchDownloadWorker";
-    private static final long PROGRESS_UPDATE_INTERVAL = 500; // 进度更新频率限制为 500ms，降低数据库写入压力
+    private static final long PROGRESS_UPDATE_INTERVAL = 750;
+    private static final OkHttpClient HTTP_CLIENT = new OkHttpClient.Builder()
+            .retryOnConnectionFailure(true)
+            .build();
     private final DownloadDao downloadDao;
     private final OkHttpClient client;
     private final DownloadPathManager pathManager;
@@ -32,7 +35,7 @@ public class BatchDownloadWorker extends Worker {
     public BatchDownloadWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
         this.downloadDao = AppDatabase.getInstance(context).downloadDao();
-        this.client = new OkHttpClient();
+        this.client = HTTP_CLIENT;
         this.pathManager = DownloadPathManager.getInstance(context);
     }
 
@@ -126,10 +129,11 @@ public class BatchDownloadWorker extends Worker {
                 try (OutputStream out = getApplicationContext().getContentResolver().openOutputStream(file.getUri())) {
                     if (out == null) throw new Exception("无法打开输出流");
 
-                    byte[] buffer = new byte[16384]; // Larger buffer
+                    byte[] buffer = new byte[32768];
                     int bytesRead;
                     long bytesWritten = 0;
                     long lastUpdateTime = 0;
+                    int lastProgress = -1;
 
                     while ((bytesRead = in.read(buffer)) != -1) {
                         if (isStopped()) {
@@ -144,8 +148,12 @@ public class BatchDownloadWorker extends Worker {
                         long currentTime = System.currentTimeMillis();
                         if (currentTime - lastUpdateTime > PROGRESS_UPDATE_INTERVAL) {
                             int progress = totalBytes > 0 ? (int) ((bytesWritten * 100) / totalBytes) : 0;
-                            updateProgress(record, DownloadRecord.STATUS_DOWNLOADING, progress, bytesWritten, totalBytes, file.getUri().toString(), null, 0);
-                            lastUpdateTime = currentTime;
+                            if (progress != lastProgress) {
+                                updateProgress(record, DownloadRecord.STATUS_DOWNLOADING, progress,
+                                        bytesWritten, totalBytes, file.getUri().toString(), null, 0);
+                                lastProgress = progress;
+                                lastUpdateTime = currentTime;
+                            }
                         }
                     }
                     out.flush();
@@ -153,13 +161,16 @@ public class BatchDownloadWorker extends Worker {
 
                 updateProgress(record, DownloadRecord.STATUS_SUCCESS, 100, totalBytes, totalBytes, file.getUri().toString(), null, System.currentTimeMillis());
                 
-                // 触发 MediaScanner 扫描文件，确保下载完成后立即在相册中可见
-                try {
-                    android.content.Intent mediaScanIntent = new android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                    mediaScanIntent.setData(file.getUri());
-                    getApplicationContext().sendBroadcast(mediaScanIntent);
-                } catch (Exception e) {
-                    Log.e(TAG, "媒体库刷新失败", e);
+                // SAF content URI is visible immediately; only filesystem URIs need MediaScanner.
+                if ("file".equals(file.getUri().getScheme())) {
+                    try {
+                        android.content.Intent mediaScanIntent = new android.content.Intent(
+                                android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                        mediaScanIntent.setData(file.getUri());
+                        getApplicationContext().sendBroadcast(mediaScanIntent);
+                    } catch (Exception e) {
+                        Log.e(TAG, "媒体库刷新失败", e);
+                    }
                 }
             }
         } catch (Exception e) {

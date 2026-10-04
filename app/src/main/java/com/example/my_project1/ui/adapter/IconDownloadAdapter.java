@@ -6,7 +6,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
-import androidx.recyclerview.widget.ListAdapter;
+import androidx.recyclerview.widget.AsyncListDiffer;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
@@ -14,21 +14,68 @@ import com.example.my_project1.R;
 import com.example.my_project1.data.model.icon.DownloadRecord;
 import com.example.my_project1.databinding.ItemCollectionDownloadBinding;
 import com.example.my_project1.databinding.ItemIconDownloadBinding;
+import com.example.my_project1.utils.AppExecutors;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class IconDownloadAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private static final int TYPE_COLLECTION = 0;
     private static final int TYPE_SINGLE_ICON = 1;
 
-    private final List<Object> displayItems = new ArrayList<>();
+    private final AsyncListDiffer<Object> differ =
+            new AsyncListDiffer<>(this, IconDownloadAdapter.ITEM_CALLBACK);
     private OnItemActionListener listener;
     private int currentFilterType = 0; // 0 for Collection, 1 for Single Icon
     private List<DownloadRecord> lastRecords = new ArrayList<>();
+    private final AtomicInteger rebuildGeneration = new AtomicInteger();
+
+    public IconDownloadAdapter() {
+        setHasStableIds(true);
+    }
+
+    private static final DiffUtil.ItemCallback<Object> ITEM_CALLBACK =
+            new DiffUtil.ItemCallback<Object>() {
+                @Override
+                public boolean areItemsTheSame(@NonNull Object oldItem, @NonNull Object newItem) {
+                    if (oldItem instanceof CollectionItem && newItem instanceof CollectionItem) {
+                        return Objects.equals(((CollectionItem) oldItem).batchId,
+                                ((CollectionItem) newItem).batchId);
+                    }
+                    if (oldItem instanceof DownloadRecord && newItem instanceof DownloadRecord) {
+                        DownloadRecord oldRecord = (DownloadRecord) oldItem;
+                        DownloadRecord newRecord = (DownloadRecord) newItem;
+                        return Objects.equals(oldRecord.getIconId(), newRecord.getIconId())
+                                && Objects.equals(oldRecord.getBatchId(), newRecord.getBatchId());
+                    }
+                    return false;
+                }
+
+                @Override
+                public boolean areContentsTheSame(@NonNull Object oldItem, @NonNull Object newItem) {
+                    if (oldItem instanceof CollectionItem && newItem instanceof CollectionItem) {
+                        return ((CollectionItem) oldItem).contentSignature
+                                .equals(((CollectionItem) newItem).contentSignature);
+                    }
+                    if (oldItem instanceof DownloadRecord && newItem instanceof DownloadRecord) {
+                        DownloadRecord a = (DownloadRecord) oldItem;
+                        DownloadRecord b = (DownloadRecord) newItem;
+                        return Objects.equals(a.getStatus(), b.getStatus())
+                                && a.getProgress() == b.getProgress()
+                                && a.getDownloadedBytes() == b.getDownloadedBytes()
+                                && a.getTotalBytes() == b.getTotalBytes()
+                                && Objects.equals(a.getLocalPath(), b.getLocalPath())
+                                && Objects.equals(a.getErrorMessage(), b.getErrorMessage())
+                                && Objects.equals(a.getThumbUrl(), b.getThumbUrl());
+                    }
+                    return false;
+                }
+            };
 
     public interface OnItemActionListener {
         void onRetryIcon(String iconId);
@@ -41,17 +88,22 @@ public class IconDownloadAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     }
 
     public void setFilterType(int filterType) {
+        if (currentFilterType == filterType) return;
         this.currentFilterType = filterType;
-        if (lastRecords != null) {
-            setItems(lastRecords);
-        }
+        rebuildDisplayItems();
     }
 
     public void setItems(List<DownloadRecord> records) {
-        this.lastRecords = records;
-        Map<String, List<DownloadRecord>> grouped = new HashMap<>();
+        this.lastRecords = records == null ? new ArrayList<>() : new ArrayList<>(records);
+        rebuildDisplayItems();
+    }
 
-        if (records != null) {
+    private void rebuildDisplayItems() {
+        final int generation = rebuildGeneration.incrementAndGet();
+        final int filterType = currentFilterType;
+        final List<DownloadRecord> records = new ArrayList<>(lastRecords);
+        AppExecutors.get().computation().execute(() -> {
+            Map<String, List<DownloadRecord>> grouped = new LinkedHashMap<>();
             for (DownloadRecord r : records) {
                 if (r.getBatchId() != null && !r.getBatchId().startsWith("single_")) {
                     if (!grouped.containsKey(r.getBatchId())) {
@@ -60,61 +112,31 @@ public class IconDownloadAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
                     grouped.get(r.getBatchId()).add(r);
                 }
             }
-        }
 
-        List<Object> newList = new ArrayList<>();
-        if (currentFilterType == 0) {
-            // 合集页签：显示合集卡片 + 独立下载的单图标
-            for (Map.Entry<String, List<DownloadRecord>> entry : grouped.entrySet()) {
-                newList.add(new CollectionItem(entry.getKey(), entry.getValue()));
-            }
-            if (records != null) {
+            List<Object> newList = new ArrayList<>();
+            if (filterType == 0) {
+                // 合集页签只展示聚合后的合集，避免重复平铺合集中的每个图标。
+                for (Map.Entry<String, List<DownloadRecord>> entry : grouped.entrySet()) {
+                    newList.add(new CollectionItem(entry.getKey(), entry.getValue()));
+                }
+            } else {
+                // 单图标页签只展示独立下载记录，不展开合集的全部图标。
                 for (DownloadRecord r : records) {
                     if (r.getBatchId() == null || r.getBatchId().startsWith("single_")) {
                         newList.add(r);
                     }
                 }
             }
-        } else {
-            // 单图标页签：平铺显示所有图标记录
-            if (records != null) {
-                newList.addAll(records);
-            }
-        }
-
-        // 使用 DiffUtil 进行增量刷新，提高 RecyclerView 性能
-        DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
-            @Override
-            public int getOldListSize() { return displayItems.size(); }
-            @Override
-            public int getNewListSize() { return newList.size(); }
-            @Override
-            public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-                Object oldItem = displayItems.get(oldItemPosition);
-                Object newItem = newList.get(newItemPosition);
-                if (oldItem instanceof CollectionItem && newItem instanceof CollectionItem) {
-                    return ((CollectionItem) oldItem).batchId.equals(((CollectionItem) newItem).batchId);
-                }
-                if (oldItem instanceof DownloadRecord && newItem instanceof DownloadRecord) {
-                    return ((DownloadRecord) oldItem).getIconId().equals(((DownloadRecord) newItem).getIconId());
-                }
-                return false;
-            }
-            @Override
-            public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-                // 这里返回 false 以确保由 ViewModel 节流控制的 UI 刷新能精准触达 itemView
-                return false;
-            }
+            AppExecutors.get().mainThread().execute(() -> {
+                if (generation == rebuildGeneration.get()) differ.submitList(newList);
+            });
         });
-
-        displayItems.clear();
-        displayItems.addAll(newList);
-        result.dispatchUpdatesTo(this);
     }
 
     @Override
     public int getItemViewType(int position) {
-        return displayItems.get(position) instanceof CollectionItem ? TYPE_COLLECTION : TYPE_SINGLE_ICON;
+        return differ.getCurrentList().get(position) instanceof CollectionItem
+                ? TYPE_COLLECTION : TYPE_SINGLE_ICON;
     }
 
     @NonNull
@@ -134,23 +156,42 @@ public class IconDownloadAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         if (holder instanceof CollectionViewHolder) {
-            ((CollectionViewHolder) holder).bind((CollectionItem) displayItems.get(position));
+            ((CollectionViewHolder) holder).bind((CollectionItem) differ.getCurrentList().get(position));
         } else {
-            ((IconViewHolder) holder).bind((DownloadRecord) displayItems.get(position));
+            ((IconViewHolder) holder).bind((DownloadRecord) differ.getCurrentList().get(position));
         }
     }
 
     @Override
+    public long getItemId(int position) {
+        Object item = differ.getCurrentList().get(position);
+        if (item instanceof CollectionItem) {
+            return ((CollectionItem) item).batchId.hashCode();
+        }
+        DownloadRecord record = (DownloadRecord) item;
+        return (String.valueOf(record.getBatchId()) + '|' + record.getIconId()).hashCode();
+    }
+
+    @Override
     public int getItemCount() {
-        return displayItems.size();
+        return differ.getCurrentList().size();
     }
 
     static class CollectionItem {
         String batchId;
         List<DownloadRecord> records;
+        String contentSignature;
         CollectionItem(String batchId, List<DownloadRecord> records) {
             this.batchId = batchId;
             this.records = records;
+            StringBuilder signature = new StringBuilder();
+            for (DownloadRecord record : records) {
+                signature.append(record.getIconId()).append(':')
+                        .append(record.getStatus()).append(':')
+                        .append(record.getProgress()).append(':')
+                        .append(record.getDownloadedBytes()).append(';');
+            }
+            this.contentSignature = signature.toString();
         }
     }
 
@@ -232,6 +273,8 @@ public class IconDownloadAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             Glide.with(binding.ivIcon.getContext())
                     .load(record.getThumbUrl())
                     .placeholder(R.drawable.ic_placeholder_camera)
+                    .dontAnimate()
+                    .override(96, 96)
                     .into(binding.ivIcon);
         }
     }

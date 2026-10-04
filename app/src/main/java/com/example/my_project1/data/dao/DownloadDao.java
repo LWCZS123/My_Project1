@@ -33,7 +33,7 @@ public interface DownloadDao {
     @Query("SELECT * FROM download_records ORDER BY timestamp DESC")
     List<DownloadRecord> getAllRecordsSync();
 
-    @Query("SELECT * FROM download_records WHERE icon_id = :iconId LIMIT 1")
+    @Query("SELECT * FROM download_records WHERE icon_id = :iconId ORDER BY timestamp DESC LIMIT 1")
     DownloadRecord getRecordByIconId(String iconId);
 
     @Query("SELECT * FROM download_records WHERE batch_id = :batchId ORDER BY timestamp ASC")
@@ -81,6 +81,6 @@ public interface DownloadDao {
     @Query("DELETE FROM download_records WHERE status = '已完成'")
     void deleteAllCompletedRecords();
 
-    @Query("SELECT * FROM download_records WHERE icon_id = :iconId")
+    @Query("SELECT * FROM download_records WHERE icon_id = :iconId ORDER BY timestamp DESC LIMIT 1")
     DownloadRecord getRecordSync(String iconId);
 }

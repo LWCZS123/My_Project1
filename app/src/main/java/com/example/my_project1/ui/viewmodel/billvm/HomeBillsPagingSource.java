@@ -13,6 +13,7 @@ import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.repository.bill.BillRepository;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
+import com.example.my_project1.utils.AppExecutors;
 
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -23,6 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
 /**
  * 首页账单分页数据源
@@ -30,6 +34,10 @@ import java.util.Map;
  * 职责：从 Room 数据库分页加载当月账单，按天组合生成 Header 标题与账单模型，确保跨页不会打断日期头。
  */
 final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel> {
+
+    interface FirstPageListener {
+        void onFirstPageLoaded(HomeBillsPagingSource source, List<HomeBillUiModel> items);
+    }
 
     private final SimpleDateFormat dateKeyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private final SimpleDateFormat dateDisplayFormat = new SimpleDateFormat("M月d日", Locale.getDefault());
@@ -43,98 +51,96 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
     private final String userId;
     private final Date monthStart;
     private final Date monthEnd;
+    private final FirstPageListener firstPageListener;
+    private final Map<Integer, Integer> previousOffsetByOffset = new ConcurrentHashMap<>();
+    private final Map<Integer, Integer> nextOffsetByOffset = new ConcurrentHashMap<>();
     private volatile Map<String, Account> accountMap;
 
     HomeBillsPagingSource(Application application, BillRepository repository, AccountDao accountDao,
-                           String userId, Date monthStart, Date monthEnd) {
+                          String userId, Date monthStart, Date monthEnd,
+                          FirstPageListener firstPageListener) {
         this.application = application;
         this.repository = repository;
         this.accountDao = accountDao;
         this.userId = userId;
         this.monthStart = monthStart;
         this.monthEnd = monthEnd;
+        this.firstPageListener = firstPageListener;
     }
 
     @NonNull
     @Override
     public Object load(@NonNull PagingSource.LoadParams<Integer> params,
                        @NonNull kotlin.coroutines.Continuation<? super PagingSource.LoadResult<Integer, HomeBillUiModel>> continuation) {
-        android.util.Log.d("HomeBillsPagingSource", "分页开始加载: offset=" + params.getKey());
+        // Cloud sync can occupy the shared disk pool for a long time. Keep the read path
+        // independent so returning to Home is not queued behind upload/download writes.
+        AppExecutors.get().computation().execute(() -> continuation.resumeWith(loadPage(params)));
+        return IntrinsicsKt.getCOROUTINE_SUSPENDED();
+    }
+
+    private synchronized PagingSource.LoadResult<Integer, HomeBillUiModel> loadPage(
+            PagingSource.LoadParams<Integer> params) {
         try {
             int offset = params.getKey() != null ? params.getKey() : 0;
-            int requested = params.getLoadSize();
+            int requested = Math.max(1, params.getLoadSize());
 
             if (userId == null || userId.isEmpty()) {
                 return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
             }
 
-            final List<Bill>[] fetchedHolder = new List[1];
-            final Throwable[] errorHolder = new Throwable[1];
-            final int finalOffset = offset;
-            final int finalRequested = requested;
             final Date endExclusive = new Date(monthEnd.getTime() + 1L);
-
-            Thread thread = new Thread(() -> {
-                try {
-                    fetchedHolder[0] = repository.getBillsInTimeRangePaged(
-                            userId, monthStart, endExclusive, finalRequested + 1, finalOffset);
-                } catch (Throwable t) {
-                    errorHolder[0] = t;
-                }
-            });
-            thread.start();
-            thread.join();
-
-            if (errorHolder[0] != null) {
-                throw errorHolder[0];
-            }
-
-            List<Bill> fetched = fetchedHolder[0];
+            List<Bill> fetched = repository.getBillsInTimeRangePaged(
+                    userId, monthStart, endExclusive, requested + 1, offset);
 
             if (fetched == null || fetched.isEmpty()) {
-                android.util.Log.d("HomeBillsPagingSource", "指定范围内未找到账单");
-                return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
+                notifyFirstPage(offset, new ArrayList<>());
+                return new PagingSource.LoadResult.Page<>(
+                        new ArrayList<>(), getPreviousKey(offset), null);
             }
 
-            android.util.Log.d("HomeBillsPagingSource", "已查询到 " + fetched.size() + " 条账单");
-
-            while (fetched != null && fetched.size() > requested
-                    && isSameDay(fetched.get(requested - 1), fetched.get(fetched.size() - 1))) {
-                int nextLimit = Math.max(fetched.size() + requested, fetched.size() * 2);
-                final List<Bill>[] expandedHolder = new List[1];
-                final int finalNextLimit = nextLimit;
-                Thread expThread = new Thread(() -> {
-                    try {
-                        expandedHolder[0] = repository.getBillsInTimeRangePaged(
-                                userId, monthStart, endExclusive, finalNextLimit, finalOffset);
-                    } catch (Throwable ignored) {}
-                });
-                expThread.start();
-                expThread.join();
-
-                List<Bill> expanded = expandedHolder[0];
-                if (expanded == null || expanded.size() <= fetched.size()) break;
-                fetched = expanded;
-            }
-
-            if (fetched == null || fetched.isEmpty()) {
-                return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
-            }
 
             int consumed = Math.min(requested, fetched.size());
-            if (fetched.size() > requested && isSameDay(fetched.get(requested - 1), fetched.get(fetched.size() - 1))) {
-                consumed = fetched.size();
+            boolean hasMore = fetched.size() > requested;
+
+            if (hasMore && isSameDay(fetched.get(requested - 1), fetched.get(requested))) {
+                Bill boundaryBill = fetched.get(requested - 1);
+                int queryLimit = requested + 1;
+                int dayEnd = findFirstDifferentDay(fetched, requested, boundaryBill);
+
+                while (dayEnd < 0 && fetched.size() == queryLimit) {
+                    int nextLimit = Math.max(queryLimit + requested, queryLimit * 2);
+                    List<Bill> expanded = repository.getBillsInTimeRangePaged(
+                            userId, monthStart, endExclusive, nextLimit, offset);
+                    if (expanded == null || expanded.size() <= fetched.size()) break;
+                    fetched = expanded;
+                    queryLimit = nextLimit;
+                    dayEnd = findFirstDifferentDay(fetched, requested, boundaryBill);
+                }
+
+                if (dayEnd >= 0) {
+                    consumed = dayEnd;
+                    hasMore = true;
+                } else {
+                    consumed = fetched.size();
+                    hasMore = false;
+                }
             }
             List<Bill> pageBills = new ArrayList<>(fetched.subList(0, consumed));
 
             Map<String, Account> map = getAccountMap();
 
-            boolean hasMore = fetched.size() > consumed;
             Integer nextKey = hasMore ? offset + consumed : null;
+            Integer previousKey = getPreviousKey(offset);
+            if (nextKey != null) {
+                previousOffsetByOffset.put(nextKey, offset);
+                nextOffsetByOffset.put(offset, nextKey);
+            }
 
+            List<HomeBillUiModel> items = mapToFlatItems(pageBills, map);
+            notifyFirstPage(offset, items);
             return new PagingSource.LoadResult.Page<>(
-                    mapToFlatItems(pageBills, map),
-                    null,
+                    items,
+                    previousKey,
                     nextKey
             );
         } catch (Throwable throwable) {
@@ -143,10 +149,45 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
         }
     }
 
+    private void notifyFirstPage(int offset, List<HomeBillUiModel> items) {
+        if (offset == 0 && firstPageListener != null) {
+            firstPageListener.onFirstPageLoaded(this, new ArrayList<>(items));
+        }
+    }
+
+    private int findFirstDifferentDay(List<Bill> bills, int startIndex, Bill boundaryBill) {
+        for (int index = startIndex; index < bills.size(); index++) {
+            if (!isSameDay(boundaryBill, bills.get(index))) return index;
+        }
+        return -1;
+    }
+
+    private Integer getPreviousKey(int offset) {
+        if (offset == 0) return null;
+        Integer previousKey = previousOffsetByOffset.get(offset);
+        return previousKey != null ? previousKey : 0;
+    }
+
     @Nullable
     @Override
     public Integer getRefreshKey(@NonNull androidx.paging.PagingState<Integer, HomeBillUiModel> state) {
-        return null;
+        Integer anchorPosition = state.getAnchorPosition();
+        if (anchorPosition == null) return 0;
+        PagingSource.LoadResult.Page<Integer, HomeBillUiModel> page =
+                state.closestPageToPosition(anchorPosition);
+        if (page == null) return 0;
+
+        Integer nextKey = page.getNextKey();
+        if (nextKey != null) {
+            Integer currentKey = previousOffsetByOffset.get(nextKey);
+            if (currentKey != null) return currentKey;
+        }
+        Integer previousKey = page.getPrevKey();
+        if (previousKey != null) {
+            Integer currentKey = nextOffsetByOffset.get(previousKey);
+            if (currentKey != null) return currentKey;
+        }
+        return 0;
     }
 
     private Map<String, Account> getAccountMap() {
@@ -155,18 +196,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
         synchronized (this) {
             if (accountMap == null) {
                 Map<String, Account> loaded = new HashMap<>();
-                final List<Account>[] accountsHolder = new List[1];
-                Thread thread = new Thread(() -> {
-                    try {
-                        accountsHolder[0] = accountDao.getAllAccountsSyncExcludeDeleted();
-                    } catch (Throwable ignored) {}
-                });
-                thread.start();
-                try {
-                    thread.join();
-                } catch (InterruptedException ignored) {}
-
-                List<Account> accounts = accountsHolder[0];
+                List<Account> accounts = accountDao.getAllAccountsSyncExcludeDeleted();
                 if (accounts != null) {
                     for (Account account : accounts) {
                         if (account.getObjectId() != null) loaded.put(account.getObjectId(), account);

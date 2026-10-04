@@ -11,9 +11,13 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,7 +34,9 @@ public class BillSnapshotManager {
     private static final String SP_NAME = "bill_snapshot";
     private static final String KEY_HEADER_SNAPSHOT = "header_data";
     private static final String KEY_BILL_ITEMS_SNAPSHOT = "bill_items";
+    private static final String KEY_BILL_ITEMS_MONTH = "bill_items_month";
     private static final String KEY_CALENDAR_SNAPSHOT = "calendar_stats";
+    private static final int MAX_BILL_SNAPSHOT_ITEMS = 60;
 
     private final Context context;
     private final Gson gson = new Gson();
@@ -48,8 +54,7 @@ public class BillSnapshotManager {
      */
     public HeaderUiModel loadHeaderSnapshot(String userId) {
         SharedPreferences sp = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
-        String headerJson = sp.getString(snapshotKey(KEY_HEADER_SNAPSHOT, userId),
-                sp.getString(KEY_HEADER_SNAPSHOT, null));
+        String headerJson = sp.getString(snapshotKey(KEY_HEADER_SNAPSHOT, userId), null);
         if (headerJson != null) {
             try {
                 return gson.fromJson(headerJson, HeaderUiModel.class);
@@ -65,8 +70,7 @@ public class BillSnapshotManager {
      */
     public Map<String, DailyStat> loadCalendarSnapshot(String userId) {
         SharedPreferences sp = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
-        String calendarJson = sp.getString(snapshotKey(KEY_CALENDAR_SNAPSHOT, userId),
-                sp.getString(KEY_CALENDAR_SNAPSHOT, null));
+        String calendarJson = sp.getString(snapshotKey(KEY_CALENDAR_SNAPSHOT, userId), null);
         if (calendarJson != null) {
             try {
                 Type type = new TypeToken<Map<String, DailyStat>>(){}.getType();
@@ -78,52 +82,83 @@ public class BillSnapshotManager {
         return null;
     }
 
-    /**
-     * 加载账单分类图标并提前预加载图片
-     */
-    public void preloadSnapshotIcons(String userId) {
+    public List<HomeBillUiModel> loadBillItemsSnapshot(String userId) {
+        if (userId == null) return Collections.emptyList();
         SharedPreferences sp = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
-        String billItemsJson = sp.getString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, userId),
-                sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null));
+        String savedMonth = sp.getString(snapshotKey(KEY_BILL_ITEMS_MONTH, userId), null);
+        if (!currentMonthKey().equals(savedMonth)) return Collections.emptyList();
+
+        String billItemsJson = sp.getString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, userId), null);
         if (billItemsJson != null) {
             try {
                 Type type = new TypeToken<List<HomeBillUiModel>>(){}.getType();
                 List<HomeBillUiModel> billItems = gson.fromJson(billItemsJson, type);
-                if (billItems != null) {
-                    Set<String> urls = new LinkedHashSet<>();
-                    for (HomeBillUiModel item : billItems) {
-                        if (item != null && item.billItem != null && item.billItem.categoryIconUrl != null) {
-                            urls.add(item.billItem.categoryIconUrl);
-                            if (urls.size() == 12) break;
-                        }
-                    }
-                    ImageLoaderUtils.preloadHomeBillCategoryIcons(context, new ArrayList<>(urls));
-                }
+                return billItems != null ? billItems : Collections.emptyList();
             } catch (Exception e) {
-                Log.e(TAG, "预加载图标失败", e);
+                Log.e(TAG, "解析首页账单快照失败", e);
             }
         }
+        return Collections.emptyList();
+    }
+
+    /** 加载账单分类图标并提前预加载图片。 */
+    public void preloadSnapshotIcons(List<HomeBillUiModel> billItems) {
+        if (billItems == null || billItems.isEmpty()) return;
+        Set<String> urls = new LinkedHashSet<>();
+        for (HomeBillUiModel item : billItems) {
+            if (item != null && item.billItem != null && item.billItem.categoryIconUrl != null) {
+                urls.add(item.billItem.categoryIconUrl);
+                if (urls.size() == 12) break;
+            }
+        }
+        ImageLoaderUtils.preloadHomeBillCategoryIcons(context, new ArrayList<>(urls));
     }
 
     /**
      * 异步持久化保存 Header 与日历快照
      */
-    public void saveSnapshot(String userId, HeaderUiModel header, Map<String, DailyStat> calendarStats,
-                             List<HomeBillUiModel> billItems, AppExecutors executors) {
+    public void saveSnapshot(String userId, HeaderUiModel header,
+                             Map<String, DailyStat> calendarStats, AppExecutors executors) {
         if (userId == null) return;
 
         executors.diskIO().execute(() -> {
             try {
                 SharedPreferences sp = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
-                sp.edit()
+                boolean saved = sp.edit()
                         .putString(snapshotKey(KEY_HEADER_SNAPSHOT, userId), gson.toJson(header))
                         .putString(snapshotKey(KEY_CALENDAR_SNAPSHOT, userId), gson.toJson(calendarStats))
-                        .putString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, userId), gson.toJson(billItems))
-                        .apply();
-                Log.d(TAG, "快照持久化成功");
+                        .commit();
+                if (saved) {
+                    Log.d(TAG, "快照持久化成功");
+                } else {
+                    Log.w(TAG, "快照写入失败");
+                }
             } catch (Exception e) {
                 Log.e(TAG, "保存快照失败", e);
             }
         });
+    }
+
+    public void saveBillItemsSnapshot(String userId, List<HomeBillUiModel> billItems,
+                                      AppExecutors executors) {
+        if (userId == null || billItems == null) return;
+        int snapshotSize = Math.min(MAX_BILL_SNAPSHOT_ITEMS, billItems.size());
+        List<HomeBillUiModel> snapshot = new ArrayList<>(billItems.subList(0, snapshotSize));
+        executors.diskIO().execute(() -> {
+            try {
+                SharedPreferences sp = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
+                boolean saved = sp.edit()
+                        .putString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, userId), gson.toJson(snapshot))
+                        .putString(snapshotKey(KEY_BILL_ITEMS_MONTH, userId), currentMonthKey())
+                        .commit();
+                if (!saved) Log.w(TAG, "首页账单快照写入失败");
+            } catch (Exception e) {
+                Log.e(TAG, "保存首页账单快照失败", e);
+            }
+        });
+    }
+
+    private String currentMonthKey() {
+        return new SimpleDateFormat("yyyy-MM", Locale.US).format(new Date());
     }
 }

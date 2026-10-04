@@ -218,13 +218,14 @@ public class SaveCategoryBottomSheet extends BottomSheetDialogFragment {
                 Toast.makeText(requireContext(), "请先选择图标", Toast.LENGTH_SHORT).show();
                 return;
             }
-            for (IconItem item : selectedItems) {
-                com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(requireContext()).startIconDownload(item);
-            }
             dismiss();
-            Toast.makeText(requireContext(), "开始后台下载选中的图标...", Toast.LENGTH_SHORT).show();
-            android.content.Intent intent = new android.content.Intent(requireContext(), com.example.my_project1.ui.activity.BatchDownloadActivity.class);
-            startActivity(intent);
+            com.example.my_project1.data.repository.icon.DownloadRepository
+                    .getInstance(requireContext())
+                    .startIconDownloads(new ArrayList<>(selectedItems), (enqueued, message) -> {
+                        if (getContext() != null) {
+                            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                        }
+                    });
         });
     }
 

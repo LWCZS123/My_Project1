@@ -98,8 +98,14 @@ public class IconDetailActivity extends AppCompatActivity {
         adapter = new IconRowAdapter(new IconRowAdapter.OnIconActionListener() {
             @Override
             public void onDownloadClick(IconItem item) {
-                DownloadRepository.getInstance(IconDetailActivity.this).startIconDownload(item);
-                Toast.makeText(IconDetailActivity.this, "已加入下载队列: " + item.getName(), Toast.LENGTH_SHORT).show();
+                DownloadRepository.getInstance(IconDetailActivity.this)
+                        .startIconDownload(item, (enqueued, message) -> {
+                            if (enqueued && adapter != null) {
+                                adapter.markDownloadQueued(item.getId());
+                            }
+                            Toast.makeText(IconDetailActivity.this,
+                                    message, Toast.LENGTH_SHORT).show();
+                        });
             }
 
             @Override
@@ -121,6 +127,8 @@ public class IconDetailActivity extends AppCompatActivity {
             }
         });
         binding.rvIcons.setAdapter(adapter);
+        DownloadRepository.getInstance(this).getAllRecords().observe(this,
+                adapter::updateDownloadRecords);
         // NestedScrollView 嵌套 RecyclerView 需禁用滑动冲突
         binding.rvIcons.setNestedScrollingEnabled(false);
     }
@@ -200,10 +208,9 @@ public class IconDetailActivity extends AppCompatActivity {
                 return;
             }
 
-            for (IconItem item : itemsToDownload) {
-                DownloadRepository.getInstance(this).startIconDownload(item);
-            }
-            Toast.makeText(this, "正在批量下载 " + itemsToDownload.size() + " 枚图标...", Toast.LENGTH_SHORT).show();
+            DownloadRepository.getInstance(this).startIconDownloads(itemsToDownload,
+                    (enqueued, message) -> Toast.makeText(this,
+                            message, Toast.LENGTH_SHORT).show());
             
             if (isMultiSelectMode) {
                 adapter.exitSelectionMode();

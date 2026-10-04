@@ -166,6 +166,8 @@ public class AllCollectionsActivity extends AppCompatActivity {
 
         binding.rvAllCategories.setLayoutManager(new LinearLayoutManager(this));
         binding.rvAllCategories.setAdapter(adapter);
+        com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(this)
+                .getAllRecords().observe(this, adapter::updateDownloadRecords);
 
         // 滚动加载更多
         binding.rvAllCategories.addOnScrollListener(new RecyclerView.OnScrollListener() {

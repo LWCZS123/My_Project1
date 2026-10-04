@@ -271,6 +271,7 @@
             app:layout_constraintBottom_toBottomOf="@+id/iv_author_avatar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@+id/iv_author_avatar"
+            app:layout_constraintVertical_bias="1.0"
             app:strokeColor="#EFFFF5"
             app:strokeWidth="1dp" />
 

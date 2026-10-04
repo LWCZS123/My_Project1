@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -141,6 +142,8 @@ public class IconMarketActivity extends AppCompatActivity {
         // so an existing card is updated in place instead of flashing.
         binding.rvCategories.setItemAnimator(null);
         binding.rvCategories.setAdapter(categoryAdapter);
+        com.example.my_project1.data.repository.icon.DownloadRepository.getInstance(this)
+                .getAllRecords().observe(this, categoryAdapter::updateDownloadRecords);
 
         binding.rvCategories.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -246,35 +249,23 @@ public class IconMarketActivity extends AppCompatActivity {
     }
 
     private void initSearchBar() {
-        binding.etSearch.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void afterTextChanged(Editable s) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String keyword = s.toString().trim();
-                if (keyword.isEmpty()) {
-                    viewModel.exitMultiSelectMode();
-                    showNormalToolbar();
-                    showCategoryView();
-                } else {
-                    showSearchView();
-                }
-                binding.etSearch.removeCallbacks(searchDebounceRunnable);
-                binding.etSearch.postDelayed(searchDebounceRunnable, SEARCH_DEBOUNCE_MS);
-            }
-        });
-
-        binding.ivClearSearch.setOnClickListener(v -> {
-            binding.etSearch.setText("");
-            viewModel.exitMultiSelectMode();
-            showNormalToolbar();
-            showCategoryView();
-        });
+        binding.etSearch.setFocusable(false);
+        binding.etSearch.setCursorVisible(false);
+        binding.layoutSearchBox.setOnClickListener(v -> openSearchPage());
+        binding.etSearch.setOnClickListener(v -> openSearchPage());
 
         binding.btnFilter.setOnClickListener(v -> {
             IconSearchFilterBottomSheet fragment = new IconSearchFilterBottomSheet();
             fragment.show(getSupportFragmentManager(), "IconSearchFilter");
         });
+    }
+
+    private void openSearchPage() {
+        android.content.Intent intent = new android.content.Intent(
+                this, IconMarketSearchActivity.class);
+        ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(
+                this, binding.layoutSearchBox, "icon_market_search");
+        startActivity(intent, options.toBundle());
     }
 
     private void initSearchMultiSelectToolbar() {
