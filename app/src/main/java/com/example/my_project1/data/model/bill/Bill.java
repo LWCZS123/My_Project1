@@ -22,6 +22,10 @@ import java.util.List;
                 @Index(
                         value = {"user_id", "type", "excludeBudget", "billTime", "category_id"},
                         name = "index_bills_budget_stats"
+                ),
+                @Index(
+                        value = {"user_id", "billTime", "id", "sync_state"},
+                        name = "index_bills_user_time_id_state"
                 )
         }
 )

@@ -12,8 +12,10 @@ import androidx.room.Update;
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.bill.BillWithBalance;
-import com.example.my_project1.data.model.budget.CategoryAmount;
+import com.example.my_project1.data.model.bill.DailyStat;
+import com.example.my_project1.data.model.bill.MonthlyStat;
 import com.example.my_project1.data.model.bill.SearchSummary;
+import com.example.my_project1.data.model.budget.CategoryAmount;
 
 import java.util.Date;
 import java.util.List;
@@ -47,8 +49,21 @@ public interface BillDao {
     /**
      * 获取指定用户的所有账单(实时监听) - 排除已删除的账单
      */
-    @Query("SELECT * FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
     LiveData<List<Bill>> getAllBillsByUser(String userId);
+
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND " +
+            "((:objectId IS NOT NULL AND object_id = :objectId) OR (:localId > 0 AND id = :localId)) " +
+            "AND sync_state != 'TO_DELETE' LIMIT 1")
+    LiveData<Bill> getBillLive(String userId, String objectId, long localId);
+
+    @Query("SELECT strftime('%Y-%m-%d', billTime/1000, 'unixepoch', 'localtime') AS day, " +
+            "COUNT(*) AS billCount, " +
+            "COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) AS incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) AS expenseTotal " +
+            "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' AND billTime IS NOT NULL " +
+            "GROUP BY day ORDER BY day DESC")
+    LiveData<List<DailyStat>> getUserDailyStatsLive(String userId);
 
     /**
      * 按时间范围查询账单(LiveData) - 排除已删除的账单
@@ -59,8 +74,30 @@ public interface BillDao {
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime < :endExclusive AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
     LiveData<List<Bill>> getBillsInTimeRangeExclusive(String userId, Date start, Date endExclusive);
 
-    @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC LIMIT :limit OFFSET :offset")
-    List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset);
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime < :endExclusive AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC LIMIT :limit OFFSET :offset")
+    List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date endExclusive, int limit, int offset);
+
+    /** 全量账单统计在 SQLite 聚合，避免为了 count/days 把所有账单实体加载到内存。 */
+    @Query("SELECT " +
+            "COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
+            "COUNT(*) as billCount, " +
+            "COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
+            "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE'")
+    LiveData<SearchSummary> getUserBillSummaryLive(String userId);
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
+            "COUNT(*) as billCount, COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
+            "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE'")
+    SearchSummary getUserBillSummarySync(String userId);
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
+            "COUNT(*) as billCount, COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
+            "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' " +
+            "AND billTime >= :start AND billTime < :endExclusive")
+    SearchSummary getBillSummaryInRangeSync(String userId, Date start, Date endExclusive);
 
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
     List<Bill> getBillsInTimeRangeSync(String userId, Date start, Date end);
@@ -125,20 +162,15 @@ public interface BillDao {
     androidx.lifecycle.LiveData<List<CategorySummary>> getAccountCategorySummaryLive(String userId, String accountId, long localAccountId, int type, java.util.Date startTime, java.util.Date endTime);
 
     @Query("SELECT strftime('%Y-%m-%d', billTime/1000, 'unixepoch', 'localtime') as day, " +
-            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
-            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal " +
+            "COUNT(*) as billCount, " +
+            "COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal " +
             "FROM bills WHERE user_id = :userId " +
             "AND (account_id = :accountId OR local_account_id = :localAccountId " +
             "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
             "AND sync_state != 'TO_DELETE' " +
             "GROUP BY day")
-    androidx.lifecycle.LiveData<List<DailyStat>> getAccountDailyStatsLive(String userId, String accountId, long localAccountId);
-
-    class DailyStat {
-        public String day;
-        public double incomeTotal;
-        public double expenseTotal;
-    }
+   LiveData<List<DailyStat>> getAccountDailyStatsLive(String userId, String accountId, long localAccountId);
 
     @Query("SELECT strftime('%Y-%m', billTime/1000, 'unixepoch', 'localtime') as month, " +
             "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
@@ -151,14 +183,6 @@ public interface BillDao {
             "AND sync_state != 'TO_DELETE' " +
             "GROUP BY month")
     androidx.lifecycle.LiveData<List<MonthlyStat>> getAccountMonthlyStatsLive(String userId, String accountId, long localAccountId);
-
-    class MonthlyStat {
-        public String month;
-        public double incomeTotal;
-        public double expenseTotal;
-        public double transferInTotal;
-        public double transferOutTotal;
-    }
 
     public static class CategorySummary {
         @ColumnInfo(name = "category_id")

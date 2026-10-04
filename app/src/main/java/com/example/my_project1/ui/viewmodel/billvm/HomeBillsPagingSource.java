@@ -25,8 +25,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Pages the current month's bills from Room. Each response ends at a day boundary so
- * a date header and its daily totals are never duplicated on the following page.
+ * 首页账单分页数据源
+ * -------------------------------------------------------
+ * 职责：从 Room 数据库分页加载当月账单，按天组合生成 Header 标题与账单模型，确保跨页不会打断日期头。
  */
 final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel> {
 
@@ -42,6 +43,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
     private final String userId;
     private final Date monthStart;
     private final Date monthEnd;
+    private volatile Map<String, Account> accountMap;
 
     HomeBillsPagingSource(Application application, BillRepository repository, AccountDao accountDao,
                            String userId, Date monthStart, Date monthEnd) {
@@ -57,66 +59,86 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
     @Override
     public Object load(@NonNull PagingSource.LoadParams<Integer> params,
                        @NonNull kotlin.coroutines.Continuation<? super PagingSource.LoadResult<Integer, HomeBillUiModel>> continuation) {
-        android.util.Log.d("HomeBillsPagingSource", "Load started: offset=" + params.getKey() + " on thread " + Thread.currentThread().getName());
+        android.util.Log.d("HomeBillsPagingSource", "分页开始加载: offset=" + params.getKey());
         try {
             int offset = params.getKey() != null ? params.getKey() : 0;
             int requested = params.getLoadSize();
-            
-            // 用户 ID 为空则返回空页
+
             if (userId == null || userId.isEmpty()) {
                 return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
             }
 
-            // Room 不允许在主线程执行查询。强制在后台线程执行数据库操作。
-            final List<Bill>[] fetchedWrapper = new List[1];
-            final Throwable[] errorWrapper = new Throwable[1];
+            final List<Bill>[] fetchedHolder = new List[1];
+            final Throwable[] errorHolder = new Throwable[1];
+            final int finalOffset = offset;
+            final int finalRequested = requested;
+            final Date endExclusive = new Date(monthEnd.getTime() + 1L);
 
-            Thread dbThread = new Thread(() -> {
+            Thread thread = new Thread(() -> {
                 try {
-                    fetchedWrapper[0] = repository.getBillsInTimeRangePaged(
-                            userId, monthStart, monthEnd, requested + 1, offset);
-                } catch (Throwable e) {
-                    errorWrapper[0] = e;
+                    fetchedHolder[0] = repository.getBillsInTimeRangePaged(
+                            userId, monthStart, endExclusive, finalRequested + 1, finalOffset);
+                } catch (Throwable t) {
+                    errorHolder[0] = t;
                 }
             });
-            dbThread.start();
-            dbThread.join();
+            thread.start();
+            thread.join();
 
-            if (errorWrapper[0] != null) throw errorWrapper[0];
-            List<Bill> fetched = fetchedWrapper[0];
+            if (errorHolder[0] != null) {
+                throw errorHolder[0];
+            }
+
+            List<Bill> fetched = fetchedHolder[0];
 
             if (fetched == null || fetched.isEmpty()) {
-                android.util.Log.d("HomeBillsPagingSource", "No bills found in range");
+                android.util.Log.d("HomeBillsPagingSource", "指定范围内未找到账单");
                 return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
             }
 
-            android.util.Log.d("HomeBillsPagingSource", "Fetched " + fetched.size() + " bills");
+            android.util.Log.d("HomeBillsPagingSource", "已查询到 " + fetched.size() + " 条账单");
+
+            while (fetched != null && fetched.size() > requested
+                    && isSameDay(fetched.get(requested - 1), fetched.get(fetched.size() - 1))) {
+                int nextLimit = Math.max(fetched.size() + requested, fetched.size() * 2);
+                final List<Bill>[] expandedHolder = new List[1];
+                final int finalNextLimit = nextLimit;
+                Thread expThread = new Thread(() -> {
+                    try {
+                        expandedHolder[0] = repository.getBillsInTimeRangePaged(
+                                userId, monthStart, endExclusive, finalNextLimit, finalOffset);
+                    } catch (Throwable ignored) {}
+                });
+                expThread.start();
+                expThread.join();
+
+                List<Bill> expanded = expandedHolder[0];
+                if (expanded == null || expanded.size() <= fetched.size()) break;
+                fetched = expanded;
+            }
+
+            if (fetched == null || fetched.isEmpty()) {
+                return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
+            }
 
             int consumed = Math.min(requested, fetched.size());
+            if (fetched.size() > requested && isSameDay(fetched.get(requested - 1), fetched.get(fetched.size() - 1))) {
+                consumed = fetched.size();
+            }
             List<Bill> pageBills = new ArrayList<>(fetched.subList(0, consumed));
 
-            final Map<String, Account> accountMap = new HashMap<>();
-            Thread accThread = new Thread(() -> {
-                List<Account> accounts = accountDao.getAllAccountsSyncExcludeDeleted();
-                if (accounts != null) {
-                    for (Account account : accounts) {
-                        accountMap.put(account.getObjectId(), account);
-                    }
-                }
-            });
-            accThread.start();
-            accThread.join();
+            Map<String, Account> map = getAccountMap();
 
             boolean hasMore = fetched.size() > consumed;
             Integer nextKey = hasMore ? offset + consumed : null;
-            
+
             return new PagingSource.LoadResult.Page<>(
-                    mapToFlatItems(pageBills, accountMap), 
-                    null, 
+                    mapToFlatItems(pageBills, map),
+                    null,
                     nextKey
             );
         } catch (Throwable throwable) {
-            android.util.Log.e("HomeBillsPagingSource", "Load error: " + throwable.getMessage(), throwable);
+            android.util.Log.e("HomeBillsPagingSource", "加载数据发生错误: " + throwable.getMessage(), throwable);
             return new PagingSource.LoadResult.Error<>(throwable);
         }
     }
@@ -127,21 +149,37 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
         return null;
     }
 
-    private List<Bill> getWholeDay(Date date) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(date);
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-        Date start = calendar.getTime();
-        calendar.add(Calendar.DAY_OF_MONTH, 1);
-        calendar.add(Calendar.MILLISECOND, -1);
-        return repository.getBillsInTimeRangeSync(userId, start, calendar.getTime());
+    private Map<String, Account> getAccountMap() {
+        Map<String, Account> cached = accountMap;
+        if (cached != null) return cached;
+        synchronized (this) {
+            if (accountMap == null) {
+                Map<String, Account> loaded = new HashMap<>();
+                final List<Account>[] accountsHolder = new List[1];
+                Thread thread = new Thread(() -> {
+                    try {
+                        accountsHolder[0] = accountDao.getAllAccountsSyncExcludeDeleted();
+                    } catch (Throwable ignored) {}
+                });
+                thread.start();
+                try {
+                    thread.join();
+                } catch (InterruptedException ignored) {}
+
+                List<Account> accounts = accountsHolder[0];
+                if (accounts != null) {
+                    for (Account account : accounts) {
+                        if (account.getObjectId() != null) loaded.put(account.getObjectId(), account);
+                        loaded.put("local:" + account.getId(), account);
+                    }
+                }
+                accountMap = loaded;
+            }
+            return accountMap;
+        }
     }
 
     private List<HomeBillUiModel> mapToFlatItems(List<Bill> bills, Map<String, Account> accountMap) {
-        android.util.Log.d("HomeBillsPagingSource", "Mapping " + bills.size() + " bills to flat items");
         List<HomeBillUiModel> items = new ArrayList<>();
         String activeDateKey = null;
         int headerIndex = -1;
@@ -150,14 +188,12 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
 
         for (int index = 0; index < bills.size(); index++) {
             Bill bill = bills.get(index);
+            if (bill == null) continue;
             Date billTime = bill.getBillTime();
-            if (billTime == null) {
-                continue;
-            }
+            if (billTime == null) continue;
 
             String dateKey = dateKeyFormat.format(billTime);
             if (!dateKey.equals(activeDateKey)) {
-                android.util.Log.d("HomeBillsPagingSource", "New date detected: " + dateKey);
                 finishHeader(items, headerIndex, expense, income);
                 Calendar calendar = Calendar.getInstance();
                 calendar.setTime(billTime);
@@ -180,12 +216,11 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
             items.add(HomeBillUiModel.item(buildBillUiModel(bill, accountMap), isLastInDay));
         }
         finishHeader(items, headerIndex, expense, income);
-        android.util.Log.d("HomeBillsPagingSource", "Mapped to " + items.size() + " flat items");
         return items;
     }
 
     private void finishHeader(List<HomeBillUiModel> items, int headerIndex, double expense, double income) {
-        if (headerIndex < 0) {
+        if (headerIndex < 0 || headerIndex >= items.size()) {
             return;
         }
         HomeBillUiModel oldHeader = items.get(headerIndex);
@@ -220,24 +255,31 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                     + "/" + R.drawable.ic_transference).toString();
         }
 
-        Account account = accountMap.get(bill.getAccountId());
-        Account toAccount = (billType == 2 || billType == 3) ? accountMap.get(bill.getToAccountId()) : null;
+        Account account = findAccount(accountMap, bill.getAccountId(), bill.getLocalAccountId());
+        Account toAccount = (billType == 2 || billType == 3)
+                ? findAccount(accountMap, bill.getToAccountId(), bill.getToLocalAccountId()) : null;
         return BillUiModel.builder()
                 .localId(bill.getId())
                 .objectId(bill.getObjectId())
-                .timeText(timeFormat.format(bill.getBillTime()))
-                .categoryName(bill.getCategoryName())
+                .timeText(bill.getBillTime() != null ? timeFormat.format(bill.getBillTime()) : "")
+                .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
                 .categoryIconUrl(categoryIcon)
                 .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
                 .amountText(amountPrefix + amountFormat.format(bill.getAmount()))
                 .amountColor(amountColor)
-                .accountName(account != null ? account.getName() : "")
-                .accountIconUrl(account != null ? account.getIconUrl() : "")
-                .toAccountName(toAccount != null ? toAccount.getName() : "")
+                .accountName(account != null && account.getName() != null ? account.getName() : "")
+                .accountIconUrl(account != null && account.getIconUrl() != null ? account.getIconUrl() : "")
+                .toAccountName(toAccount != null && toAccount.getName() != null ? toAccount.getName() : "")
                 .billType(billType)
-                .remarkText(bill.getRemark())
-                .imageUrls(bill.getImageUrls())
+                .remarkText(bill.getRemark() != null ? bill.getRemark() : "")
+                .imageUrls(bill.getImageUrls() != null ? bill.getImageUrls() : new ArrayList<>())
                 .originalBill(bill)
                 .build();
+    }
+
+    private Account findAccount(Map<String, Account> accounts, String cloudId, long localId) {
+        if (accounts == null) return null;
+        Account account = cloudId == null ? null : accounts.get(cloudId);
+        return account != null || localId <= 0 ? account : accounts.get("local:" + localId);
     }
 }

@@ -45,7 +45,7 @@ import com.example.my_project1.data.model.icon.DownloadRecord;
                 Wish.class, WishRecord.class,
                 SavingPlan.class, SavingRecord.class, DownloadRecord.class
         },
-        version = 40,
+        version = 41,
         exportSchema = true
 )
 
@@ -75,6 +75,13 @@ public abstract class AppDatabase extends RoomDatabase {
                     + "ON `budgets` (`owner_id`, `transaction_type`, `budget_type`, `year`, `month`, `target_type`)");
         }
     };
+    static final Migration MIGRATION_40_41 = new Migration(40, 41) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_bills_user_time_id_state` "
+                    + "ON `bills` (`user_id`, `billTime`, `id`, `sync_state`)");
+        }
+    };
 
     public abstract CategoryDao categoryDao();
     public abstract SubCategoryDao subCategoryDao();
@@ -97,7 +104,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "accounting_app_db"
                     )
-                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29)
+                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41)
                             .fallbackToDestructiveMigration() // 调试阶段允许重建数据库
                             .build();
                 }

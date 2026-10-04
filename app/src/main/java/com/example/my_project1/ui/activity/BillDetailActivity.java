@@ -196,50 +196,18 @@ public class BillDetailActivity extends AppCompatActivity {
      * 加载账单详情（支持本地ID和objectId双重查找）
      */
     private void loadBillDetail(String billObjectId, long billLocalId) {
-        billViewModel.getAllBills().removeObservers(this);
-
-        // 根据ID查询账单，只observe一次
-        billViewModel.getAllBills().observe(this, new androidx.lifecycle.Observer<List<Bill>>() {
+        // 按标识查询单条账单，避免详情页为了找一条记录加载用户全部账单。
+        billViewModel.getBillLive(billObjectId, billLocalId).observe(this, new androidx.lifecycle.Observer<Bill>() {
             @Override
-            public void onChanged(List<Bill> bills) {
-                if (bills != null && !bills.isEmpty()) {
-                    Bill foundBill = null;
-
-                    // 优先通过 objectId 查找（在线账单）
-                    if (billObjectId != null && !billObjectId.isEmpty()) {
-                        for (Bill bill : bills) {
-                            if (billObjectId.equals(bill.getObjectId())) {
-                                foundBill = bill;
-                                Log.d(TAG, "✅ 通过objectId找到账单: " + billObjectId);
-                                break;
-                            }
-                        }
-                    }
-
-                    // 如果通过 objectId 没找到，尝试通过本地ID查找（离线账单）
-                    if (foundBill == null && billLocalId != -1) {
-                        for (Bill bill : bills) {
-                            if (bill.getId() == billLocalId) {
-                                foundBill = bill;
-                                Log.d(TAG, "✅ 通过本地ID找到账单: " + billLocalId);
-                                break;
-                            }
-                        }
-                    }
-
-                    if (foundBill != null) {
-                        currentBill = foundBill;
-                        displayBillDetail(foundBill);
-                    } else {
-                        Log.e(TAG, "❌ 未找到账单 - objectId: " + billObjectId + ", localId: " + billLocalId);
-                        SnackbarUtils.showError(binding.getRoot(), "账单不存在");
-                        finish();
-                    }
-                } else {
-                    Log.w(TAG, "⚠️ 账单列表为空");
-                    SnackbarUtils.showError(binding.getRoot(), "账单数据为空");
-                    finish();
+            public void onChanged(Bill bill) {
+                if (bill != null) {
+                    currentBill = bill;
+                    displayBillDetail(bill);
+                    return;
                 }
+                Log.e(TAG, "未找到账单 - objectId: " + billObjectId + ", localId: " + billLocalId);
+                SnackbarUtils.showError(binding.getRoot(), "账单不存在");
+                finish();
             }
         });
     }

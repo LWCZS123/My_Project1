@@ -1,7 +1,6 @@
 package com.example.my_project1.ui.viewmodel.billvm;
 
 import android.app.Application;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -15,176 +14,155 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.Transformations;
 import androidx.paging.PagingData;
 
-import com.example.my_project1.R;
 import com.example.my_project1.data.dao.AccountDao;
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.bill.SearchSummary;
+import com.example.my_project1.data.model.calendar.DailyStat;
 import com.example.my_project1.data.model.common.ApiResponse;
+import com.example.my_project1.data.repository.account.AccountRepository;
 import com.example.my_project1.data.repository.bill.BillRepository;
 import com.example.my_project1.data.repository.user.UserProfileRepository;
-import com.example.my_project1.utils.ImageLoaderUtils;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.work.BillSyncWorker;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
-import java.lang.reflect.Type;
-import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
 
 /**
- * BillViewModel (优化版)
+ * 账单 ViewModel
  * -------------------------------------------------------
- * 1. 快照优先：构造时立即从 SP 恢复上一次的统计和账单，实现零等待。
- * 2. 保护机制：冷启动设置 500ms 保护期，防止数据闪烁。
- * 3. 静默刷新：后台默默更新数据，DiffUtil 平滑过渡。
+ * 职责：
+ * 1. 作为 UI 层与数据 Repository 层的桥梁，管理账单 CRUD 操作与云端同步。
+ * 2. 分页处理：首页通过 Paging 3 加载账单，保证高流畅度。
+ * 3. 统计计算剥离：Header 概览计算委托给 HeaderCalculator，通过 SQLite 聚合查询，避免一次性把整月账单加载到内存。
+ * 4. 映射与快照剥离：UI 转换委托给 BillUiModelMapper，快照持久化委托给 BillSnapshotManager。
+ * 5. 注释使用纯文字说明。
  */
 public class BillViewModel extends AndroidViewModel {
 
     private static final String TAG = "BillViewModel";
-    private static final String SP_NAME = "bill_snapshot";
-    private static final String KEY_HEADER_SNAPSHOT = "header_data";
-    private static final String KEY_BILL_ITEMS_SNAPSHOT = "bill_items";
-    private static final String KEY_CALENDAR_SNAPSHOT = "calendar_stats";
 
     // 分页常量
-    private static final int PAGE_SIZE        = 500;  // 每页条数
-    private static final long SNAPSHOT_PROTECT_MS = 500L; // 快照保护期
+    private static final int PAGE_SIZE = 50;
+    private static final long SNAPSHOT_PROTECT_MS = 500L;
 
-    // 后台计算线程
-    private final Handler mainHandler        = new Handler(Looper.getMainLooper());
-    private final Gson gson = new Gson();
+    // 辅助工具类
+    private final HeaderCalculator headerCalculator = new HeaderCalculator();
+    private final BillUiModelMapper uiModelMapper = new BillUiModelMapper();
+    private final BillSnapshotManager snapshotManager;
+    private final AppExecutors executors;
 
-    // 性能优化相关
-    private final Map<String, BillUiModel> billUiCache = new ConcurrentHashMap<>();
+    // 数据库与仓库
+    private final AccountDao accountDao;
+    private final AccountRepository accountRepository;
+    private final BillRepository repository;
+    private final UserProfileRepository userProfileRepository;
+
+    // 主线程 Handler
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    // 性能优化与缓存控制
     private volatile Map<String, List<Bill>> dailyBillsCache = Collections.emptyMap();
     private volatile boolean dailyBillsCacheReady = false;
-    private String lastHomeFingerprint = "";
-
-    private static final SimpleDateFormat DATE_KEY_FMT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-
     private volatile boolean isCleared = false;
 
     private final long viewModelStartTime;
     private boolean isSnapshotLoaded = false;
-    private final AccountDao accountDao;
-    private final com.example.my_project1.data.repository.account.AccountRepository accountRepository; 
-    private final BillRepository repository;
-    private final UserProfileRepository userProfileRepository;
-    private final com.example.my_project1.utils.AppExecutors executors;
 
-    // 用户
+    // 用户标识
     private String currentUserId;
     private String lastUserId;
 
-    // LiveData
-
-    /** 触发器：值变化时重新查询当月账单 */
+    // 触发器与 LiveData 依赖
     private final MutableLiveData<Long> _refreshTrigger = new MutableLiveData<>(System.currentTimeMillis());
-
-    /** 原始当月账单（Room → ViewModel 内部使用，不直接暴露给 UI，仅用于计算统计） */
-    private LiveData<List<Bill>> currentMonthBills;
-
-    /** 所有账户（用于联动刷新 UI 和 Header） */
     private LiveData<List<Account>> allAccountsLive;
+    private final LiveData<List<Bill>> allBills = new MutableLiveData<>();
+    private LiveData<List<com.example.my_project1.data.model.bill.DailyStat>> dailyStatsLive;
+    private LiveData<SearchSummary> billSummary;
 
-    /** 所有账单（用于统计 billCount / billDays） */
-    private LiveData<List<Bill>> allBills;
-
-    /** 首页分页数据流版本号，用于触发刷新 */
+    // 首页 Paging LiveData
     private final MutableLiveData<Integer> _pagerVersion = new MutableLiveData<>(0);
-
-    /** 首页分页数据流 */
     public final LiveData<PagingData<HomeBillUiModel>> homeBillPagingData;
-
     private volatile HomeBillsPagingSource homeBillsPagingSource;
 
-    /** 供 HeaderAdapter 使用的统计概览数据 */
-    private final MutableLiveData<HeaderUiModel> _headerData =
-            new MutableLiveData<>(
-                    new HeaderUiModel(
-                            "¥0.00", "¥0.00", "¥0.00", "¥0.00",
-                            "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00"
-                    )
-            );
-    public  final LiveData<HeaderUiModel>         headerData  = _headerData;
+    // Header 数据
+    private final MutableLiveData<HeaderUiModel> _headerData = new MutableLiveData<>(
+            new HeaderUiModel("¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00", "¥0.00")
+    );
+    public final LiveData<HeaderUiModel> headerData = _headerData;
 
-
-
-
-    /** 账单总数 */
+    // 统计数据
     private final MutableLiveData<Integer> _billCount = new MutableLiveData<>(0);
-    public  final LiveData<Integer>         billCount  = _billCount;
+    public final LiveData<Integer> billCount = _billCount;
 
-    /** 记账天数 */
     private final MutableLiveData<Integer> _billDays = new MutableLiveData<>(0);
-    public  final LiveData<Integer>         billDays  = _billDays;
+    public final LiveData<Integer> billDays = _billDays;
 
-    /** CRUD 操作状态 */
-    private final MutableLiveData<ApiResponse<String>> _operationState =
-            new MutableLiveData<>(ApiResponse.idle());
+    // 操作与同步状态
+    private final MutableLiveData<ApiResponse<String>> _operationState = new MutableLiveData<>(ApiResponse.idle());
     public final LiveData<ApiResponse<String>> operationState = _operationState;
 
-    /** 同步状态 */
-    private final MutableLiveData<ApiResponse<BillRepository.SyncResult>> _syncState =
-            new MutableLiveData<>(ApiResponse.idle());
+    private final MutableLiveData<ApiResponse<BillRepository.SyncResult>> _syncState = new MutableLiveData<>(ApiResponse.idle());
     public final LiveData<ApiResponse<BillRepository.SyncResult>> syncState = _syncState;
 
-    /** Toast 消息 */
     private final MutableLiveData<String> _toastMessage = new MutableLiveData<>();
     public final LiveData<String> toastMessage = _toastMessage;
 
-    /** 日历专用的每日统计映射 */
-    private final MutableLiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> _dailyStatsMap = new MutableLiveData<>(new HashMap<>());
-    public final LiveData<Map<String, com.example.my_project1.data.model.calendar.DailyStat>> dailyStatsMap = _dailyStatsMap;
+    // 日历专用的每日统计映射
+    private final MutableLiveData<Map<String, DailyStat>> _dailyStatsMap = new MutableLiveData<>(new HashMap<>());
+    public final LiveData<Map<String, DailyStat>> dailyStatsMap = _dailyStatsMap;
 
-    /** 选中日期的账单列表（取代全量分组映射） */
+    // 选中日期的账单列表
     private final MutableLiveData<Date> _selectedDate = new MutableLiveData<>(new Date());
     public LiveData<List<Bill>> selectedDateBills;
 
-    // 同步节流
-    private long    lastSyncTime        = 0;
+    // 同步节流与防抖控制
+    private long lastSyncTime = 0;
     private static final long SYNC_THROTTLE_MS = 5 * 60 * 1000L;
-    private boolean isSyncing           = false;
-    private boolean isFirstInit         = true;
+    private boolean isSyncing = false;
+    private boolean isFirstInit = true;
 
-    // 统计防抖
     private final Handler statsDebounceHandler = new Handler(Looper.getMainLooper());
     private static final long STATS_DEBOUNCE_MS = 2000L;
     private Runnable statsDebounceRunnable;
     private int lastSyncedCount = -1;
-    private int lastSyncedDays  = -1;
+    private int lastSyncedDays = -1;
 
-    // Observer 引用（防内存泄漏）
+    // Observer 引用管理，防止泄露
     private Observer<Integer> billCountObserver;
     private Observer<Integer> billDaysObserver;
-    private Observer<List<Bill>> monthBillsObserver;
     private Observer<List<Account>> accountsObserver;
-    private Observer<List<Bill>> allBillsObserver;
+    private Observer<Long> refreshTriggerObserver;
+    private Observer<List<com.example.my_project1.data.model.bill.DailyStat>> dailyStatsObserver;
+    private Observer<SearchSummary> billSummaryObserver;
 
-    // 构造
+    // 账户账单缓存映射
+    private final Map<String, List<Bill>> mAccountBillsCache = new ConcurrentHashMap<>();
+    private final Map<String, LiveData<List<Bill>>> mActiveAccountLiveDatas = new ConcurrentHashMap<>();
+
     public BillViewModel(@NonNull Application application) {
         super(application);
 
-        executors = com.example.my_project1.utils.AppExecutors.get();
-        AppDatabase db        = AppDatabase.getInstance(application);
-        accountDao            = db.accountDao();
-        accountRepository     = new com.example.my_project1.data.repository.account.AccountRepository(application);
-        repository            = new BillRepository(application);
+        executors = AppExecutors.get();
+        snapshotManager = new BillSnapshotManager(application);
+
+        AppDatabase db = AppDatabase.getInstance(application);
+        accountDao = db.accountDao();
+        accountRepository = new AccountRepository(application);
+        repository = new BillRepository(application);
         userProfileRepository = UserProfileRepository.getInstance(application);
 
         viewModelStartTime = System.currentTimeMillis();
@@ -192,35 +170,42 @@ public class BillViewModel extends AndroidViewModel {
         BmobUser user = BmobUser.getCurrentUser();
         if (user != null) {
             currentUserId = user.getObjectId();
-            lastUserId    = currentUserId;
+            lastUserId = currentUserId;
         }
 
-        // 首页使用 Paging3 按需加载，避免一次性读取整个账单集合
+        // 1. 加载本地快照数据，实现页面零等待展示
         loadSnapshot();
 
+        // 2. 绑定选中日期的账单 LiveData
         selectedDateBills = Transformations.switchMap(_selectedDate, date -> {
-            if (date == null || currentUserId == null) return new MutableLiveData<>(new ArrayList<>());
+            if (date == null || currentUserId == null) {
+                return new MutableLiveData<>(new ArrayList<>());
+            }
             Calendar cal = Calendar.getInstance();
             cal.setTime(date);
-            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);      cal.set(Calendar.MILLISECOND, 0);
             Date start = cal.getTime();
-            cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999);
+
+            cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59);
+            cal.set(Calendar.SECOND, 59);      cal.set(Calendar.MILLISECOND, 999);
             Date end = cal.getTime();
             return repository.getBillsInTimeRange(currentUserId, start, end);
         });
 
+        // 3. 初始化全局 LiveData
         initializeLiveData();
 
-        // 首页使用 Paging3 按需加载
+        // 4. 构建首页 Paging3 分页数据流
         homeBillPagingData = Transformations.switchMap(_pagerVersion, version -> {
-            Log.d(TAG, "Creating new Pager for version: " + version);
+            Log.d(TAG, "创建新的 Pager 版本: " + version);
             if (currentUserId == null) {
                 return new MutableLiveData<>(PagingData.from(new ArrayList<>()));
             }
 
-            Date[] range = getCurrentMonthRange();
+            Date[] range = headerCalculator.getCurrentMonthRange();
             androidx.paging.Pager<Integer, HomeBillUiModel> pager = new androidx.paging.Pager<>(
-                    new androidx.paging.PagingConfig(PAGE_SIZE, 5, false),
+                    new androidx.paging.PagingConfig(PAGE_SIZE, 10, false, PAGE_SIZE, PAGE_SIZE * 3),
                     () -> {
                         homeBillsPagingSource = new HomeBillsPagingSource(
                                 getApplication(),
@@ -238,136 +223,140 @@ public class BillViewModel extends AndroidViewModel {
             return androidx.paging.PagingLiveData.cachedIn(pagedLiveData, androidx.lifecycle.ViewModelKt.getViewModelScope(this));
         });
 
+        // 5. 监听统计与 Header 变更
         observeAllBillsForStats();
         observeStatsForSync();
-        observeMonthBillsForHeaderUpdate();
+        observeHeaderDataUpdate();
     }
 
     /**
-     * 快照优先：从 SharedPreferences 恢复数据
+     * 加载本地快照
      */
     private void loadSnapshot() {
-        android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
-
-        String headerJson = sp.getString(snapshotKey(KEY_HEADER_SNAPSHOT),
-                sp.getString(KEY_HEADER_SNAPSHOT, null));
-        String calendarJson = sp.getString(snapshotKey(KEY_CALENDAR_SNAPSHOT),
-                sp.getString(KEY_CALENDAR_SNAPSHOT, null));
-        String billItemsJson = sp.getString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT),
-                sp.getString(KEY_BILL_ITEMS_SNAPSHOT, null));
-
-        if (headerJson != null) {
-            HeaderUiModel header = gson.fromJson(headerJson, HeaderUiModel.class);
+        HeaderUiModel header = snapshotManager.loadHeaderSnapshot(currentUserId);
+        if (header != null) {
             _headerData.setValue(header);
         }
 
-        if (calendarJson != null) {
-            Type type = new TypeToken<Map<String, com.example.my_project1.data.model.calendar.DailyStat>>(){}.getType();
-            Map<String, com.example.my_project1.data.model.calendar.DailyStat> stats = gson.fromJson(calendarJson, type);
-            _dailyStatsMap.setValue(stats);
+        Map<String, DailyStat> calendarStats = snapshotManager.loadCalendarSnapshot(currentUserId);
+        if (calendarStats != null) {
+            _dailyStatsMap.setValue(calendarStats);
         }
 
-        if (billItemsJson != null) {
-            Type type = new TypeToken<List<HomeBillUiModel>>(){}.getType();
-            List<HomeBillUiModel> billItems = gson.fromJson(billItemsJson, type);
-            if (billItems != null) {
-                ImageLoaderUtils.preloadHomeBillCategoryIcons(getApplication(), collectCategoryIconUrls(billItems));
-            }
-        }
-
+        snapshotManager.preloadSnapshotIcons(currentUserId);
         isSnapshotLoaded = true;
-        Log.d(TAG, "快照加载完成");
     }
 
     /**
-     * 保存快照：包含统计数据和日历统计
+     * 保存快照
      */
-    private String snapshotKey(String baseKey) {
-        return snapshotKey(baseKey, currentUserId);
-    }
-
-    private String snapshotKey(String baseKey, String userId) {
-        return userId == null ? baseKey : baseKey + "_" + userId;
-    }
-
-    private void saveSnapshot(HeaderUiModel header, Map<String, com.example.my_project1.data.model.calendar.DailyStat> calendarStats,
-                              List<HomeBillUiModel> billItems) {
+    private void saveSnapshot(HeaderUiModel header) {
         if (isCleared) return;
-        String snapshotUserId = currentUserId;
-        executors.diskIO().execute(() -> {
-            if (isCleared) return;
-            android.content.SharedPreferences sp = getApplication().getSharedPreferences(SP_NAME, android.content.Context.MODE_PRIVATE);
-
-            sp.edit()
-                .putString(snapshotKey(KEY_HEADER_SNAPSHOT, snapshotUserId), gson.toJson(header))
-                .putString(snapshotKey(KEY_CALENDAR_SNAPSHOT, snapshotUserId), gson.toJson(calendarStats))
-                .putString(snapshotKey(KEY_BILL_ITEMS_SNAPSHOT, snapshotUserId), gson.toJson(billItems))
-                .apply();
-            Log.d(TAG, "快照已持久化");
-        });
+        snapshotManager.saveSnapshot(currentUserId, header, _dailyStatsMap.getValue(), new ArrayList<>(), executors);
     }
 
+    /**
+     * LiveData 数据源初始化
+     */
+    private void initializeLiveData() {
+        if (currentUserId != null) {
+            allAccountsLive = accountDao.getAllAccountsLive();
+            billSummary = repository.getUserBillSummary(currentUserId);
+            dailyStatsLive = repository.getUserDailyStats(currentUserId);
+        } else {
+            allAccountsLive = new MutableLiveData<>(new ArrayList<>());
+            billSummary = new MutableLiveData<>();
+            dailyStatsLive = new MutableLiveData<>(new ArrayList<>());
+        }
+    }
 
+    /**
+     * 监听每日统计与全量聚合数据变化
+     */
     private void observeAllBillsForStats() {
-        if (allBillsObserver != null && allBills != null) {
-            allBills.removeObserver(allBillsObserver);
+        if (dailyStatsObserver != null && dailyStatsLive != null) {
+            dailyStatsLive.removeObserver(dailyStatsObserver);
         }
 
-        allBillsObserver = bills -> {
-            if (bills == null || isCleared) return;
+        dailyStatsObserver = rows -> {
+            if (rows == null || isCleared) return;
+            Map<String, DailyStat> statsMap = new HashMap<>();
+            for (com.example.my_project1.data.model.bill.DailyStat row : rows) {
+                if (row.day == null) continue;
+                // 修复参数顺序：收入、支出、账单数
+                statsMap.put(row.day, new DailyStat(row.incomeTotal, row.expenseTotal, row.billCount));
+            }
+            dailyBillsCache = Collections.emptyMap();
+            dailyBillsCacheReady = false;
+            _dailyStatsMap.setValue(statsMap);
+        };
+        if (dailyStatsLive != null) dailyStatsLive.observeForever(dailyStatsObserver);
+
+        if (billSummaryObserver != null && billSummary != null) {
+            billSummary.removeObserver(billSummaryObserver);
+        }
+        billSummaryObserver = summary -> {
+            if (summary == null || isCleared) return;
+            _billCount.setValue(summary.getBillCount());
+            _billDays.setValue(summary.getBillDays());
+        };
+        if (billSummary != null) billSummary.observeForever(billSummaryObserver);
+    }
+
+    /**
+     * 核心优化：更新 Header 概览统计数据
+     * 说明：不再加载当月全部账单列表，而是通过 SQLite 聚合函数直接查询统计结果。
+     */
+    private void observeHeaderDataUpdate() {
+        if (refreshTriggerObserver != null) {
+            _refreshTrigger.removeObserver(refreshTriggerObserver);
+        }
+        if (accountsObserver != null && allAccountsLive != null) {
+            allAccountsLive.removeObserver(accountsObserver);
+        }
+
+        Runnable updateAction = () -> {
+            if (isCleared || currentUserId == null) return;
 
             executors.computation().execute(() -> {
                 if (isCleared) return;
 
-                int count = computeBillCount(bills);
-                int days  = computeBillDays(bills);
+                List<Account> accounts = allAccountsLive.getValue();
+                SearchSummary totalSum = repository.getUserBillSummarySync(currentUserId);
+                Date[] monthRange = headerCalculator.getCurrentMonthRange();
+                SearchSummary monthSum = repository.getBillSummaryInRangeSync(currentUserId, monthRange[0], monthRange[1]);
 
-                Map<String, com.example.my_project1.data.model.calendar.DailyStat> statsMap = new HashMap<>();
-                Map<String, List<Bill>> billsByDate = new HashMap<>();
-
-                for (Bill b : bills) {
-                    if (b.getBillTime() == null) continue;
-                    String key = DATE_KEY_FMT.format(b.getBillTime());
-
-                    List<Bill> dailyBills = billsByDate.get(key);
-                    if (dailyBills == null) {
-                        dailyBills = new ArrayList<>();
-                        billsByDate.put(key, dailyBills);
-                    }
-                    dailyBills.add(b);
-
-                    com.example.my_project1.data.model.calendar.DailyStat stat = statsMap.get(key);
-                    if (stat == null) {
-                        stat = new com.example.my_project1.data.model.calendar.DailyStat(0, 0, 0);
-                        statsMap.put(key, stat);
-                    }
-                    stat.count++;
-                    if (b.getType() == 1) stat.income += b.getAmount();
-                    else if (b.getType() == 0) stat.expense += b.getAmount();
+                // 检查数据指纹，避免重复刷新
+                if (headerCalculator.isHeaderDataUnchanged(accounts, totalSum, monthSum)) {
+                    return;
                 }
 
-                Map<String, List<Bill>> immutableCache = new HashMap<>(billsByDate.size());
-                for (Map.Entry<String, List<Bill>> entry : billsByDate.entrySet()) {
-                    immutableCache.put(entry.getKey(),
-                            Collections.unmodifiableList(new ArrayList<>(entry.getValue())));
-                }
-                dailyBillsCache = Collections.unmodifiableMap(immutableCache);
-                dailyBillsCacheReady = true;
+                HeaderUiModel header = headerCalculator.calculateHeader(currentUserId, repository, accounts);
 
-                mainHandler.post(() -> {
-                    _billCount.setValue(count);
-                    _billDays.setValue(days);
-                    _dailyStatsMap.setValue(statsMap);
-                });
+                long elapsed = System.currentTimeMillis() - viewModelStartTime;
+                long delay = isSnapshotLoaded ? Math.max(0, SNAPSHOT_PROTECT_MS - elapsed) : 0;
+
+                mainHandler.postDelayed(() -> {
+                    if (isCleared) return;
+                    _headerData.setValue(header);
+                    saveSnapshot(header);
+                    isSnapshotLoaded = false;
+                }, delay);
             });
         };
 
-        if (allBills != null) {
-            allBills.observeForever(allBillsObserver);
+        refreshTriggerObserver = trigger -> updateAction.run();
+        accountsObserver = accounts -> updateAction.run();
+
+        _refreshTrigger.observeForever(refreshTriggerObserver);
+        if (allAccountsLive != null) {
+            allAccountsLive.observeForever(accountsObserver);
         }
     }
 
-    /** Returns null until the initial Room snapshot has populated the cache. */
+    /**
+     * 获取缓存中某天的账单列表
+     */
     @Nullable
     public List<Bill> getCachedBillsForDate(int year, int month, int day) {
         if (!dailyBillsCacheReady) return null;
@@ -375,6 +364,9 @@ public class BillViewModel extends AndroidViewModel {
         return bills == null ? Collections.emptyList() : bills;
     }
 
+    /**
+     * 获取指定日期的账单列表 LiveData
+     */
     public LiveData<List<Bill>> getBillsForDate(int year, int month, int day) {
         if (currentUserId == null) {
             return new MutableLiveData<>(Collections.emptyList());
@@ -392,6 +384,9 @@ public class BillViewModel extends AndroidViewModel {
         return String.format(Locale.US, "%04d-%02d-%02d", year, month, day);
     }
 
+    /**
+     * 设置当前选中的日期
+     */
     public void setSelectedDate(int year, int month, int day) {
         Date current = _selectedDate.getValue();
         if (current != null) {
@@ -408,23 +403,13 @@ public class BillViewModel extends AndroidViewModel {
         _selectedDate.setValue(cal.getTime());
     }
 
-    // LiveData 初始化
-    private void initializeLiveData() {
-        if (currentUserId != null) {
-            currentMonthBills = Transformations.switchMap(_refreshTrigger, trigger -> {
-                Date[] range = getCurrentMonthRange();
-                Log.d(TAG, "查询当月账单: " + formatDate(range[0]) + " ~ " + formatDate(range[1]));
-                return repository.getBillsInTimeRange(currentUserId, range[0], range[1]);
-            });
-            allAccountsLive = accountDao.getAllAccountsLive();
-            allBills = repository.getAllBillsByUser(currentUserId);
-        } else {
-            currentMonthBills = new MutableLiveData<>();
-            allAccountsLive = new MutableLiveData<>();
-            allBills          = new MutableLiveData<>();
-        }
+    /**
+     * 重建首页 Paging 数据源
+     */
+    public void rebuildHomeBillsPager() {
+        Integer current = _pagerVersion.getValue();
+        _pagerVersion.setValue(current == null ? 1 : current + 1);
     }
-
 
     private void invalidateHomeBillsPaging() {
         HomeBillsPagingSource source = homeBillsPagingSource;
@@ -434,278 +419,31 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     /**
-     * 快速判断首页数据指纹是否变化
-     * -------------------------------------------------------
-     * 数据对比优化：通过累加所有账单的更新时间戳来生成更可靠的指纹。
+     * 判断首页数据是否保持未变
      */
     public boolean isHomeDataUnchanged(List<Bill> bills, List<Account> accounts) {
         if (bills == null) return false;
 
-        StringBuilder sb = new StringBuilder();
-        sb.append(bills.size()).append("_");
+        SearchSummary totalSum = repository.getUserBillSummarySync(currentUserId);
+        Date[] monthRange = headerCalculator.getCurrentMonthRange();
+        SearchSummary monthSum = repository.getBillSummaryInRangeSync(currentUserId, monthRange[0], monthRange[1]);
 
-        // 核心改进：累加所有账单的 ID 和更新时间，确保中间项修改也能被感知
-        long billChecksum = 0;
-        for (Bill b : bills) {
-            billChecksum += b.getId();
-            if (b.getUpdatedAt() != null) {
-                billChecksum += b.getUpdatedAt().getTime();
-            }
-        }
-        sb.append(billChecksum).append("_");
-
-        // 加入账户指纹 (比对所有账户的余额变化)
-        if (accounts != null) {
-            sb.append(accounts.size()).append("_");
-            for (Account acc : accounts) {
-                sb.append(acc.getObjectId()).append(acc.getName()).append(acc.getIconUrl())
-                        .append(acc.getBalance()).append(acc.getSyncState()).append(",");
-            }
-        }
-
-        String newFingerprint = sb.toString();
-        if (newFingerprint.equals(lastHomeFingerprint)) {
-            return true;
-        }
-        lastHomeFingerprint = newFingerprint;
-        return false;
+        return headerCalculator.isHeaderDataUnchanged(accounts, totalSum, monthSum);
     }
 
     /**
-     * 核心优化：联动观察账单与账户以更新 Header 统计
-     * 首页账单列表现在由 Paging 3 自动接管，此处仅负责 Header 统计和快照保存。
+     * 将账单列表转换为 UI 展示模型（委托给 BillUiModelMapper）
      */
-    private void observeMonthBillsForHeaderUpdate() {
-        if (monthBillsObserver != null && currentMonthBills != null) {
-            currentMonthBills.removeObserver(monthBillsObserver);
-        }
-        if (accountsObserver != null && allAccountsLive != null) {
-            allAccountsLive.removeObserver(accountsObserver);
-        }
-
-        Runnable updateAction = () -> {
-            if (isCleared) return;
-            List<Bill> bills = currentMonthBills.getValue();
-            List<Account> accounts = allAccountsLive.getValue();
-
-            if (bills == null) return;
-
-            // 指纹对比属于 CPU 密集型操作，放到后台线程执行，避免阻塞主线程
-            executors.computation().execute(() -> {
-                if (isCleared) return;
-                
-                // 此处复用指纹逻辑来判断 Header 是否需要更新
-                if (isHomeDataUnchanged(bills, accounts)) {
-                    return;
-                }
-
-                HeaderUiModel header = buildHeaderUiModel(bills, accounts);
-
-                long elapsed = System.currentTimeMillis() - viewModelStartTime;
-                long delay = isSnapshotLoaded ? Math.max(0, SNAPSHOT_PROTECT_MS - elapsed) : 0;
-
-                mainHandler.postDelayed(() -> {
-                    _headerData.setValue(header);
-                    
-                    // 注意：因为列表是 Paging3 动态加载的，快照只保存 Header
-                    saveSnapshot(header, _dailyStatsMap.getValue(), new ArrayList<>());
-                    isSnapshotLoaded = false;
-                }, delay);
-            });
-        };
-
-        monthBillsObserver = bills -> updateAction.run();
-        accountsObserver = accounts -> updateAction.run();
-
-        if (currentMonthBills != null) {
-            currentMonthBills.observeForever(monthBillsObserver);
-        }
-        if (allAccountsLive != null) {
-            allAccountsLive.observeForever(accountsObserver);
-        }
-    }
-
-    public void rebuildHomeBillsPager() {
-        Integer current = _pagerVersion.getValue();
-        _pagerVersion.setValue(current == null ? 1 : current + 1);
-    }
-
-    //  UiModel 映射 (单层列表版) - 优化版
-    // ════════════════════════════════════════════════════
     public List<BillUiModel> mapBillsToUiModels(List<Bill> bills) {
-        if (bills == null || bills.isEmpty()) return new ArrayList<>();
-
-        DecimalFormat amountFormatter = new DecimalFormat("#,##0.00");
-        SimpleDateFormat timeFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
-
-        List<Account> accounts = allAccountsLive.getValue();
-        Map<String, Account> accountMap = new HashMap<>();
-        if (accounts != null) {
-            for (Account acc : accounts) {
-                accountMap.put(acc.getObjectId(), acc);
-            }
-        }
-
-        List<BillUiModel> uiModels = new ArrayList<>(bills.size());
-
-        for (Bill bill : bills) {
-            // 唯一标识符：ID + 更新时间
-            String cacheKey = "B_" + bill.getId() + "_" + (bill.getUpdatedAt() != null ? bill.getUpdatedAt().getTime() : 0);
-            BillUiModel cached = billUiCache.get(cacheKey);
-            if (cached != null) {
-                uiModels.add(cached);
-                continue;
-            }
-
-            int billType = bill.getType();
-            String prefix = "";
-            int amountColor;
-            String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
-
-            if (billType == 0) {
-                prefix = "- ¥";
-                amountColor = getApplication().getColor(R.color.red);
-            } else if (billType == 1) {
-                prefix = "+ ¥";
-                amountColor = getApplication().getColor(R.color.green);
-            } else {
-                prefix = "¥";
-                amountColor = getApplication().getColor(R.color.orange_500);
-                Uri uri = Uri.parse("android.resource://" + getApplication().getPackageName() + "/" + R.drawable.ic_transference);
-                categoryIcon = uri.toString();
-            }
-
-            String amountText = prefix + amountFormatter.format(bill.getAmount());
-
-            Account account = accountMap.get(bill.getAccountId());
-            Account toAccount = (billType == 2 || billType == 3) ? accountMap.get(bill.getToAccountId()) : null;
-
-            BillUiModel newModel = BillUiModel.builder()
-                    .localId(bill.getId())
-                    .objectId(bill.getObjectId())
-                    .timeText(timeFormatter.format(bill.getBillTime()))
-                    .categoryName(bill.getCategoryName() != null ? bill.getCategoryName() : "")
-                    .categoryIconUrl(categoryIcon)
-                    .categoryIconBackgroundColor(bill.getCategoryIconBackgroundColor())
-                    .amountText(amountText)
-                    .amountColor(amountColor)
-                    .accountName(account != null ? account.getName() : "")
-                    .accountIconUrl(account != null ? account.getIconUrl() : "")
-                    .toAccountName(toAccount != null ? toAccount.getName() : "")
-                    .billType(billType)
-                    .remarkText(bill.getRemark())
-                    .imageUrls(bill.getImageUrls())
-                    .originalBill(bill) // 设置原始对象，方便编辑回传
-                    .build();
-
-            billUiCache.put(cacheKey, newModel);
-            uiModels.add(newModel);
-        }
-        return uiModels;
+        List<Account> accounts = allAccountsLive != null ? allAccountsLive.getValue() : null;
+        return uiModelMapper.mapBillsToUiModels(getApplication(), bills, accounts);
     }
-
-    // ════════════════════════════════════════════════════
-    //  UiModel 映射 (聚合版)
-    // ════════════════════════════════════════════════════
-
 
     /**
-     * 构建页眉统计数据。
-     * 优化：传入已获取的账户列表，避免重复查询数据库。
+     * 下拉刷新数据
      */
-    private HeaderUiModel buildHeaderUiModel(List<Bill> monthBills, List<Account> accounts) {
-        double monthlyExpense = 0, monthlyIncome = 0;
-        double todayChange = 0;
-
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String todayKey = fmt.format(new Date());
-
-        if (monthBills != null) {
-            for (Bill b : monthBills) {
-                if (b.getType() == 0) monthlyExpense += b.getAmount();
-                else if (b.getType() == 1) monthlyIncome += b.getAmount();
-
-                // 计算今日变化
-                if (b.getBillTime() != null && todayKey.equals(fmt.format(b.getBillTime()))) {
-                    if (b.getType() == 0) todayChange -= b.getAmount();
-                    else if (b.getType() == 1) todayChange += b.getAmount();
-                }
-            }
-        }
-
-        // 计算总资产和负债 (从传入的账户列表获取)
-        double assets = 0, liabilities = 0;
-        if (accounts != null) {
-            for (Account acc : accounts) {
-                // 排除标记删除的账户
-                if (acc.getSyncState() == com.example.my_project1.data.model.SyncState.TO_DELETE) continue;
-
-                if (acc.isCredit()) {
-                    liabilities += acc.getBalance();
-                } else {
-                    assets += acc.getBalance();
-                }
-            }
-        }
-
-        // 计算总收入和总支出 (从所有账单获取) 以及周结余
-        double totalExpense = 0, totalIncome = 0;
-        double weeklyExpense = 0, weeklyIncome = 0;
-
-        Date[] weekRange = getCurrentWeekRange();
-
-        List<Bill> allBillsList = repository.getAllBillsByUserSync(currentUserId);
-        if (allBillsList != null) {
-            for (Bill b : allBillsList) {
-                double amt = b.getAmount();
-                if (b.getType() == 0) {
-                    totalExpense += amt;
-                    if (b.getBillTime() != null && b.getBillTime().after(weekRange[0]) && b.getBillTime().before(weekRange[1])) {
-                        weeklyExpense += amt;
-                    }
-                } else if (b.getType() == 1) {
-                    totalIncome += amt;
-                    if (b.getBillTime() != null && b.getBillTime().after(weekRange[0]) && b.getBillTime().before(weekRange[1])) {
-                        weeklyIncome += amt;
-                    }
-                }
-            }
-        }
-
-        DecimalFormat df = new DecimalFormat("#,##0.00");
-        String changePrefix = todayChange >= 0 ? "+ ¥" : "- ¥";
-
-        return new HeaderUiModel(
-                "¥" + df.format(assets - liabilities),
-                changePrefix + df.format(Math.abs(todayChange)),
-                "¥" + df.format(assets),
-                "¥" + df.format(liabilities),
-                "¥" + df.format(monthlyIncome),
-                "¥" + df.format(totalIncome),
-                "¥" + df.format(monthlyExpense),
-                "¥" + df.format(totalExpense),
-                "¥" + df.format(weeklyIncome - weeklyExpense)
-        );
-    }
-
-    private Date[] getCurrentWeekRange() {
-        Calendar c = Calendar.getInstance();
-        c.setFirstDayOfWeek(Calendar.MONDAY);
-        c.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
-        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0);
-        c.set(Calendar.SECOND, 0);      c.set(Calendar.MILLISECOND, 0);
-        Date start = c.getTime();
-
-        c.add(Calendar.DAY_OF_WEEK, 6);
-        c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59);
-        c.set(Calendar.SECOND, 59);      c.set(Calendar.MILLISECOND, 999);
-        return new Date[]{start, c.getTime()};
-    }
-
-    /** 下拉刷新先同步云端增量，再重建首页分页数据。 */
     public void refresh() {
         Log.d(TAG, "开始下拉刷新...");
-
         if (currentUserId != null) {
             forceSyncFromCloud();
         } else {
@@ -713,30 +451,26 @@ public class BillViewModel extends AndroidViewModel {
         }
     }
 
-    private List<String> collectCategoryIconUrls(List<HomeBillUiModel> items) {
-        Set<String> urls = new java.util.LinkedHashSet<>();
-        if (items == null) return new ArrayList<>();
-        for (HomeBillUiModel item : items) {
-            if (item != null && item.billItem != null && item.billItem.categoryIconUrl != null) {
-                urls.add(item.billItem.categoryIconUrl);
-                if (urls.size() == 12) break;
-            }
-        }
-        return new ArrayList<>(urls);
+    /**
+     * 兼容旧调用方
+     */
+    public LiveData<List<Bill>> getAllBills() {
+        return allBills;
     }
 
-    /** 兼容旧代码：返回所有账单列表 */
-    public LiveData<List<Bill>> getAllBills()   { return allBills; }
+    public LiveData<Bill> getBillLive(String objectId, long localId) {
+        if (currentUserId == null) return new MutableLiveData<>();
+        return repository.getBillLive(currentUserId, objectId, localId);
+    }
 
-    public LiveData<List<Account>> getAllAccountsLive() { return allAccountsLive; }
+    public LiveData<List<Account>> getAllAccountsLive() {
+        return allAccountsLive;
+    }
 
     public LiveData<List<Bill>> getBillsInTimeRange(Date start, Date end) {
         if (currentUserId == null) return new MutableLiveData<>();
         return repository.getBillsInTimeRange(currentUserId, start, end);
     }
-
-    private final Map<String, List<Bill>> mAccountBillsCache = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Map<String, LiveData<List<Bill>>> mActiveAccountLiveDatas = new java.util.concurrent.ConcurrentHashMap<>();
 
     public LiveData<List<Bill>> getBillsByAccount(String accountId) {
         return getBillsByAccount(accountId, -1);
@@ -745,27 +479,23 @@ public class BillViewModel extends AndroidViewModel {
     public LiveData<List<Bill>> getBillsByAccount(String accountId, long localAccountId) {
         final String cacheKey = (accountId != null ? accountId : "") + "_" + localAccountId;
 
-        // 1. 如果已有活跃的 LiveData，直接返回 (避免重复创建 Room 查询)
         if (mActiveAccountLiveDatas.containsKey(cacheKey)) {
             return mActiveAccountLiveDatas.get(cacheKey);
         }
 
         MediatorLiveData<List<Bill>> result = new MediatorLiveData<>();
 
-        // 2. 尝试从内存缓存获取并立即返回 (瞬间展示)
         List<Bill> cached = mAccountBillsCache.get(cacheKey);
         if (cached != null) {
             result.setValue(new ArrayList<>(cached));
         }
 
-        // 3. 观察数据库 LiveData (后台刷新)
         if (currentUserId != null) {
             LiveData<List<Bill>> dbLive = repository.getBillsByAccount(currentUserId, accountId, localAccountId);
             result.addSource(dbLive, bills -> {
                 if (bills != null) {
                     List<Bill> oldBills = mAccountBillsCache.get(cacheKey);
-                    if (oldBills != null && oldBills.equals(bills)) {
-                        // 内容完全一致，跳过更新，防止 UI 闪烁
+                    if (Objects.equals(oldBills, bills)) {
                         return;
                     }
                     mAccountBillsCache.put(cacheKey, new ArrayList<>(bills));
@@ -779,21 +509,16 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     /**
-     * 刷新首页数据。统计依赖 Room LiveData，列表依赖自定义 PagingSource，
-     * 因此两者分别触发，并保证调用线程不会影响 LiveData 的安全性。
+     * 刷新首页数据与通知触发器
      */
     public void refreshData() {
         Runnable refreshAction = () -> {
             if (isCleared) return;
-
-            // Room LiveData 会自动刷新统计数据；分页数据使用新的 Pager 代际，
-            // 这样即使旧 PagingSource 尚未创建，也不会丢失本次刷新请求。
             _refreshTrigger.setValue(System.currentTimeMillis());
             rebuildHomeBillsPager();
             invalidateHomeBillsPaging();
         };
 
-        // 所有 LiveData 写操作统一切回主线程，避免后台回调触发线程异常。
         if (Looper.myLooper() == Looper.getMainLooper()) {
             refreshAction.run();
         } else {
@@ -811,14 +536,15 @@ public class BillViewModel extends AndroidViewModel {
 
     public void insertBill(Bill bill) {
         if (currentUserId == null) { _toastMessage.setValue("请先登录"); return; }
-        if (bill == null)           { _toastMessage.setValue("账单数据为空"); return; }
+        if (bill == null) { _toastMessage.setValue("账单数据为空"); return; }
         bill.setUserId(currentUserId);
         _operationState.setValue(ApiResponse.loading("正在添加..."));
         repository.insertBill(bill, r -> {
             if (r.isSuccess()) {
                 _operationState.setValue(ApiResponse.success(r.message));
                 _toastMessage.setValue(r.message);
-                refreshData(); triggerBackgroundSync();
+                refreshData();
+                triggerBackgroundSync();
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("添加失败: " + r.message);
@@ -893,11 +619,10 @@ public class BillViewModel extends AndroidViewModel {
             _toastMessage.setValue("请先登录");
             return;
         }
-        // 兼容旧数据中 userId 为空的账单，同时阻止跨用户修改。
         if (bill.getUserId() == null) {
             bill.setUserId(currentUserId);
         }
-        if (!currentUserId.equals(bill.getUserId())) {
+        if (!Objects.equals(currentUserId, bill.getUserId())) {
             _toastMessage.setValue("账单所属用户无效");
             return;
         }
@@ -906,7 +631,8 @@ public class BillViewModel extends AndroidViewModel {
             if (r.isSuccess()) {
                 _operationState.setValue(ApiResponse.success(r.message));
                 _toastMessage.setValue(r.message);
-                refreshData(); triggerBackgroundSync();
+                refreshData();
+                triggerBackgroundSync();
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("更新失败: " + r.message);
@@ -916,12 +642,18 @@ public class BillViewModel extends AndroidViewModel {
 
     public void deleteBill(Bill bill) {
         if (bill == null) { _toastMessage.setValue("账单数据为空"); return; }
+        if (currentUserId == null) { _toastMessage.setValue("请先登录"); return; }
+        if (bill.getUserId() != null && !Objects.equals(currentUserId, bill.getUserId())) {
+            _toastMessage.setValue("账单所属用户无效");
+            return;
+        }
         _operationState.setValue(ApiResponse.loading("正在删除..."));
         repository.deleteBill(bill, r -> {
             if (r.isSuccess()) {
                 _operationState.setValue(ApiResponse.success(r.message));
                 _toastMessage.setValue(r.message);
-                refreshData(); triggerBackgroundSync();
+                refreshData();
+                triggerBackgroundSync();
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("删除失败: " + r.message);
@@ -929,10 +661,12 @@ public class BillViewModel extends AndroidViewModel {
         });
     }
 
-    // 同步
     private void triggerBackgroundSync() {
-        try { BillSyncWorker.enqueue(getApplication()); }
-        catch (Exception e) { Log.e(TAG, "触发同步失败", e); }
+        try {
+            BillSyncWorker.enqueue(getApplication());
+        } catch (Exception e) {
+            Log.e(TAG, "触发同步失败", e);
+        }
     }
 
     public void smartSyncFromCloud() {
@@ -955,11 +689,10 @@ public class BillViewModel extends AndroidViewModel {
             return;
         }
 
-        isSyncing     = true;
-        lastSyncTime  = System.currentTimeMillis();
+        isSyncing = true;
+        lastSyncTime = System.currentTimeMillis();
         _syncState.setValue(ApiResponse.loading("正在同步..."));
 
-        // 联动同步：先同步账户，再同步账单
         accountRepository.syncFromAccountGroupCloud((success, message) -> {
             if (!success) {
                 Log.w(TAG, "账户同步失败: " + message);
@@ -970,26 +703,19 @@ public class BillViewModel extends AndroidViewModel {
                 if (r.isSuccess()) {
                     _syncState.setValue(ApiResponse.success(r.data, r.message));
                     _toastMessage.setValue("同步成功");
-
-                    // 同步成功后，触发本地数据库重新查询
-                    mainHandler.post(this::refreshData);
                 } else {
-
                     _syncState.setValue(ApiResponse.error(r.message));
-                    _toastMessage.setValue("同步失败: " + r.message);
-                    mainHandler.post(this::refreshData);
+                    _toastMessage.setValue("同步失败: " + (r.message != null ? r.message : "未知错误"));
                 }
+                mainHandler.post(this::refreshData);
             });
         });
     }
-
 
     public void silentSyncFromCloud() {
         if (isSyncing || currentUserId == null) return;
 
         isSyncing = true;
-        // 注意：静默同步不更新 _syncState 为 loading，也不显示 Toast
-
         Log.d(TAG, "开始后台静默同步...");
 
         accountRepository.syncFromAccountGroupCloud((success, message) -> {
@@ -1006,49 +732,46 @@ public class BillViewModel extends AndroidViewModel {
         });
     }
 
-    // 用户切换
     public void checkUserSwitch() {
-        BmobUser user      = BmobUser.getCurrentUser();
-        String   newUserId = user != null ? user.getObjectId() : null;
-        if (!isUserIdEqual(lastUserId, newUserId)) {
+        BmobUser user = BmobUser.getCurrentUser();
+        String newUserId = user != null ? user.getObjectId() : null;
+        if (!Objects.equals(lastUserId, newUserId)) {
             Log.d(TAG, "用户切换: " + lastUserId + " -> " + newUserId);
-            lastUserId    = newUserId;
+            lastUserId = newUserId;
             currentUserId = newUserId;
-            isFirstInit   = true;
-            isSyncing     = false;
-            lastSyncTime  = 0;
+            isFirstInit = true;
+            isSyncing = false;
+            lastSyncTime = 0;
             dailyBillsCache = Collections.emptyMap();
             dailyBillsCacheReady = false;
+            uiModelMapper.clearCache();
             reinitializeLiveData();
-            if (currentUserId != null) Log.d(TAG, "新用户登录，将自动加载数据");
+            if (currentUserId != null) Log.d(TAG, "新用户登录，自动加载数据");
         }
     }
 
-    private boolean isUserIdEqual(String a, String b) {
-        if (a == null && b == null) return true;
-        if (a == null || b == null) return false;
-        return a.equals(b);
-    }
-
     private void reinitializeLiveData() {
-        if (monthBillsObserver != null && currentMonthBills != null) {
-            currentMonthBills.removeObserver(monthBillsObserver);
+        if (refreshTriggerObserver != null) {
+            _refreshTrigger.removeObserver(refreshTriggerObserver);
         }
         if (accountsObserver != null && allAccountsLive != null) {
             allAccountsLive.removeObserver(accountsObserver);
         }
-        if (allBillsObserver != null && allBills != null) {
-            allBills.removeObserver(allBillsObserver);
+        if (dailyStatsObserver != null && dailyStatsLive != null) {
+            dailyStatsLive.removeObserver(dailyStatsObserver);
+        }
+        if (billSummaryObserver != null && billSummary != null) {
+            billSummary.removeObserver(billSummaryObserver);
         }
         if (billCountObserver != null) billCount.removeObserver(billCountObserver);
-        if (billDaysObserver  != null) billDays .removeObserver(billDaysObserver);
+        if (billDaysObserver != null) billDays.removeObserver(billDaysObserver);
 
         initializeLiveData();
         loadSnapshot();
         rebuildHomeBillsPager();
         observeAllBillsForStats();
         observeStatsForSync();
-        observeMonthBillsForHeaderUpdate();
+        observeHeaderDataUpdate();
 
         _refreshTrigger.setValue(System.currentTimeMillis());
 
@@ -1061,68 +784,39 @@ public class BillViewModel extends AndroidViewModel {
         checkUserSwitch();
         if (currentUserId == null) return;
 
-        // 自动同步检查：触发本地数据刷新，确保从其他 Activity 返回首页时 UI 状态最新
         refreshData();
 
         long now = System.currentTimeMillis();
-        // 如果是首次初始化，或者距离上次同步超过阈值，则触发静默同步
         if (isFirstInit || (now - lastSyncTime > SYNC_THROTTLE_MS)) {
             isFirstInit = false;
             silentSyncFromCloud();
         }
     }
 
-    // 统计写回 UserProfile
     private void observeStatsForSync() {
         if (currentUserId == null) return;
         billCountObserver = v -> scheduleSyncStats();
-        billDaysObserver  = v -> scheduleSyncStats();
+        billDaysObserver = v -> scheduleSyncStats();
         billCount.observeForever(billCountObserver);
-        billDays .observeForever(billDaysObserver);
+        billDays.observeForever(billDaysObserver);
     }
 
     private void scheduleSyncStats() {
-        if (statsDebounceRunnable != null)
+        if (statsDebounceRunnable != null) {
             statsDebounceHandler.removeCallbacks(statsDebounceRunnable);
+        }
         statsDebounceRunnable = this::syncStatsToUserProfile;
         statsDebounceHandler.postDelayed(statsDebounceRunnable, STATS_DEBOUNCE_MS);
     }
 
     private void syncStatsToUserProfile() {
         Integer count = billCount.getValue();
-        Integer days  = billDays .getValue();
+        Integer days = billDays.getValue();
         if (count == null || days == null) return;
         if (count == lastSyncedCount && days == lastSyncedDays) return;
         lastSyncedCount = count;
-        lastSyncedDays  = days;
+        lastSyncedDays = days;
         userProfileRepository.updateBillStats(currentUserId, days, count);
-    }
-
-    // 工具
-    private int computeBillCount(List<Bill> bills) { return bills == null ? 0 : bills.size(); }
-
-    private int computeBillDays(List<Bill> bills) {
-        if (bills == null) return 0;
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        Set<String> days = new HashSet<>();
-        for (Bill b : bills) if (b.getBillTime() != null) days.add(fmt.format(b.getBillTime()));
-        return days.size();
-    }
-
-    private Date[] getCurrentMonthRange() {
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.DAY_OF_MONTH, 1);
-        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0);
-        c.set(Calendar.SECOND, 0);      c.set(Calendar.MILLISECOND, 0);
-        Date start = c.getTime();
-        c.set(Calendar.DAY_OF_MONTH, c.getActualMaximum(Calendar.DAY_OF_MONTH));
-        c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59);
-        c.set(Calendar.SECOND, 59);      c.set(Calendar.MILLISECOND, 999);
-        return new Date[]{start, c.getTime()};
-    }
-
-    private String formatDate(Date d) {
-        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(d);
     }
 
     @Override
@@ -1132,14 +826,12 @@ public class BillViewModel extends AndroidViewModel {
         mainHandler.removeCallbacksAndMessages(null);
         statsDebounceHandler.removeCallbacksAndMessages(null);
 
-        if (billCountObserver  != null) billCount.removeObserver(billCountObserver);
-        if (billDaysObserver   != null) billDays .removeObserver(billDaysObserver);
-        if (allBillsObserver   != null && allBills != null)
-            allBills.removeObserver(allBillsObserver);
-        if (monthBillsObserver != null && currentMonthBills != null)
-            currentMonthBills.removeObserver(monthBillsObserver);
-        if (accountsObserver != null && allAccountsLive != null)
-            allAccountsLive.removeObserver(accountsObserver);
+        if (billCountObserver != null) billCount.removeObserver(billCountObserver);
+        if (billDaysObserver != null) billDays.removeObserver(billDaysObserver);
+        if (refreshTriggerObserver != null) _refreshTrigger.removeObserver(refreshTriggerObserver);
+        if (accountsObserver != null && allAccountsLive != null) allAccountsLive.removeObserver(accountsObserver);
+        if (dailyStatsObserver != null && dailyStatsLive != null) dailyStatsLive.removeObserver(dailyStatsObserver);
+        if (billSummaryObserver != null && billSummary != null) billSummary.removeObserver(billSummaryObserver);
 
         super.onCleared();
     }

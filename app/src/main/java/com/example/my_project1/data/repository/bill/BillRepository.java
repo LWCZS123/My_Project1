@@ -11,6 +11,8 @@ import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.bill.DailyStat;
+import com.example.my_project1.data.model.bill.MonthlyStat;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.remote.model.cloudbill.BmobBillApiImpl;
 import com.example.my_project1.data.remote.model.cloudbill.CloudBill;
@@ -196,12 +198,26 @@ public class BillRepository {
     public void deleteBill(Bill bill, ApiResponse.Callback<Integer> callback) {
         executors.diskIO().execute(() -> {
             try {
-                restoreAccountBalanceForDeletedBill(bill);
+                // 以数据库中的最新版本为准，删除操作幂等且不会因重复点击重复冲销余额。
+                Bill stored = bill.getId() > 0 ? billDao.getBillByIdSync(bill.getId()) : null;
+                if (stored == null && bill.getObjectId() != null && !bill.getObjectId().isEmpty()) {
+                    stored = billDao.getBillByObjectIdSync(bill.getObjectId());
+                }
+                if (stored == null) {
+                    postUpdateResult(callback, ApiResponse.error("找不到要删除的账单"));
+                    return;
+                }
+                if (stored.getSyncState() == SyncState.TO_DELETE) {
+                    postUpdateResult(callback, ApiResponse.success(0, "账单已删除"));
+                    return;
+                }
 
-                bill.setSyncState(SyncState.TO_DELETE);
-                bill.setUpdatedAt(new Date());
+                restoreAccountBalanceForDeletedBill(stored);
 
-                int rows = billDao.update(bill);
+                stored.setSyncState(SyncState.TO_DELETE);
+                stored.setUpdatedAt(new Date());
+
+                int rows = billDao.update(stored);
 
                 Log.d(TAG, "标记删除成功: " + rows + " 行, objectId=" + bill.getObjectId());
 
@@ -539,6 +555,23 @@ public class BillRepository {
         return billDao.getAllBillsByUser(userId);
     }
 
+    public LiveData<Bill> getBillLive(String userId, String objectId, long localId) {
+        return billDao.getBillLive(userId, objectId, localId);
+    }
+
+    public LiveData<List<DailyStat>> getUserDailyStats(String userId) {
+        return billDao.getUserDailyStatsLive(userId);
+    }
+
+    public com.example.my_project1.data.model.bill.SearchSummary getUserBillSummarySync(String userId) {
+        return billDao.getUserBillSummarySync(userId);
+    }
+
+    public com.example.my_project1.data.model.bill.SearchSummary getBillSummaryInRangeSync(
+            String userId, Date start, Date endExclusive) {
+        return billDao.getBillSummaryInRangeSync(userId, start, endExclusive);
+    }
+
     public List<Bill> getAllBillsByUserSync(String userId) {
         return billDao.getAllBillsByUserSync(userId);
     }
@@ -551,8 +584,12 @@ public class BillRepository {
         return billDao.getBillsInTimeRangeExclusive(userId, start, endExclusive);
     }
 
-    public List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset) {
-        return billDao.getBillsInTimeRangePaged(userId, start, end, limit, offset);
+    public List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date endExclusive, int limit, int offset) {
+        return billDao.getBillsInTimeRangePaged(userId, start, endExclusive, limit, offset);
+    }
+
+    public LiveData<com.example.my_project1.data.model.bill.SearchSummary> getUserBillSummary(String userId) {
+        return billDao.getUserBillSummaryLive(userId);
     }
 
     public List<Bill> getBillsInTimeRangeSync(String userId, Date start, Date end) {

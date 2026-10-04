@@ -20,6 +20,8 @@ import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.bill.BillWithBalance;
+import com.example.my_project1.data.model.bill.DailyStat;
+import com.example.my_project1.data.model.bill.MonthlyStat;
 import com.example.my_project1.data.model.bill.SearchSummary;
 import com.example.my_project1.utils.AppExecutors;
 
@@ -52,8 +54,8 @@ public class AccountDetailViewModel extends AndroidViewModel {
     public final LiveData<SearchSummary> stats;
     public final LiveData<List<BillDao.CategorySummary>> expenseSummary;
     public final LiveData<List<BillDao.CategorySummary>> incomeSummary;
-    public final LiveData<List<BillDao.MonthlyStat>> monthlyStats;
-    public final LiveData<List<BillDao.DailyStat>> dailyStats;
+    public final LiveData<List<MonthlyStat>> monthlyStats;
+    public final LiveData<List<DailyStat>> dailyStats;
     
     public final LiveData<PagingData<AccountBillUiModel>> billPagingData;
 
@@ -149,13 +151,13 @@ public class AccountDetailViewModel extends AndroidViewModel {
         );
 
         billPagingData = Transformations.switchMap(combinedStatsSource, stats -> {
-            Map<String, BillDao.MonthlyStat> mStatMap = new HashMap<>();
+            Map<String, MonthlyStat> mStatMap = new HashMap<>();
             if (stats.monthly != null) {
-                for (BillDao.MonthlyStat s : stats.monthly) mStatMap.put(s.month, s);
+                for (MonthlyStat s : stats.monthly) mStatMap.put(s.month, s);
             }
-            Map<String, BillDao.DailyStat> dStatMap = new HashMap<>();
+            Map<String, DailyStat> dStatMap = new HashMap<>();
             if (stats.daily != null) {
-                for (BillDao.DailyStat s : stats.daily) dStatMap.put(s.day, s);
+                for (DailyStat s : stats.daily) dStatMap.put(s.day, s);
             }
             
             return Transformations.switchMap(account, acc -> 
@@ -222,7 +224,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
         });
     }
 
-    private AccountBillUiModel createMonthHeader(Date date, boolean isCollapsed, BillDao.MonthlyStat stat) {
+    private AccountBillUiModel createMonthHeader(Date date, boolean isCollapsed, MonthlyStat stat) {
         String monthKey = monthKeyFmt.get().format(date);
         Calendar cal = Calendar.getInstance();
         cal.setTime(date);
@@ -252,7 +254,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
         );
     }
 
-    private AccountBillUiModel createDayHeader(Date date, BillDao.DailyStat stat) {
+    private AccountBillUiModel createDayHeader(Date date, DailyStat stat) {
         String monthKey = monthKeyFmt.get().format(date);
         String summary = "支出: ¥0.00 收入: ¥0.00";
         if (stat != null) {
@@ -332,9 +334,9 @@ public class AccountDetailViewModel extends AndroidViewModel {
     }
 
     private static class CombinedStats {
-        final List<BillDao.MonthlyStat> monthly;
-        final List<BillDao.DailyStat> daily;
-        CombinedStats(List<BillDao.MonthlyStat> m, List<BillDao.DailyStat> d) {
+        final List<MonthlyStat> monthly;
+        final List<DailyStat> daily;
+        CombinedStats(List<MonthlyStat> m, List<DailyStat> d) {
             this.monthly = m;
             this.daily = d;
         }
