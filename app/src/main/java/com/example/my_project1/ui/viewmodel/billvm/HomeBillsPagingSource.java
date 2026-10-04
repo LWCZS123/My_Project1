@@ -67,8 +67,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                 return new PagingSource.LoadResult.Page<>(new ArrayList<>(), null, null);
             }
 
-            // 🚀 重要：Room 不允许在主线程执行查询。由于 Java PagingSource.load 可能被回调在主线程，
-            // 我们通过一个简单的阻塞方式强制在后台线程执行数据库操作，规避 MainThread 检查。
+            // Room 不允许在主线程执行查询。强制在后台线程执行数据库操作。
             final List<Bill>[] fetchedWrapper = new List[1];
             final Throwable[] errorWrapper = new Throwable[1];
 
@@ -94,12 +93,8 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
             android.util.Log.d("HomeBillsPagingSource", "Fetched " + fetched.size() + " bills");
 
             int consumed = Math.min(requested, fetched.size());
-
-            // 简单的分页逻辑，暂不进行复杂的跨天截断，以确稳定
             List<Bill> pageBills = new ArrayList<>(fetched.subList(0, consumed));
 
-            // 获取账户信息用于 UI 模型转换（同样在 dbThread 中获取会更安全，但如果之前 join 了，这里大概率还在主线程，
-            // 索性全部移入 dbThread 或再次阻塞）
             final Map<String, Account> accountMap = new HashMap<>();
             Thread accThread = new Thread(() -> {
                 List<Account> accounts = accountDao.getAllAccountsSyncExcludeDeleted();
@@ -242,7 +237,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                 .billType(billType)
                 .remarkText(bill.getRemark())
                 .imageUrls(bill.getImageUrls())
-                .originalBill(bill) // 🔑 设置原始对象
+                .originalBill(bill)
                 .build();
     }
 }

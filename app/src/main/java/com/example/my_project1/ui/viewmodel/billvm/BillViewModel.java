@@ -595,7 +595,7 @@ public class BillViewModel extends AndroidViewModel {
                     .billType(billType)
                     .remarkText(bill.getRemark())
                     .imageUrls(bill.getImageUrls())
-                    .originalBill(bill) // 🔑 设置原始对象，方便编辑回传
+                    .originalBill(bill) // 设置原始对象，方便编辑回传
                     .build();
 
             billUiCache.put(cacheKey, newModel);
@@ -605,7 +605,7 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     // ════════════════════════════════════════════════════
-    //  ✅ UiModel 映射 (聚合版) - 优化版
+    //  UiModel 映射 (聚合版)
     // ════════════════════════════════════════════════════
 
 

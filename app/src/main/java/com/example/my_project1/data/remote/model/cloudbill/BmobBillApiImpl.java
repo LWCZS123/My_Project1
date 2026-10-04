@@ -6,7 +6,6 @@ import android.util.Log;
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.bill.Bill;
-import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.BmobPointerUtil;
 
 import java.util.Date;
@@ -22,12 +21,9 @@ import cn.bmob.v3.listener.SaveListener;
 import cn.bmob.v3.listener.UpdateListener;
 
 /**
- * BmobBillApiImpl - Bmob 账单 API 实现（修复版）
+ * BmobBillApiImpl - Bmob 账单 API 实现
  * -------------------------------------------------------
- * 🔧 修复内容：
- * 1. deleteBillSync() 不再依赖 CloudBill.deleteSync()
- * 2. 使用 CountDownLatch 包装异步删除为同步方法
- * 3. 添加超时控制和错误处理
+ * 提供账单云端增删改查与同步 API
  */
 public class BmobBillApiImpl {
 
@@ -42,7 +38,6 @@ public class BmobBillApiImpl {
         this.db = AppDatabase.getInstance(this.context);
     }
 
-    // 无参构造器（用于单元测试或静态调用）
     public BmobBillApiImpl() {
         this.context = null;
         this.db = null;
@@ -55,12 +50,11 @@ public class BmobBillApiImpl {
     }
 
     // ----------------------------------------------------------------------
-    // 🟢 账单上传（创建/更新）
+    // 账单上传（创建/更新）
     // ----------------------------------------------------------------------
 
     /**
      * 上传账单（异步）
-     * 如果 objectId 存在则更新，否则创建
      */
     public void uploadBill(Bill local, SaveListener<String> listener) {
         String userId = getCurrentUserId();
@@ -72,7 +66,6 @@ public class BmobBillApiImpl {
         CloudBill cloud = CloudBill.fromLocal(local);
         cloud.setUser(BmobPointerUtil.user(userId));
 
-        // 关联账户
         if (local.getAccountId() != null) {
             cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));
         }
@@ -81,12 +74,12 @@ public class BmobBillApiImpl {
             @Override
             public void done(String objectId, BmobException e) {
                 if (e == null) {
-                    Log.d(TAG, "✅ 上传账单成功: " + local.getAmount() + " -> " + objectId);
+                    Log.d(TAG, "上传账单成功: " + local.getAmount() + " -> " + objectId);
                     local.setObjectId(objectId);
                     local.setSyncState(SyncState.SYNCED);
                     listener.done(objectId, null);
                 } else {
-                    Log.e(TAG, "❌ 上传账单失败: " + e.getMessage());
+                    Log.e(TAG, "上传账单失败: " + e.getMessage());
                     listener.done(null, e);
                 }
             }
@@ -104,7 +97,6 @@ public class BmobBillApiImpl {
 
         CloudBill cloud = CloudBill.fromLocal(local);
 
-        // 关联账户
         if (local.getAccountId() != null) {
             cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));
         }
@@ -113,11 +105,11 @@ public class BmobBillApiImpl {
             @Override
             public void done(BmobException e) {
                 if (e == null) {
-                    Log.d(TAG, "✅ 更新账单成功: " + local.getAmount());
+                    Log.d(TAG, "更新账单成功: " + local.getAmount());
                     local.setSyncState(SyncState.SYNCED);
                     listener.done(null);
                 } else {
-                    Log.e(TAG, "❌ 更新账单失败: " + e.getMessage());
+                    Log.e(TAG, "更新账单失败: " + e.getMessage());
                     listener.done(e);
                 }
             }
@@ -139,10 +131,10 @@ public class BmobBillApiImpl {
             @Override
             public void done(BmobException e) {
                 if (e == null) {
-                    Log.d(TAG, "✅ 删除账单成功: " + objectId);
+                    Log.d(TAG, "删除账单成功: " + objectId);
                     listener.done(null);
                 } else {
-                    Log.e(TAG, "❌ 删除账单失败: " + e.getMessage());
+                    Log.e(TAG, "删除账单失败: " + e.getMessage());
                     listener.done(e);
                 }
             }
@@ -150,29 +142,23 @@ public class BmobBillApiImpl {
     }
 
     /**
-     * 🔧 修复：同步删除账单（阻塞）
-     * 使用 CountDownLatch 包装异步删除为同步方法
-     *
-     * @param objectId 云端账单ID
-     * @return 是否删除成功
+     * 同步删除账单（阻塞）
      */
     public boolean deleteBillSync(String objectId) {
         if (objectId == null || objectId.isEmpty()) {
-            Log.e(TAG, "❌ deleteBillSync - objectId为空");
+            Log.e(TAG, "deleteBillSync - objectId为空");
             return false;
         }
 
-        Log.d(TAG, "🔄 同步删除账单: objectId=" + objectId);
+        Log.d(TAG, "同步删除账单: objectId=" + objectId);
 
         try {
-            // 使用 CountDownLatch 等待异步操作完成
             final BmobException[] exceptionHolder = new BmobException[1];
             final CountDownLatch latch = new CountDownLatch(1);
 
             CloudBill cloud = new CloudBill();
             cloud.setObjectId(objectId);
 
-            // 调用异步删除
             cloud.delete(new UpdateListener() {
                 @Override
                 public void done(BmobException e) {
@@ -181,45 +167,42 @@ public class BmobBillApiImpl {
                 }
             });
 
-            // 等待删除完成
             boolean completed = latch.await(DELETE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
             if (!completed) {
-                Log.e(TAG, "❌ 同步删除账单超时: objectId=" + objectId);
+                Log.e(TAG, "同步删除账单超时: objectId=" + objectId);
                 return false;
             }
 
-            // 检查是否有异常
             if (exceptionHolder[0] != null) {
                 BmobException e = exceptionHolder[0];
 
-                // 🔑 关键：如果云端对象不存在（错误码101），也视为删除成功
                 if (e.getErrorCode() == 101) {
-                    Log.d(TAG, "✅ 云端对象已不存在，视为删除成功: objectId=" + objectId);
+                    Log.d(TAG, "云端对象已不存在，视为删除成功: objectId=" + objectId);
                     return true;
                 }
 
-                Log.e(TAG, "❌ 同步删除账单失败: objectId=" + objectId
+                Log.e(TAG, "同步删除账单失败: objectId=" + objectId
                         + ", error=" + e.getMessage()
                         + ", code=" + e.getErrorCode(), e);
                 return false;
             }
 
-            Log.d(TAG, "✅ 同步删除账单成功: " + objectId);
+            Log.d(TAG, "同步删除账单成功: " + objectId);
             return true;
 
         } catch (InterruptedException e) {
-            Log.e(TAG, "❌ 同步删除账单被中断: objectId=" + objectId, e);
+            Log.e(TAG, "同步删除账单被中断: objectId=" + objectId, e);
             Thread.currentThread().interrupt();
             return false;
         } catch (Exception e) {
-            Log.e(TAG, "❌ 同步删除账单异常: objectId=" + objectId, e);
+            Log.e(TAG, "同步删除账单异常: objectId=" + objectId, e);
             return false;
         }
     }
 
     // ----------------------------------------------------------------------
-    // 🟡 账单查询
+    // 账单查询
     // ----------------------------------------------------------------------
 
     /**
@@ -234,9 +217,9 @@ public class BmobBillApiImpl {
 
         BmobQuery<CloudBill> query = new BmobQuery<>();
         query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
-        query.include("book,account"); // 展开关联对象
-        query.order("-billTime"); // 按账单时间倒序
-        query.setLimit(1000); // 设置查询上限
+        query.include("book,account");
+        query.order("-billTime");
+        query.setLimit(1000);
         query.findObjects(listener);
     }
 
@@ -294,81 +277,74 @@ public class BmobBillApiImpl {
     }
 
     // ----------------------------------------------------------------------
-    // 🧩 同步接口（同步方法，仅在后台任务使用）
+    // 同步接口（同步方法，仅在后台任务使用）
     // ----------------------------------------------------------------------
 
     /**
      * 同步上传单个账单（阻塞）
-     * 如果 objectId 存在则更新，否则创建
      */
     public boolean uploadBillSync(Bill local) {
         try {
             String userId = getCurrentUserId();
             if (userId == null) {
-                Log.e(TAG, "❌ uploadBillSync - 用户未登录");
+                Log.e(TAG, "uploadBillSync - 用户未登录");
                 return false;
             }
 
             CloudBill cloud = CloudBill.fromLocal(local);
             cloud.setUser(BmobPointerUtil.user(userId));
-            Log.d(TAG, "🚀 uploadBillSync() 调用"
-                    + " amount=" + local.getAmount()
+            Log.d(TAG, "uploadBillSync() 调用 amount=" + local.getAmount()
                     + " state=" + local.getSyncState()
-                    + " objectId=" + local.getObjectId()
-            );
+                    + " objectId=" + local.getObjectId());
 
-            // 关联账户
             if (local.getAccountId() != null) {
                 cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));
             }
 
             String cloudId;
             if (local.getObjectId() == null || local.getObjectId().isEmpty()) {
-                // 创建新账单
                 cloudId = cloud.saveSync();
                 local.setObjectId(cloudId);
-                Log.d(TAG, "✅ 同步创建账单成功: " + local.getAmount() + " -> " + cloudId);
+                Log.d(TAG, "同步创建账单成功: " + local.getAmount() + " -> " + cloudId);
             } else {
-                // 更新现有账单
                 cloud.updateSync(local.getObjectId());
                 cloudId = local.getObjectId();
-                Log.d(TAG, "✅ 同步更新账单成功: " + local.getAmount() + " -> " + cloudId);
+                Log.d(TAG, "同步更新账单成功: " + local.getAmount() + " -> " + cloudId);
             }
 
-            // 更新本地状态和时间戳(加1秒余量)
             Date now = new Date();
-            now.setTime(now.getTime() + 1000);  // 加1秒
+            now.setTime(now.getTime() + 1000);
 
             local.setSyncState(SyncState.SYNCED);
             local.setUpdatedAt(now);
 
-            Log.d(TAG, "🔧 更新本地时间戳: " + now + " (已加1秒余量)");
+            Log.d(TAG, "更新本地时间戳: " + now);
 
             if (db != null) {
-                AppExecutors.get().diskIO().execute(() -> {
+                try {
                     db.billDao().update(local);
-                    
-                    // 同步更新关联的愿望记录
+
                     com.example.my_project1.data.model.wish.WishRecord wishRecord = db.wishDao().getRecordByBillId(local.getId());
                     if (wishRecord != null) {
                         wishRecord.setLinkedBillObjectId(local.getObjectId());
                         db.wishDao().updateRecord(wishRecord);
                     }
-                    
-                    // 同步更新关联的存钱计划记录
+
                     com.example.my_project1.data.model.saving.SavingRecord savingRecord = db.savingPlanDao().getRecordByBillId(local.getId());
                     if (savingRecord != null) {
                         savingRecord.setLinkedBillObjectId(local.getObjectId());
                         db.savingPlanDao().updateRecord(savingRecord);
                     }
 
-                    Log.d(TAG, "✅ 本地数据库已更新: ID=" + local.getId());
-                });
+                    Log.d(TAG, "本地数据库已同步更新: ID=" + local.getId());
+                } catch (Exception e) {
+                    Log.e(TAG, "本地数据库更新异常: " + e.getMessage(), e);
+                }
             }
 
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "❌ 同步上传账单失败: " + e.getMessage(), e);
+            Log.e(TAG, "同步上传账单失败: " + e.getMessage(), e);
             return false;
         }
     }
@@ -402,10 +378,6 @@ public class BmobBillApiImpl {
         return query.findObjectsSync(CloudBill.class);
     }
 
-    // ----------------------------------------------------------------------
-    // 🔧 辅助工具方法
-    // ----------------------------------------------------------------------
-
     /**
      * 批量上传账单（异步）
      */
@@ -421,8 +393,6 @@ public class BmobBillApiImpl {
             return;
         }
 
-        // TODO: 实现批量上传逻辑
-        // Bmob SDK 支持批量操作，可以使用 BmobBatch
         Log.w(TAG, "批量上传功能待实现");
     }
 }

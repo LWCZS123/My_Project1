@@ -23,10 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * SearchRepository - 搜索功能数据仓库 (优化版)
+ * SearchRepository - 搜索功能数据仓库
  * -------------------------------------------------------
- * ✅ 支持分页查询
- * ✅ 支持数据库聚合计算汇总
+ * 支持分页查询与数据库聚合计算汇总
  */
 public class SearchRepository {
 
@@ -52,7 +51,7 @@ public class SearchRepository {
     }
 
     /**
-     * 🔍 搜索账单汇总 (高性能聚合查询)
+     * 搜索账单汇总 (聚合查询)
      */
     public void getSearchSummary(String userId, SearchFilter filter, OperationCallback<SearchSummary> callback) {
         executors.diskIO().execute(() -> {
@@ -67,20 +66,20 @@ public class SearchRepository {
                         accountIds, accountIdsCount, filter.getStartDate(), filter.getEndDate(),
                         filter.getMinAmount(), filter.getMaxAmount(), filter.getIncludeBudget()
                 );
-                
+
                 if (summary == null) summary = new SearchSummary(0, 0, 0, 0, 0);
-                
+
                 SearchSummary finalSummary = summary;
                 executors.mainThread().execute(() -> callback.onComplete(ApiResponse.success(finalSummary)));
             } catch (Exception e) {
-                Log.e(TAG, "❌ 获取搜索汇总异常", e);
+                Log.e(TAG, "获取搜索汇总异常", e);
                 executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
 
     /**
-     * 🔍 分页搜索账单
+     * 分页搜索账单
      */
     public void searchBillsPaged(String userId, SearchFilter filter, int limit, int offset, OperationCallback<List<Bill>> callback) {
         executors.diskIO().execute(() -> {
@@ -96,10 +95,10 @@ public class SearchRepository {
                         filter.getMinAmount(), filter.getMaxAmount(), filter.getIncludeBudget(),
                         limit, offset
                 );
-                
+
                 executors.mainThread().execute(() -> callback.onComplete(ApiResponse.success(results)));
             } catch (Exception e) {
-                Log.e(TAG, "❌ 分页搜索账单异常", e);
+                Log.e(TAG, "分页搜索账单异常", e);
                 executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
@@ -136,7 +135,7 @@ public class SearchRepository {
 
                 executors.mainThread().execute(() -> callback.onComplete(ApiResponse.success(uniqueSuggestions)));
             } catch (Exception e) {
-                Log.e(TAG, "❌ 获取建议异常", e);
+                Log.e(TAG, "获取建议异常", e);
                 executors.mainThread().execute(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
@@ -152,7 +151,7 @@ public class SearchRepository {
                 if (keyword == null || keyword.trim().isEmpty()) return;
                 searchHistoryDao.insert(new SearchHistory(userId, keyword.trim()));
             } catch (Exception e) {
-                Log.e(TAG, "❌ 添加搜索历史异常", e);
+                Log.e(TAG, "添加搜索历史异常", e);
             }
         });
     }

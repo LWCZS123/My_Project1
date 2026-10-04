@@ -102,22 +102,18 @@ public class CloudBill extends BmobObject {
 
     // ======================== 便捷方法 ========================
 
-    /** 获取本地用户ID */
     public String getUserId() {
         return user != null ? user.getObjectId() : null;
     }
 
-    /** 获取本地账本ID */
     public String getBookId() {
         return book != null ? book.getObjectId() : null;
     }
 
-    /** 获取本地账户ID */
     public String getAccountId() {
         return account != null ? account.getObjectId() : null;
     }
 
-    /** 获取本地转入账户ID */
     public String getToAccountId() {
         return toAccount != null ? toAccount.getObjectId() : null;
     }
@@ -125,9 +121,7 @@ public class CloudBill extends BmobObject {
     // ======================== 转换方法 ========================
 
     /**
-     * 🔴 BmobDate 转换为 Date 的工具方法
-     * BmobDate.getDate() 返回的是 ISO 8601 格式的字符串
-     * 例如: "2025-12-13 20:24:55"
+     * BmobDate 转换为 Date 的工具方法
      */
     private Date convertBmobDateToDate(BmobDate bmobDate) {
         if (bmobDate == null) {
@@ -140,7 +134,6 @@ public class CloudBill extends BmobObject {
                 return null;
             }
 
-            // Bmob 返回的日期格式: "yyyy-MM-dd HH:mm:ss"
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
             Date date = sdf.parse(dateStr);
 
@@ -150,10 +143,8 @@ public class CloudBill extends BmobObject {
         } catch (Exception e) {
             Log.e(TAG, "BmobDate 转换失败: " + e.getMessage(), e);
 
-            // 尝试其他可能的格式
             try {
                 String dateStr = bmobDate.getDate();
-                // ISO 8601 格式: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
                 SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault());
                 return isoFormat.parse(dateStr);
             } catch (Exception ex) {
@@ -164,13 +155,12 @@ public class CloudBill extends BmobObject {
     }
 
     /**
-     * 🔴 云端 → 本地 (完全修复版本)
+     * 云端 → 本地
      * 将云端 CloudBill 转换为本地 Bill 实体
      */
     public Bill toLocalEntity() {
         Bill local = new Bill();
 
-        // 基本字段
         local.setObjectId(getObjectId());
         local.setUserId(getUserId());
         local.setBookId(getBookId());
@@ -187,24 +177,20 @@ public class CloudBill extends BmobObject {
         local.setImageUrls(imageUrls);
         local.setLocation(location);
 
-        // 🔴 关键修复: BmobDate 转换为 Date
         if (billTime != null) {
             Date date = convertBmobDateToDate(billTime);
             if (date != null) {
                 local.setBillTime(date);
                 Log.d(TAG, "账单时间转换成功 - objectId=" + getObjectId() + ", billTime=" + date);
             } else {
-                // 如果转换失败，使用当前时间
                 Log.w(TAG, "账单时间转换失败，使用当前时间 - objectId=" + getObjectId());
                 local.setBillTime(new Date());
             }
         } else {
-            // 如果 billTime 为空，使用当前时间
             Log.w(TAG, "账单时间为空，使用当前时间 - objectId=" + getObjectId());
             local.setBillTime(new Date());
         }
 
-        // 时间字段 - createdAt 和 updatedAt
         local.setCreatedAt(DateConvertUtil.safeConvertToDate(getCreatedAt()));
         local.setUpdatedAt(DateConvertUtil.safeConvertToDate(getUpdatedAt()));
 
@@ -218,12 +204,10 @@ public class CloudBill extends BmobObject {
     public static CloudBill fromLocal(Bill local) {
         CloudBill cloud = new CloudBill();
 
-        // 设置 objectId（如果存在）
         if (local.getObjectId() != null) {
             cloud.setObjectId(local.getObjectId());
         }
 
-        // 基本字段
         cloud.setCategoryId(local.getCategoryId());
         cloud.setCategoryName(local.getCategoryName());
         cloud.setCategoryIconUrl(local.getCategoryIconUrl());
@@ -235,27 +219,16 @@ public class CloudBill extends BmobObject {
         cloud.setImageUrls(local.getImageUrls());
         cloud.setLocation(local.getLocation());
 
-
-        // 🔴 时间字段: Date → BmobDate
         if (local.getBillTime() != null) {
             cloud.setBillTime(new BmobDate(local.getBillTime()));
         } else {
-            // 如果本地时间为空，使用当前时间
             Log.w(TAG, "本地账单时间为空，使用当前时间");
             cloud.setBillTime(new BmobDate(new Date()));
         }
 
-        // 关联字段（使用 BmobPointer）
         if (local.getUserId() != null) {
             cloud.setUser(BmobPointerUtil.user(local.getUserId()));
         }
-
-        /**
-         * 账本功能待实现
-         if (local.getBookId() != null) {
-         cloud.setBook(BmobPointerUtil.book(local.getBookId()));
-         }
-         */
 
         if (local.getAccountId() != null) {
             cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));

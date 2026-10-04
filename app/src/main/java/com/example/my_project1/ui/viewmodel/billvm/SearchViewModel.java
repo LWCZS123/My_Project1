@@ -36,13 +36,9 @@ import cn.bmob.v3.BmobUser;
 import io.reactivex.annotations.NonNull;
 
 /**
- * SearchViewModel - 搜索功能 ViewModel (深度优化版)
+ * SearchViewModel - 搜索功能 ViewModel
  * -------------------------------------------------------
- * ✅ 修复 Lottie 动画显示问题：通过明确的状态转换和异步调度，确保 UI 线程优先渲染 Loading 状态
- * ✅ 修复日期筛选问题：支持精确到毫秒的时间边界处理
- * ✅ 分页加载数据，避免大内存占用
- * ✅ 数据库层聚合计算汇总，提升统计速度
- * ✅ 后台线程处理 UI Model 转换和日期分组
+ * 处理账单搜索、筛选、分页与 UI 映射
  */
 public class SearchViewModel extends AndroidViewModel {
 
@@ -57,14 +53,12 @@ public class SearchViewModel extends AndroidViewModel {
 
     private String currentUserId;
     private final SearchFilter currentFilter = new SearchFilter();
-    
+
     private int currentPage = 0;
     private boolean isLastPage = false;
     private boolean isLoading = false;
     private final List<Bill> allLoadedBills = new ArrayList<>();
     private final AtomicInteger searchGeneration = new AtomicInteger(0);
-
-    // ==================== LiveData ====================
 
     private final MutableLiveData<List<BillAdapter.BillGroup>> _uiGroups = new MutableLiveData<>();
     public final LiveData<List<BillAdapter.BillGroup>> uiGroups = _uiGroups;
@@ -86,8 +80,6 @@ public class SearchViewModel extends AndroidViewModel {
 
     public LiveData<List<SearchHistory>> searchHistory;
 
-    // ==================== 构造函数 ====================
-
     public SearchViewModel(@NonNull Application application) {
         super(application);
         repository = new SearchRepository(application);
@@ -101,8 +93,6 @@ public class SearchViewModel extends AndroidViewModel {
             fetchSuggestions("");
         }
     }
-
-    // ==================== 搜索逻辑 ====================
 
     public void setKeyword(String keyword) {
         currentFilter.setKeyword(keyword);
@@ -134,7 +124,6 @@ public class SearchViewModel extends AndroidViewModel {
             repository.addSearchHistory(currentUserId, keyword.trim());
         }
 
-        // 1. 重置分页状态
         currentPage = 0;
         isLastPage = false;
         isLoading = false;
@@ -142,20 +131,15 @@ public class SearchViewModel extends AndroidViewModel {
         _uiGroups.setValue(new ArrayList<>());
         _uiItems.setValue(new ArrayList<>());
 
-        // 2. 先设置 Loading 状态。由于 setValue 在主线程，UI 会立即收到通知。
         _searchState.setValue(ApiResponse.loading());
 
-        // 3. 使用 Handler.post 将真正的搜索逻辑放到下一个消息循环，
-        // 确保 Android 系统有时间渲染 Loading 布局并启动 Lottie 动画。
         handler.post(() -> {
-            // 异步获取“完整结果”的汇总数据 (SQL 聚合)
             repository.getSearchSummary(currentUserId, currentFilter, response -> {
                 if (response.isSuccess()) {
                     _searchSummary.postValue(response.data);
                 }
             });
 
-            // 加载第一页数据
             loadNextPageInternal(generation);
         });
     }
@@ -182,9 +166,7 @@ public class SearchViewModel extends AndroidViewModel {
                     currentPage++;
                     if (newBills.size() < PAGE_SIZE) isLastPage = true;
 
-                    // 后台线程进行 UI Model 映射，不阻塞主线程
                     processBillsToUiItems(new ArrayList<>(allLoadedBills), generation);
-                    // 标记为 Success，但 Activity 此时不隐藏 Loading，直到 uiGroups 渲染
                     _searchState.setValue(ApiResponse.success("已加载"));
                 }
             } else {
@@ -228,12 +210,8 @@ public class SearchViewModel extends AndroidViewModel {
         handler.postDelayed(suggestionRunnable, DEBOUNCE_MS);
     }
 
-    // ==================== 历史管理 ====================
-
     public void deleteHistory(SearchHistory history) { repository.deleteSearchHistory(history); }
     public void clearHistory() { if (currentUserId != null) repository.clearAllHistory(currentUserId); }
-
-    // ==================== UI 映射 (在计算线程执行) ====================
 
     private List<BillAdapter.BillGroup> mapBillsToUiGroups(List<Bill> sorted) {
         if (sorted == null || sorted.isEmpty()) return new ArrayList<>();
@@ -244,7 +222,6 @@ public class SearchViewModel extends AndroidViewModel {
         DecimalFormat amtFmt = new DecimalFormat("#,##0.00");
         String[] weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 
-        // 获取当前年份用于显示逻辑
         int currentYear = Calendar.getInstance().get(Calendar.YEAR);
 
         List<BillAdapter.BillGroup> groups = new ArrayList<>();
@@ -279,15 +256,14 @@ public class SearchViewModel extends AndroidViewModel {
         try {
             Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateKey);
             if (date == null) return;
-            
-            Calendar cal = Calendar.getInstance(); 
+
+            Calendar cal = Calendar.getInstance();
             cal.setTime(date);
             int billYear = cal.get(Calendar.YEAR);
-            
-            // 如果不是本年，显示年份
+
             String pattern = (billYear == currentYear) ? "M月d日" : "yyyy年M月d日";
             String dateDisp = new SimpleDateFormat(pattern, Locale.getDefault()).format(date);
-            
+
             String disp = dateDisp + "（" + weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1] + "）";
             groups.add(new BillAdapter.BillGroup(
                     new BillAdapter.DateHeader(dateKey, disp, String.format("支 %.2f", exp), String.format("收 %.2f", inc)),

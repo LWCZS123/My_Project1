@@ -19,54 +19,39 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * BillDao（优化版 - 添加搜索功能）
+ * BillDao
  * -------------------------------------------------------
- * 账单数据库访问层
- * 核心优化：
- *  - ✅ 所有查询都添加 userId 过滤，实现用户数据隔离
- *  - ✅ 排除已删除的账单（sync_state != 3）
- *  - ✅ 按时间倒序排序，优化查询性能
- *  - ✅ 新增搜索功能(支持分类、备注、地点模糊查询)
+ * 账单数据库访问接口
  */
 @Dao
 public interface BillDao {
 
-    //基本增删改
-    /** 插入账单(冲突替换),返回主键 */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     long insert(Bill bill);
 
-    /** 批量插入账单 */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     List<Long> insertBills(List<Bill> bills);
 
-    /** 更新账单(返回影响条数) */
     @Update
     int update(Bill bill);
 
-    /** 删除单条账单 */
     @Delete
     int delete(Bill bill);
 
-
-    /** 根据同步状态查询账单 */
     @Query("SELECT * FROM bills WHERE sync_state = :state")
     List<Bill> getBillsBySyncState(SyncState state);
 
-    // ==================== LiveData查询 ====================
-
-    // 在 BillDao 中添加
     @Query("SELECT * FROM bills WHERE id = :id")
     Bill getByIdSync(long id);
 
     /**
-     * 🔥 获取指定用户的所有账单(实时监听) - 排除已删除的账单
+     * 获取指定用户的所有账单(实时监听) - 排除已删除的账单
      */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getAllBillsByUser(String userId);
 
     /**
-     * 🔥 按时间范围查询账单(LiveData) - 排除已删除的账单
+     * 按时间范围查询账单(LiveData) - 排除已删除的账单
      */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsInTimeRange(String userId, Date start, Date end);
@@ -74,14 +59,13 @@ public interface BillDao {
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime < :endExclusive AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
     LiveData<List<Bill>> getBillsInTimeRangeExclusive(String userId, Date start, Date endExclusive);
 
-    /** Homepage paging query with a stable tie-breaker for equal timestamps. */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC LIMIT :limit OFFSET :offset")
     List<Bill> getBillsInTimeRangePaged(String userId, Date start, Date end, int limit, int offset);
 
     @Query("SELECT * FROM bills WHERE user_id = :userId AND billTime >= :start AND billTime <= :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC, id DESC")
     List<Bill> getBillsInTimeRangeSync(String userId, Date start, Date end);
 
-    /** 🔥 按账本和用户查询账单 - 排除已删除的账单 */
+    /** 按账本和用户查询账单 - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND book_id = :bookId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsByBook(String userId, String bookId);
 
@@ -96,7 +80,6 @@ public interface BillDao {
 
     /**
      * 获取账户账单（带余额计算）
-     * 采用关联子查询替代 Window Function (OVER) 以兼容旧版 Room 解析器
      */
     @Query("SELECT *, (:currentBalance - (SELECT COALESCE(SUM(CASE " +
             "WHEN b2.type = 1 THEN b2.amount " +
@@ -152,7 +135,7 @@ public interface BillDao {
     androidx.lifecycle.LiveData<List<DailyStat>> getAccountDailyStatsLive(String userId, String accountId, long localAccountId);
 
     class DailyStat {
-        public String day; // yyyy-MM-dd
+        public String day;
         public double incomeTotal;
         public double expenseTotal;
     }
@@ -170,7 +153,7 @@ public interface BillDao {
     androidx.lifecycle.LiveData<List<MonthlyStat>> getAccountMonthlyStatsLive(String userId, String accountId, long localAccountId);
 
     class MonthlyStat {
-        public String month; // yyyy-MM
+        public String month;
         public double incomeTotal;
         public double expenseTotal;
         public double transferInTotal;
@@ -186,39 +169,34 @@ public interface BillDao {
         public double totalAmount;
     }
 
-    /** 🔥 按账户和用户查询账单 - 排除已删除的账单 */
+    /** 按账户和用户查询账单 - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId " +
             "AND (account_id = :accountId OR local_account_id = :localAccountId " +
             "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
             "AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsByAccount(String userId, String accountId, long localAccountId);
 
-    /** 🔥 按分类ID和用户查询账单(支持一级/二级) - 排除已删除的账单 */
+    /** 按分类ID和用户查询账单(支持一级/二级) - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND category_id = :categoryId AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getBillsByCategory(String userId, String categoryId);
 
-    /** 🔥 获取某用户某账本在某月的账单(适合做图表) - 排除已删除的账单 */
+    /** 获取某用户某账本在某月的账单 - 排除已删除的账单 */
     @Query("SELECT * FROM bills WHERE user_id = :userId AND book_id = :bookId AND billTime BETWEEN :start AND :end AND sync_state != 'TO_DELETE' ORDER BY billTime DESC")
     LiveData<List<Bill>> getMonthlyBills(String userId, String bookId, Date start, Date end);
 
-
-    // BillDao.java
     @Query("SELECT * FROM bills WHERE source_wish_id = :wishId AND sync_state != 'TO_DELETE'")
     List<Bill> getBillsBySourceWishId(long wishId);
 
     @Query("SELECT * FROM bills WHERE id = :billId LIMIT 1")
     Bill getBillByIdSync(long billId);
 
-
     @Query("SELECT * FROM bills WHERE user_id = :userId")
     List<Bill> getAllBillsByUserSync(String userId);
 
-    // ==================== 搜索功能(新增) ====================
+    // ==================== 搜索功能 ====================
 
     /**
-     * 🔍 搜索账单(模糊查询)
-     * 支持搜索: 分类名称(category_name)、备注(remark)、地点(location)
-     * 排除已删除的账单
+     * 搜索账单(模糊查询)
      */
     @Query("SELECT * FROM bills WHERE user_id = :userId " +
             "AND sync_state != 'TO_DELETE' " +
@@ -229,7 +207,7 @@ public interface BillDao {
     List<Bill> searchBills(String userId, String keyword);
 
     /**
-     * 🔥 高级搜索：支持多种筛选条件
+     * 高级搜索：支持多种筛选条件
      */
     @Query("SELECT * FROM bills WHERE user_id = :userId " +
             "AND sync_state != 'TO_DELETE' " +
@@ -247,7 +225,7 @@ public interface BillDao {
                                    Date startTime, Date endTime, Double minAmount, Double maxAmount);
 
     /**
-     * 🔥 高级搜索：支持分页
+     * 高级搜索：支持分页
      */
     @Query("SELECT * FROM bills WHERE user_id = :userId " +
             "AND sync_state != 'TO_DELETE' " +
@@ -268,7 +246,7 @@ public interface BillDao {
                                         int limit, int offset);
 
     /**
-     * 📊 高级搜索汇总：直接在数据库层面计算聚合结果
+     * 高级搜索汇总：直接在数据库层面计算聚合结果
      */
     @Query("SELECT " +
             "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
@@ -291,75 +269,59 @@ public interface BillDao {
                                            Date startTime, Date endTime, Double minAmount, Double maxAmount,
                                            Boolean includeBudget);
 
-    /**
-     * 获取搜索建议：备注
-     */
     @Query("SELECT DISTINCT remark FROM bills WHERE user_id = :userId AND remark LIKE :keyword AND sync_state != 'TO_DELETE' LIMIT 5")
     List<String> getRemarkSuggestions(String userId, String keyword);
 
-    /**
-     * 获取搜索建议：地点
-     */
     @Query("SELECT DISTINCT location FROM bills WHERE user_id = :userId AND location LIKE :keyword AND sync_state != 'TO_DELETE' LIMIT 5")
     List<String> getLocationSuggestions(String userId, String keyword);
 
-    // ==================== 同步查询(非LiveData) ====================
+    // ==================== 同步查询 ====================
 
-    /** 同步查询所有账单(Worker使用) */
     @Query("SELECT * FROM bills ORDER BY billTime DESC")
     List<Bill> getAllBillsSync();
 
-    /** 🔴 查询需要同步的账单 (TO_CREATE=1, TO_UPDATE=2, TO_DELETE=3) */
     @Query("SELECT * FROM bills WHERE sync_state != 'SYNCED'")
     List<Bill> getPendingSyncBills();
 
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND sync_state IN ('TO_CREATE', 'TO_UPDATE')")
+    List<Bill> getPendingSyncBillsByUser(String userId);
 
-    /** 🔴 查询需要删除的账单 */
     @Query("SELECT * FROM bills WHERE sync_state = 'TO_DELETE'")
     List<Bill> getToDeleteBills();
 
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND sync_state = 'TO_DELETE'")
+    List<Bill> getToDeleteBillsByUser(String userId);
 
-    /** 🔴 根据 objectId 查询账单 */
     @Query("SELECT * FROM bills WHERE object_id = :objectId LIMIT 1")
     Bill getBillByObjectId(String objectId);
 
-    // ==================== 批量删除 ====================
+    // ==================== 批量删除与更新 ====================
 
-    /** 🔥 删除某用户某账本下全部账单 */
     @Query("DELETE FROM bills WHERE user_id = :userId AND book_id = :bookId")
     int deleteBillsByBook(String userId, String bookId);
 
-    /** 🔥 批量标记删除某用户某账户下全部账单 (提升性能) */
     @Query("UPDATE bills SET sync_state = 'TO_DELETE', updatedAt = :now " +
             "WHERE user_id = :userId AND (account_id = :accountId OR local_account_id = :localAccountId)")
     int markBillsAsDeletedByAccountId(String userId, String accountId, long localAccountId, long now);
 
-    /** 🔥 删除某用户某账户下全部账单 */
     @Query("DELETE FROM bills WHERE user_id = :userId AND (account_id = :accountId OR local_account_id = :localAccountId)")
     int deleteBillsByAccountId(String userId, String accountId, long localAccountId);
 
-    /** 🔥 删除某用户某分类下账单 */
     @Query("DELETE FROM bills WHERE user_id = :userId AND category_id = :categoryId")
     int deleteBillsByCategory(String userId, String categoryId);
 
-    /** 🔥 批量标记删除账单 */
     @Query("UPDATE bills SET sync_state = 'TO_DELETE', updatedAt = :now WHERE id IN (:billIds)")
     void markBillsDeletedByIds(List<Long> billIds, long now);
 
-    /** 🔥 批量物理删除账单 */
     @Query("DELETE FROM bills WHERE id IN (:billIds)")
     void deleteBillsByIds(List<Long> billIds);
 
-    /** 批量根据ID查询账单 */
     @Query("SELECT * FROM bills WHERE id IN (:billIds)")
     List<Bill> getBillsByIds(List<Long> billIds);
 
     @Query("SELECT COUNT(*) FROM bills WHERE category_id = :categoryId AND user_id = :userId AND sync_state != 'TO_DELETE'")
     int countBillsByCategory(String userId, String categoryId);
 
-    /**
-     * 迁移账单到新分类
-     */
     @Query("UPDATE bills SET category_id = :targetId, category_name = :targetName, " +
             "category_icon = :targetIcon, category_icon_bg_color = :targetIconBg, " +
             "sync_state = 'TO_UPDATE', updatedAt = :now " +
@@ -367,33 +329,16 @@ public interface BillDao {
     void migrateBills(String userId, String sourceId, String targetId, String targetName,
                       String targetIcon, String targetIconBg, long now);
 
-
-
-    // 在 BillDao 接口中新增以下方法
-
-    /**
-     * 同步查询某个账户下的所有账单（用于后台任务）
-     */
     @Query("SELECT * FROM bills WHERE account_id = :accountId OR local_account_id = :localAccountId " +
             "OR to_account_id = :accountId OR to_local_account_id = :localAccountId ORDER BY billTime DESC")
     List<Bill> getBillsByAccountSync(String accountId, long localAccountId);
 
-    /**
-     * 批量更新账单的账户ID
-     */
     @Query("UPDATE bills SET account_id = :newAccountId, sync_state = 'TO_UPDATE' WHERE account_id = :oldAccountId")
     int updateAccountIdForBills(String oldAccountId, String newAccountId);
 
-    /**
-     * 将账单设置为无账户
-     */
     @Query("UPDATE bills SET account_id = NULL, sync_state = 'TO_UPDATE' WHERE account_id = :accountId")
     int setAccountIdToNull(String accountId);
 
-    /**
-     * 根据objectId同步查询账单（用于编辑模式）
-     * 注意：这是同步方法，必须在后台线程调用
-     */
     @Query("SELECT * FROM bills WHERE object_id = :objectId AND sync_state != 'TO_DELETE' LIMIT 1")
     Bill getBillByObjectIdSync(String objectId);
 
@@ -407,40 +352,33 @@ public interface BillDao {
     List<Bill> getBillsByCategoryInRange(String userId, String catCloudId,
                                          int billType, long startMs, long endMs);
 
+    @Query("SELECT * FROM bills " +
+            "WHERE user_id = :userId " +
+            "AND type = 0 " +
+            "AND excludeBudget = 0 " +
+            "AND billTime >= :startMs AND billTime <= :endMs " +
+            "AND sync_state != 'TO_DELETE'")
+    List<Bill> getExpenseBillsInRange(String userId, long startMs, long endMs);
 
+    @Query("SELECT * FROM bills " +
+            "WHERE user_id = :userId " +
+            "AND type = 1 " +
+            "AND excludeBudget = 0 " +
+            "AND billTime >= :startMs AND billTime <= :endMs " +
+            "AND sync_state != 'TO_DELETE'")
+    List<Bill> getIncomeBillsInRange(String userId, long startMs, long endMs);
 
-     @Query("SELECT * FROM bills " +
-                 "WHERE user_id = :userId " +
-                 "AND type = 0 " +
-                 "AND excludeBudget = 0 " +
-                 "AND billTime >= :startMs AND billTime <= :endMs " +
-                 "AND sync_state != 'TO_DELETE'")
-     List<Bill> getExpenseBillsInRange(String userId, long startMs, long endMs);
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM bills " +
+            "WHERE user_id = :userId AND type = :type AND excludeBudget = 0 " +
+            "AND billTime >= :startMs AND billTime <= :endMs " +
+            "AND sync_state != 'TO_DELETE'")
+    double getBudgetAmountInRange(String userId, int type, long startMs, long endMs);
 
-     @Query("SELECT * FROM bills " +
-                 "WHERE user_id = :userId " +
-                 "AND type = 1 " +
-                 "AND excludeBudget = 0 " +
-                 "AND billTime >= :startMs AND billTime <= :endMs " +
-                 "AND sync_state != 'TO_DELETE'")
-     List<Bill> getIncomeBillsInRange(String userId, long startMs, long endMs);
-
-     @Query("SELECT COALESCE(SUM(amount), 0) FROM bills " +
-             "WHERE user_id = :userId AND type = :type AND excludeBudget = 0 " +
-             "AND billTime >= :startMs AND billTime <= :endMs " +
-             "AND sync_state != 'TO_DELETE'")
-     double getBudgetAmountInRange(String userId, int type, long startMs, long endMs);
-
-     @Query("SELECT category_id, COALESCE(SUM(amount), 0) AS total_amount FROM bills " +
-             "WHERE user_id = :userId AND type = :billType AND excludeBudget = 0 " +
-             "AND billTime >= :startMs AND billTime <= :endMs " +
-             "AND sync_state != 'TO_DELETE' AND category_id IS NOT NULL " +
-             "GROUP BY category_id")
-     List<CategoryAmount> getBudgetAmountsByCategoryInRange(
-             String userId, int billType, long startMs, long endMs);
-
-
-
-
-
+    @Query("SELECT category_id, COALESCE(SUM(amount), 0) AS total_amount FROM bills " +
+            "WHERE user_id = :userId AND type = :billType AND excludeBudget = 0 " +
+            "AND billTime >= :startMs AND billTime <= :endMs " +
+            "AND sync_state != 'TO_DELETE' AND category_id IS NOT NULL " +
+            "GROUP BY category_id")
+    List<CategoryAmount> getBudgetAmountsByCategoryInRange(
+            String userId, int billType, long startMs, long endMs);
 }
