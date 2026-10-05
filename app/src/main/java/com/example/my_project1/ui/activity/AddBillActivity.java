@@ -862,9 +862,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 return false;
             }
 
-            // 🔑 验证账户
-            if (selectedAccount == null) {
-                showSnackbar(billType == 2 || billType == 3 ? "请选择转出账户" : "请选择账户", SnackbarUtils.Type.WARNING);
+            // 🔑 验证账户 (转账/还款模式下必须有账户，普通收支可选无账户)
+            if ((billType == 2 || billType == 3) && selectedAccount == null) {
+                showSnackbar("请选择转出账户", SnackbarUtils.Type.WARNING);
                 return false;
             }
 
@@ -1267,6 +1267,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         if (selectedAccount != null) {
             bill.setAccountId(selectedAccount.getObjectId());
             bill.setLocalAccountId(selectedAccount.getId());
+        } else {
+            bill.setAccountId(null);
+            bill.setLocalAccountId(-1L);
         }
 
         // 🔑 转入账户 (用于转账/还款)

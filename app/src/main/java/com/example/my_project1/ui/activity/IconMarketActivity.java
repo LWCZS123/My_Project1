@@ -71,6 +71,16 @@ public class IconMarketActivity extends AppCompatActivity {
         binding = ActivityIconMarketBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        androidx.core.app.ActivityCompat.setExitSharedElementCallback(this, new androidx.core.app.SharedElementCallback() {
+            @Override
+            public void onSharedElementEnd(List<String> sharedElementNames, List<View> sharedElements, List<View> sharedElementSnapshots) {
+                super.onSharedElementEnd(sharedElementNames, sharedElements, sharedElementSnapshots);
+                if (getWindow() != null && getWindow().getDecorView() != null) {
+                    getWindow().getDecorView().getOverlay().clear();
+                }
+            }
+        });
+
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
@@ -261,6 +271,9 @@ public class IconMarketActivity extends AppCompatActivity {
     }
 
     private void openSearchPage() {
+        if (binding != null && binding.layoutSearchBox != null) {
+            binding.layoutSearchBox.setTransitionName("icon_market_search");
+        }
         android.content.Intent intent = new android.content.Intent(
                 this, IconMarketSearchActivity.class);
         ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(
@@ -528,7 +541,39 @@ public class IconMarketActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onActivityReenter(int resultCode, android.content.Intent data) {
+        super.onActivityReenter(resultCode, data);
+        postponeEnterTransition();
+        if (binding != null) {
+            binding.getRoot().post(() -> {
+                startPostponedEnterTransition();
+                binding.getRoot().postDelayed(this::clearSearchSharedElement, 350L);
+            });
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (binding != null && binding.layoutSearchBox != null) {
+            binding.layoutSearchBox.postDelayed(this::clearSearchSharedElement, 350L);
+        }
+    }
+
+    private void clearSearchSharedElement() {
+        if (binding != null && binding.layoutSearchBox != null) {
+            binding.layoutSearchBox.setTransitionName(null);
+            binding.layoutSearchBox.invalidate();
+        }
+        if (getWindow() != null && getWindow().getDecorView() != null) {
+            getWindow().getDecorView().getOverlay().clear();
+        }
+    }
+
+    @Override
     public void finish() {
+        clearSearchSharedElement();
+        androidx.core.app.ActivityCompat.setExitSharedElementCallback(this, null);
         super.finish();
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
     }

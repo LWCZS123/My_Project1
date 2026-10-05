@@ -207,9 +207,24 @@ public class IconMarketSearchActivity extends AppCompatActivity {
             selectTypeTab(binding.tabIcons, iconResults);
             selectTypeTab(binding.tabCollections, !iconResults);
             binding.layoutViewModes.setVisibility(iconResults ? View.VISIBLE : View.INVISIBLE);
+
+            android.view.ViewGroup.MarginLayoutParams lp =
+                    (android.view.ViewGroup.MarginLayoutParams) binding.rvResults.getLayoutParams();
             if (iconResults) {
+                binding.rvResults.setBackgroundResource(R.drawable.bg_search_results);
+                lp.leftMargin = dp(16);
+                lp.rightMargin = dp(16);
+                lp.setMarginStart(dp(16));
+                lp.setMarginEnd(dp(16));
+                binding.rvResults.setLayoutParams(lp);
                 if (gridMode) showIconGrid(); else showIconList();
             } else {
+                binding.rvResults.setBackgroundResource(0);
+                lp.leftMargin = 0;
+                lp.rightMargin = 0;
+                lp.setMarginStart(0);
+                lp.setMarginEnd(0);
+                binding.rvResults.setLayoutParams(lp);
                 binding.rvResults.setLayoutManager(new LinearLayoutManager(this));
                 binding.rvResults.setAdapter(collectionAdapter);
             }

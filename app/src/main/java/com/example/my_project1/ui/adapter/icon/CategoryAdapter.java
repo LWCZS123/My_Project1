@@ -254,9 +254,10 @@ public class CategoryAdapter extends ListAdapter<IconCategory, CategoryAdapter.V
                         (com.google.android.material.card.MaterialCardView) itemView;
                 card.setCardElevation(0f);
                 card.setStateListAnimator(null);
+                float radiusPx = 20f * itemView.getContext().getResources().getDisplayMetrics().density;
+                card.setRadius(radiusPx);
                 if (flatStyle) {
                     card.setStrokeWidth(0);
-                    card.setRadius(12f);
                 }
             }
             List<String> thumbUrls = category.getThumbUrls();

@@ -268,7 +268,9 @@ public class IconSelectionActivity extends AppCompatActivity {
             iconGridAdapter.setSelectedIcon(icon);
             if (icon != null) {
                 ImageLoaderUtils.load(this, icon.getUrl(), binding.ivSelectedIcon);
-                binding.etCategoryName.setText(icon.getName());
+                if (binding.etCategoryName.getText().toString().trim().isEmpty()) {
+                    binding.etCategoryName.setText(icon.getName());
+                }
             }
         });
 

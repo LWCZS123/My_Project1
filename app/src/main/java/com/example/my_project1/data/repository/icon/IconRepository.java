@@ -542,7 +542,9 @@ public class IconRepository {
                     if (name != null && name.toLowerCase(Locale.CHINA).contains(lowerKeyword)) {
                         String key = String.valueOf(category.getStyle()) + '|'
                                 + String.valueOf(category.getFile());
-                        uniqueMatches.put(key, category.copy());
+                        IconCategory copy = category.copy();
+                        fillThumbsForCategory(assets, copy);
+                        uniqueMatches.put(key, copy);
                     }
                 }
                 dispatchResult(callback, ApiResponse.success(
@@ -847,6 +849,20 @@ public class IconRepository {
             Log.d(TAG, "Filled " + thumbs.size() + " thumbs for " + category.getCategory() + ". First URL: " + (thumbs.isEmpty() ? "none" : thumbs.get(0)));
         } catch (Exception e) {
             Log.e(TAG, "fillAssetCategoryThumbs 异常", e);
+        }
+    }
+
+    private void fillThumbsForCategory(AssetManager assets, IconCategory cat) {
+        if (cat == null) return;
+        if (cat.getThumbUrls() != null && !cat.getThumbUrls().isEmpty()) return;
+        if (cat.getFile() != null && cat.getFile().startsWith("flaticon:")) {
+            fillFlaticonCategoryThumbs(cat);
+        } else if ("line".equals(cat.getStyle())) {
+            fillAssetCategoryThumbs(assets, "freeicon_line.json", cat);
+        } else if ("lineal-color".equals(cat.getStyle())) {
+            fillAssetCategoryThumbs(assets, "线性色.json", cat);
+        } else {
+            fillCategoryThumbs(cat);
         }
     }
 

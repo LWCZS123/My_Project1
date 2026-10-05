@@ -336,9 +336,6 @@ public class IconSelectionViewModel extends AndroidViewModel {
                 items.add(item);
             }
             _iconItems.postValue(items);
-            if (!items.isEmpty()) {
-                _selectedIcon.postValue(items.get(0));
-            }
         } catch (Exception e) {
             _errorMessage.postValue("加载图标详情失败");
         }
@@ -427,9 +424,6 @@ public class IconSelectionViewModel extends AndroidViewModel {
                 }
                 if (results.size() > 100) results = results.subList(0, 100);
                 _iconItems.postValue(results);
-                if (!results.isEmpty()) {
-                    _selectedIcon.postValue(results.get(0));
-                }
             } catch (Exception e) {
                 // ignore
             }

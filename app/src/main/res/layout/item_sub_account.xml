@@ -21,15 +21,24 @@
             android:paddingVertical="12dp"
             android:gravity="center_vertical">
 
-            <!-- 左侧图标 -->
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/iv_icon"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+            <FrameLayout
+                android:layout_width="42dp"
+                android:layout_height="42dp"
                 android:layout_marginEnd="12dp"
-                android:src="@drawable/ic_wallet"
-                android:scaleType="centerInside"
-                app:shapeAppearanceOverlay="@style/CircleAppearance" />
+                android:background="@drawable/bg_icon_item_container"
+                >
+                <!-- 左侧图标 -->
+                <ImageView
+                    android:id="@+id/iv_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_wallet"
+                    android:scaleType="centerInside"
+                     />
+            </FrameLayout>
+
+
 
             <!-- 中间文本 -->
             <LinearLayout

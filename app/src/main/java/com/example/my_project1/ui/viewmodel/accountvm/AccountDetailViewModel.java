@@ -237,8 +237,10 @@ public class AccountDetailViewModel extends AndroidViewModel {
         String outflow = "流出: ¥0.00";
         String billAmount = "账单金额：未出账";
         if (stat != null) {
-            inflow = "流入: ¥" + moneyFmt.get().format(stat.transferInTotal);
-            outflow = "流出: ¥" + moneyFmt.get().format(stat.transferOutTotal);
+            double totalIn = stat.incomeTotal + stat.transferInTotal;
+            double totalOut = stat.expenseTotal + stat.transferOutTotal;
+            inflow = "流入: ¥" + moneyFmt.get().format(totalIn);
+            outflow = "流出: ¥" + moneyFmt.get().format(totalOut);
             billAmount = "账单金额: ¥" + moneyFmt.get().format(stat.expenseTotal - stat.incomeTotal);
         }
 

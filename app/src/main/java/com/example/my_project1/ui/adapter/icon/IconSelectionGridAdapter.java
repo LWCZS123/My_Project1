@@ -21,6 +21,7 @@ public class IconSelectionGridAdapter extends RecyclerView.Adapter<IconSelection
 
     private List<IconItem> list = new ArrayList<>();
     private final OnIconClickListener listener;
+    private String initialIconUrl;
     private String selectedIconUrl;
 
     public interface OnIconClickListener {
@@ -37,12 +38,13 @@ public class IconSelectionGridAdapter extends RecyclerView.Adapter<IconSelection
     }
 
     public void setSelectedIcon(IconItem icon) {
-        selectedIconUrl = icon == null ? null : icon.getUrl();
+        selectedIconUrl = icon == null ? initialIconUrl : icon.getUrl();
         notifyDataSetChanged();
     }
 
     public void setSelectedIconUrl(String iconUrl) {
-        selectedIconUrl = iconUrl;
+        this.initialIconUrl = iconUrl;
+        this.selectedIconUrl = iconUrl;
         notifyDataSetChanged();
     }
 

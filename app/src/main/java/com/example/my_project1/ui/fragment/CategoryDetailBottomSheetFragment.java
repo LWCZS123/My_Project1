@@ -153,10 +153,13 @@ public class CategoryDetailBottomSheetFragment extends BottomSheetDialogFragment
                 args.putString("title","二级分类");
                 args.putString("categoryName",subCategory.getName());
                 args.putString("categoryIconUrl",subCategory.getIconUri());
+                args.putString("categoryIconBg", subCategory.getIconBackgroundColor());
                 args.putLong("subcategoryId",subCategory.getId());
+                args.putLong("parentCategoryId", subCategory.getParentCategoryId());
                 args.putString("type","subcategory");
                 args.putString("categoryCloudId", subCategory.getCloudId());
                 args.putString("categoryType", category.getType());
+                args.putBoolean("excludeBudget", subCategory.isExcludeBudget());
                 dialog.setArguments(args);
                 dialog.show(getParentFragmentManager(), "subcategory_more");
             }
