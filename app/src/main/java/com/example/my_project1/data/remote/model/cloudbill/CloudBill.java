@@ -36,6 +36,7 @@ public class CloudBill extends BmobObject {
     private String categoryIconUrl;    // 分类图标URL
     private String categoryIconBackgroundColor; // 图标背景色
     private Double amount;             // 金额
+    private Double discount;           // 优惠金额
     private Integer type;              // 0支出 1收入
     private Boolean excludeBudget;     // 是否不计入预算
     private String remark;             // 备注
@@ -71,6 +72,9 @@ public class CloudBill extends BmobObject {
 
     public Double getAmount() { return amount; }
     public void setAmount(Double amount) { this.amount = amount; }
+
+    public Double getDiscount() { return discount; }
+    public void setDiscount(Double discount) { this.discount = discount; }
 
     public Integer getType() { return type; }
     public void setType(Integer type) { this.type = type; }
@@ -171,6 +175,7 @@ public class CloudBill extends BmobObject {
         local.setCategoryIconUrl(categoryIconUrl);
         local.setCategoryIconBackgroundColor(categoryIconBackgroundColor);
         local.setAmount(amount != null ? amount : 0);
+        local.setDiscount(discount != null ? discount : 0.0);
         local.setType(type != null ? type : 0);
         local.setExcludeBudget(excludeBudget != null && excludeBudget);
         local.setRemark(remark);
@@ -213,6 +218,7 @@ public class CloudBill extends BmobObject {
         cloud.setCategoryIconUrl(local.getCategoryIconUrl());
         cloud.setCategoryIconBackgroundColor(local.getCategoryIconBackgroundColor());
         cloud.setAmount(local.getAmount());
+        cloud.setDiscount(local.getDiscount());
         cloud.setType(local.getType());
         cloud.setExcludeBudget(local.isExcludeBudget());
         cloud.setRemark(local.getRemark());

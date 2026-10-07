@@ -288,6 +288,17 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
         Account account = findAccount(accountMap, bill.getAccountId(), bill.getLocalAccountId());
         Account toAccount = (billType == 2 || billType == 3)
                 ? findAccount(accountMap, bill.getToAccountId(), bill.getToLocalAccountId()) : null;
+
+        double discount = bill.getDiscount();
+        boolean hasDiscount = discount > 0;
+        String originalAmountText = "";
+        String discountText = "";
+        if (hasDiscount) {
+            double originalAmount = bill.getAmount() + discount;
+            originalAmountText = "¥" + amountFormat.format(originalAmount);
+            discountText = String.format(java.util.Locale.getDefault(), "优惠¥%s", amountFormat.format(discount));
+        }
+
         return BillUiModel.builder()
                 .localId(bill.getId())
                 .objectId(bill.getObjectId())
@@ -304,6 +315,9 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                 .remarkText(bill.getRemark() != null ? bill.getRemark() : "")
                 .imageUrls(bill.getImageUrls() != null ? bill.getImageUrls() : new ArrayList<>())
                 .originalBill(bill)
+                .originalAmountText(originalAmountText)
+                .discountText(discountText)
+                .hasDiscount(hasDiscount)
                 .build();
     }
 

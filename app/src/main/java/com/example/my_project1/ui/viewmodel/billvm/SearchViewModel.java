@@ -277,6 +277,16 @@ public class SearchViewModel extends AndroidViewModel {
         int color = getApplication().getColor(type == 0 ? R.color.red : (type == 1 ? R.color.green : R.color.orange_500));
         String amountText = (type == 0 ? "- ¥" : (type == 1 ? "+ ¥" : "¥")) + amtFmt.format(bill.getAmount());
 
+        double discount = bill.getDiscount();
+        boolean hasDiscount = discount > 0;
+        String originalAmountText = "";
+        String discountText = "";
+        if (hasDiscount) {
+            double originalAmount = bill.getAmount() + discount;
+            originalAmountText = "¥" + amtFmt.format(originalAmount);
+            discountText = String.format(java.util.Locale.getDefault(), "优惠¥%s", amtFmt.format(discount));
+        }
+
         Account acc = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
         Account toAcc = (accountMap != null && type == 2) ? accountMap.get(bill.getToAccountId()) : null;
 
@@ -289,6 +299,9 @@ public class SearchViewModel extends AndroidViewModel {
                 .amountText(amountText).amountColor(color)
                 .accountName(acc != null ? acc.getName() : "").toAccountName(toAcc != null ? toAcc.getName() : "")
                 .billType(type).remarkText(bill.getRemark()).imageUrls(bill.getImageUrls())
+                .originalAmountText(originalAmountText)
+                .discountText(discountText)
+                .hasDiscount(hasDiscount)
                 .build();
     }
 

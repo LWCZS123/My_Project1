@@ -2,6 +2,7 @@ package com.example.my_project1.ui.adapter.bill;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -63,6 +64,19 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
             b.tvCategory.setText(bill.categoryName);
             b.tvAmount.setText(bill.amountText);
             b.tvAmount.setTextColor(bill.amountColor);
+
+            if (bill.hasDiscount) {
+                b.tvOriginalAmount.setVisibility(View.VISIBLE);
+                b.tvOriginalAmount.setText(bill.originalAmountText);
+                b.tvOriginalAmount.setPaintFlags(b.tvOriginalAmount.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+
+                b.tvDiscount.setVisibility(View.VISIBLE);
+                b.tvDiscount.setText(bill.discountText);
+            } else {
+                b.tvOriginalAmount.setVisibility(View.GONE);
+                b.tvOriginalAmount.setPaintFlags(b.tvOriginalAmount.getPaintFlags() & (~Paint.STRIKE_THRU_TEXT_FLAG));
+                b.tvDiscount.setVisibility(View.GONE);
+            }
             
             String subInfo = bill.timeText;
             if (bill.remarkText != null && !bill.remarkText.isEmpty()) {

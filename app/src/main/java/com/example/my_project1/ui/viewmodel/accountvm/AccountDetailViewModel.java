@@ -308,6 +308,16 @@ public class AccountDetailViewModel extends AndroidViewModel {
         // 💡 动态余额逻辑：信用账户显示“欠款”，其他显示“余额”
         String label = (acc != null && acc.isCredit()) ? "欠款: " : "余额: ";
         String balanceStr = label + "¥" + moneyFmt.get().format(balanceAfter);
+
+        double discount = bill.getDiscount();
+        boolean hasDiscount = discount > 0;
+        String originalAmountText = "";
+        String discountText = "";
+        if (hasDiscount) {
+            double originalAmount = bill.getAmount() + discount;
+            originalAmountText = "¥" + moneyFmt.get().format(originalAmount);
+            discountText = String.format(Locale.getDefault(), "优惠¥%s", moneyFmt.get().format(discount));
+        }
         
         AccountBillUiModel m = new AccountBillUiModel(
                 bill.getId(),
@@ -318,7 +328,10 @@ public class AccountDetailViewModel extends AndroidViewModel {
                 prefix + "¥" + moneyFmt.get().format(bill.getAmount()),
                 color,
                 balanceStr,
-                bill
+                bill,
+                originalAmountText,
+                discountText,
+                hasDiscount
         );
         if (bill.getBillTime() != null) {
             m.key = monthKeyFmt.get().format(bill.getBillTime());

@@ -5,9 +5,11 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
@@ -19,6 +21,8 @@ import com.example.my_project1.ui.adapter.bill.BillListAdapter;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.AppExecutors;
+import com.example.my_project1.utils.BottomSheetNavigationBarUtils;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.nlf.calendar.Solar;
 
@@ -52,12 +56,40 @@ public class DailyBillsBottomSheetDialogFragment extends BottomSheetDialogFragme
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setStyle(STYLE_NORMAL, R.style.CustomBottomSheetDialogTheme);
+        setStyle(STYLE_NORMAL, R.style.WhiteNavigationBottomSheetDialogTheme);
         if (getArguments() != null) {
             year = getArguments().getInt("year");
             month = getArguments().getInt("month");
             day = getArguments().getInt("day");
         }
+    }
+
+    @NonNull
+    @Override
+    public android.app.Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+        BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
+        dialog.setOnShowListener(ignored -> {
+            View bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackground(ContextCompat.getDrawable(
+                        requireContext(),
+                        R.drawable.bg_bottom_sheet_white
+                ));
+            }
+            BottomSheetNavigationBarUtils.setup(dialog);
+        });
+        return dialog;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getDialog() == null || getDialog().getWindow() == null) return;
+
+        Window window = getDialog().getWindow();
+        BottomSheetNavigationBarUtils.applyLightAppearance(window);
+        window.getDecorView().post(() ->
+                BottomSheetNavigationBarUtils.applyLightAppearance(window));
     }
 
     @Nullable

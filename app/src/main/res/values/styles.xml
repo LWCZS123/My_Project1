@@ -37,6 +37,24 @@
         <item name="android:windowSoftInputMode">adjustResize|stateHidden</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <style name="WhiteNavigationBottomSheetDialogTheme" parent="Theme.MaterialComponents.Light.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/WhiteNavigationBottomSheetStyle</item>
+        <item name="android:windowSoftInputMode">adjustResize|stateHidden</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="enableEdgeToEdge">true</item>
+    </style>
+
+    <style name="WhiteNavigationBottomSheetStyle" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="paddingBottomSystemWindowInsets">true</item>
     </style>
 
     <style name="ShapeAppearanceBottomSheet" parent="Widget.Design.BottomSheet.Modal">
@@ -216,19 +234,19 @@
 
     <style name="KeyboardButtonStyle">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">52dp</item>
+        <item name="android:layout_height">44dp</item>
         <item name="android:layout_columnWeight">1</item>
-        <item name="android:layout_margin">4dp</item>
+        <item name="android:layout_margin">2.5dp</item>
         <item name="android:background">@drawable/keyboard_button_bg</item>
         <item name="android:gravity">center</item>
         <item name="android:textColor">#333333</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">18sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <style name="KeyboardFunctionButtonStyle" parent="KeyboardButtonStyle">
         <item name="android:textColor">#666666</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">15sp</item>
     </style>
 
     <style name="BudgetQuickButtonStyle">

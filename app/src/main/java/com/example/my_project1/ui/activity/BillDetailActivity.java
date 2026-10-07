@@ -261,6 +261,15 @@ public class BillDetailActivity extends AppCompatActivity {
             binding.tvBillTime.setText(sdf.format(bill.getBillTime()));
         }
 
+        // 优惠金额
+        if (bill.getDiscount() > 0) {
+            binding.tvDiscount.setText(String.format(Locale.getDefault(), "¥%.2f", bill.getDiscount()));
+            binding.tvDiscount.setTextColor(getColor(R.color.accent_color));
+        } else {
+            binding.tvDiscount.setText("无");
+            binding.tvDiscount.setTextColor(getColor(R.color.secondary_text));
+        }
+
         // 6. 预算设置
         if (bill.isExcludeBudget()) {
             binding.tvBudget.setText("不计入预算");
@@ -580,6 +589,7 @@ public class BillDetailActivity extends AppCompatActivity {
 
             intent.putExtra("bill_type", currentBill.getType());
             intent.putExtra("bill_amount", currentBill.getAmount());
+            intent.putExtra("bill_discount", currentBill.getDiscount());
             intent.putExtra("category_id", currentBill.getCategoryId());
             intent.putExtra("category_name", currentBill.getCategoryName());
             intent.putExtra("category_icon", currentBill.getCategoryIconUrl());

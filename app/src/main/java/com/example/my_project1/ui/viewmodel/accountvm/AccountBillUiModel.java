@@ -32,6 +32,9 @@ public class AccountBillUiModel {
     public String balanceText;
     public Bill originalBill;
     public boolean isLastInSection;
+    public String originalAmountText;
+    public String discountText;
+    public boolean hasDiscount;
 
     // Header Constructor
     public AccountBillUiModel(int type, String title, String subtitle, String billAmountText, 
@@ -50,6 +53,13 @@ public class AccountBillUiModel {
     public AccountBillUiModel(long id, String objectId, String categoryName, String categoryIconUrl, 
                              String timeNote, String amountText, int amountColor, String balanceText, 
                              Bill originalBill) {
+        this(id, objectId, categoryName, categoryIconUrl, timeNote, amountText, amountColor, balanceText, originalBill, "", "", false);
+    }
+
+    // Bill Item Constructor with discount info
+    public AccountBillUiModel(long id, String objectId, String categoryName, String categoryIconUrl, 
+                             String timeNote, String amountText, int amountColor, String balanceText, 
+                             Bill originalBill, String originalAmountText, String discountText, boolean hasDiscount) {
         this.type = TYPE_BILL_ITEM;
         this.id = id;
         this.objectId = objectId;
@@ -60,6 +70,9 @@ public class AccountBillUiModel {
         this.amountColor = amountColor;
         this.balanceText = balanceText;
         this.originalBill = originalBill;
+        this.originalAmountText = originalAmountText != null ? originalAmountText : "";
+        this.discountText = discountText != null ? discountText : "";
+        this.hasDiscount = hasDiscount;
     }
 
     @Override
@@ -72,6 +85,7 @@ public class AccountBillUiModel {
                 id == that.id &&
                 amountColor == that.amountColor &&
                 isLastInSection == that.isLastInSection &&
+                hasDiscount == that.hasDiscount &&
                 Objects.equals(title, that.title) &&
                 Objects.equals(subtitle, that.subtitle) &&
                 Objects.equals(billAmountText, that.billAmountText) &&
@@ -84,13 +98,15 @@ public class AccountBillUiModel {
                 Objects.equals(timeNote, that.timeNote) &&
                 Objects.equals(amountText, that.amountText) &&
                 Objects.equals(balanceText, that.balanceText) &&
-                Objects.equals(originalBill, that.originalBill);
+                Objects.equals(originalBill, that.originalBill) &&
+                Objects.equals(originalAmountText, that.originalAmountText) &&
+                Objects.equals(discountText, that.discountText);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(type, title, subtitle, billAmountText, inflowText, outflowText, isCollapsed, 
                             key, id, objectId, categoryName, categoryIconUrl, timeNote, amountText, 
-                            amountColor, balanceText, originalBill, isLastInSection);
+                            amountColor, balanceText, originalBill, isLastInSection, originalAmountText, discountText, hasDiscount);
     }
 }

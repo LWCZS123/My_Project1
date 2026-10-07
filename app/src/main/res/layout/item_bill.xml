@@ -94,7 +94,21 @@
             app:layout_constraintStart_toEndOf="@id/ivTransferArrow"
             app:layout_constraintTop_toTopOf="@id/tvAccount" />
 
-        <!-- 金额：位置微调，与文字区域中心对齐 -->
+        <!-- 原价（带删除线） -->
+        <TextView
+            android:id="@+id/tvOriginalAmount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:text="¥333.00"
+            android:textColor="#A0A0A0"
+            android:textSize="13sp"
+            android:fontFamily="@font/font3_regular"
+            android:visibility="gone"
+            app:layout_constraintEnd_toStartOf="@id/tvAmount"
+            app:layout_constraintBaseline_toBaselineOf="@id/tvAmount" />
+
+        <!-- 金额：位置与类别标题顶端对齐 -->
         <TextView
             android:id="@+id/tvAmount"
             android:layout_width="wrap_content"
@@ -105,8 +119,26 @@
             android:textStyle="bold"
             android:fontFamily="@font/font3_regular"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@id/ivCategoryIcon"
-            app:layout_constraintBottom_toBottomOf="@id/tvAccount" />
+            app:layout_constraintTop_toTopOf="@id/ivCategoryIcon" />
+
+        <!-- 优惠金额标签/胶囊 -->
+        <TextView
+            android:id="@+id/tvDiscount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/bg_discount_tag"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:text="优惠¥35.00"
+            android:textColor="#888888"
+            android:textSize="10sp"
+            android:fontFamily="@font/font3_regular"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvAmount" />
 
         <!-- 图片列表 -->
         <LinearLayout

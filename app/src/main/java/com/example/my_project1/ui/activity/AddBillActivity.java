@@ -92,6 +92,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
 
     // 金额
     private double currentAmount = 0;
+    private double billDiscount = 0.0; // 优惠金额
 
     // 账户
     private Account selectedAccount = null;
@@ -349,11 +350,15 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         // 1. 账单类型
         billType = intent.getIntExtra("bill_type", 0);
 
-        // 2. 金额
-        currentAmount = intent.getDoubleExtra("bill_amount", 0);
-        if (currentAmount > 0) {
-            currentInput = new StringBuilder(formatAmount(currentAmount));
+        // 2. 金额与优惠
+        double actualAmount = intent.getDoubleExtra("bill_amount", 0);
+        billDiscount = intent.getDoubleExtra("bill_discount", 0.0);
+        double inputAmount = actualAmount + billDiscount;
+        currentAmount = actualAmount;
+        if (inputAmount > 0) {
+            currentInput = new StringBuilder(formatAmount(inputAmount));
         }
+        updateDiscountUi();
 
         // 3.分类（在ViewPager设置后才能选中）
         selectedCategoryCloudId = intent.getStringExtra("category_id");
@@ -664,9 +669,53 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         binding.cardAccount.setOnClickListener(v -> selectAccount(false));
         binding.cardTargetAccount.setOnClickListener(v -> selectAccount(true)); // 🔑 选择转入账户
         binding.cardCalendar.setOnClickListener(v -> selectCalendar());
+        binding.cardDiscount.setOnClickListener(v -> showDiscountDialog());
         binding.cardLabel.setOnClickListener(v -> selectLabel());
         binding.cardRecord.setOnClickListener(v -> selectLocation());
         binding.tvRemarkHint.setOnClickListener(v -> editRemark());
+    }
+
+    private double getCurrentInputAmount() {
+        String amountStr = currentInput.toString();
+        if (amountStr.isEmpty() || amountStr.equals("0") || amountStr.equals("0.")) {
+            return 0;
+        }
+        try {
+            return Double.parseDouble(amountStr);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private void showDiscountDialog() {
+        com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment fragment =
+                com.example.my_project1.ui.fragment.BalanceAdjustmentBottomSheetFragment.newInstance(billDiscount, "优惠金额");
+        fragment.setOnBalanceAdjustedListener((newAmount, recordAsTransaction) -> {
+            if (newAmount < 0) {
+                showSnackbar("优惠金额不能为负数", SnackbarUtils.Type.WARNING);
+                return;
+            }
+            double inputAmount = getCurrentInputAmount();
+            if (inputAmount > 0 && newAmount > inputAmount) {
+                showSnackbar("优惠金额不能大于账单金额", SnackbarUtils.Type.WARNING);
+                return;
+            }
+            billDiscount = newAmount;
+            updateDiscountUi();
+        });
+        fragment.show(getSupportFragmentManager(), "discount_adjustment");
+    }
+
+    private void updateDiscountUi() {
+        if (billDiscount > 0) {
+            binding.tvDiscount.setText(String.format(java.util.Locale.getDefault(), "优惠 ¥%.2f", billDiscount));
+            binding.tvDiscount.setTextColor(Color.parseColor("#3478F6"));
+            binding.ivDiscount.setColorFilter(Color.parseColor("#3478F6"));
+        } else {
+            binding.tvDiscount.setText("优惠");
+            binding.tvDiscount.setTextColor(Color.parseColor("#666666"));
+            binding.ivDiscount.setColorFilter(Color.parseColor("#666666"));
+        }
     }
 
     /**
@@ -813,6 +862,12 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 return;
             }
 
+            if (result > 0 && billDiscount > result) {
+                billDiscount = result;
+                updateDiscountUi();
+                showSnackbar("优惠金额已自动调整为账单金额", SnackbarUtils.Type.INFO);
+            }
+
             currentInput = new StringBuilder(formatAmount(result));
             fullExpression = "";
             pendingOperator = null;
@@ -862,6 +917,16 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 return false;
             }
 
+            if (billDiscount > finalAmount) {
+                showSnackbar("优惠金额不能大于账单金额", SnackbarUtils.Type.WARNING);
+                return false;
+            }
+
+            if (billDiscount < 0) {
+                billDiscount = 0;
+                updateDiscountUi();
+            }
+
             // 🔑 验证账户 (转账/还款模式下必须有账户，普通收支可选无账户)
             if ((billType == 2 || billType == 3) && selectedAccount == null) {
                 showSnackbar("请选择转出账户", SnackbarUtils.Type.WARNING);
@@ -880,7 +945,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 return false;
             }
 
-            currentAmount = finalAmount;
+            currentAmount = finalAmount - billDiscount;
             isRepeatMode = isRepeat;
             return true;
 
@@ -1100,6 +1165,8 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
      */
     private void resetForRepeat() {
         resetCalculation();
+        billDiscount = 0.0;
+        updateDiscountUi();
         selectedImages.clear();
         existingImageUrls.clear();
         updateImageDisplay();
@@ -1249,6 +1316,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private void updateBillData(Bill bill, List<String> imageObjectKeys) {
         bill.setUserId(currentUserId);
         bill.setAmount(currentAmount);
+        bill.setDiscount(billDiscount);
         bill.setType(billType);
         bill.setCategoryId(selectedCategoryCloudId);
         bill.setCategoryName(selectedCategoryName);

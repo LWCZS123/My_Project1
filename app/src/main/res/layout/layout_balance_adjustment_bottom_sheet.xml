@@ -5,14 +5,17 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_bottom_sheet1"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="16dp">
 
     <View
         android:layout_width="32dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="8dp"
-        android:background="#DDDDDD" />
+        android:background="@drawable/bg_drag_handle" />
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -33,21 +36,21 @@
             android:layout_centerInParent="true"
             android:text="余额调整"
             android:textColor="#333333"
-            android:textSize="18sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
     </RelativeLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="12dp"
         android:background="@drawable/bg_amount_capsule"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="16dp"
         android:paddingEnd="12dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
 
         <TextView
             android:id="@+id/tv_amount"
@@ -56,7 +59,7 @@
             android:layout_weight="1"
             android:text="0"
             android:textColor="#333333"
-            android:textSize="24sp"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <ImageView
@@ -71,15 +74,15 @@
         android:id="@+id/cb_record_transaction"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:text="将增减金额记为收支"
         android:textColor="#999999"
-        android:textSize="13sp" />
+        android:textSize="12sp" />
 
     <include
         layout="@layout/view_custom_keyboard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="8dp" />
 
 </LinearLayout>

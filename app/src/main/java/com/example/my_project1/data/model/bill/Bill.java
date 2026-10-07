@@ -68,6 +68,8 @@ public class Bill implements Serializable {
     private String categoryIconBackgroundColor;
 
     private double amount;        // 金额
+    @ColumnInfo(name = "discount", defaultValue = "0.0")
+    private double discount = 0.0; // 优惠金额
     private int type;             // 0支出 1收入
 
     private boolean excludeBudget;   // 是否不计入预算
@@ -163,6 +165,9 @@ public class Bill implements Serializable {
     public double getAmount() { return amount; }
     public void setAmount(double amount) { this.amount = amount; }
 
+    public double getDiscount() { return discount; }
+    public void setDiscount(double discount) { this.discount = discount; }
+
     public int getType() { return type; }
     public void setType(int type) { this.type = type; }
 
@@ -214,6 +219,7 @@ public class Bill implements Serializable {
 
         if (id != bill.id) return false;
         if (Double.compare(bill.amount, amount) != 0) return false;
+        if (Double.compare(bill.discount, discount) != 0) return false;
         if (type != bill.type) return false;
         if (excludeBudget != bill.excludeBudget) return false;
         if (sourceWishId != bill.sourceWishId) return false;
@@ -282,6 +288,7 @@ public class Bill implements Serializable {
                 ", categoryName='" + categoryName + '\'' +
                 ", categoryIconUrl='" + categoryIconUrl + '\'' +
                 ", amount=" + amount +
+                ", discount=" + discount +
                 ", type=" + type +
                 ", excludeBudget=" + excludeBudget +
                 ", remark='" + remark + '\'' +

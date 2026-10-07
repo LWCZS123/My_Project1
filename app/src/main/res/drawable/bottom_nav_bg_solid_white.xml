@@ -2,11 +2,10 @@
 <!-- iOS风格毛玻璃背景 - 基础版（适用于所有API） -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 1. 半透明白色背景层 -->
+    <!-- 1. 半透明白色背景层，保留悬浮毛玻璃效果 -->
     <item>
         <shape android:shape="rectangle">
-            <!-- 高透明度的白色，模拟毛玻璃效果 -->
-            <solid android:color="#E6FFFFFF" />  <!-- 90%不透明 -->
+            <solid android:color="#E6FFFFFF" />
             <corners android:radius="28dp" />
         </shape>
     </item>

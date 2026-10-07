@@ -32,6 +32,9 @@ public class BillUiModel {
     public final String locationText;      // 位置，空串则隐藏
     public final java.util.List<String> imageUrls; // 图片 URL 列表
     public final com.example.my_project1.data.model.bill.Bill originalBill; // 原始账单对象
+    public final String originalAmountText; // 原价文本，例如 "¥333.00"
+    public final String discountText;       // 优惠文本，例如 "优惠¥35.00"
+    public final boolean hasDiscount;       // 是否有优惠
 
     // ── 时间轴连线状态（Adapter 按位置判定后写入）────────
     /** true → 该 item 是当天第一笔，上方没有连线（隐藏上半段竖线） */
@@ -60,6 +63,9 @@ public class BillUiModel {
         this.locationText   = b.locationText;
         this.imageUrls      = b.imageUrls;
         this.originalBill   = b.originalBill;
+        this.originalAmountText = b.originalAmountText;
+        this.discountText   = b.discountText;
+        this.hasDiscount    = b.hasDiscount;
         this.isFirstOfDay   = b.isFirstOfDay;
         this.isLastOfDay    = b.isLastOfDay;
         this.diffKey        = (objectId != null && !objectId.isEmpty())
@@ -73,6 +79,7 @@ public class BillUiModel {
         BillUiModel that = (BillUiModel) o;
         return localId == that.localId &&
                 amountColor == that.amountColor &&
+                hasDiscount == that.hasDiscount &&
                 isFirstOfDay == that.isFirstOfDay &&
                 isLastOfDay == that.isLastOfDay &&
                 billType == that.billType &&
@@ -82,6 +89,8 @@ public class BillUiModel {
                 java.util.Objects.equals(categoryIconUrl, that.categoryIconUrl) &&
                 java.util.Objects.equals(categoryIconBackgroundColor, that.categoryIconBackgroundColor) &&
                 java.util.Objects.equals(amountText, that.amountText) &&
+                java.util.Objects.equals(originalAmountText, that.originalAmountText) &&
+                java.util.Objects.equals(discountText, that.discountText) &&
                 java.util.Objects.equals(accountName, that.accountName) &&
                 java.util.Objects.equals(toAccountName, that.toAccountName) &&
                 java.util.Objects.equals(accountIconUrl, that.accountIconUrl) &&
@@ -94,8 +103,9 @@ public class BillUiModel {
     @Override
     public int hashCode() {
         return java.util.Objects.hash(localId, objectId, timeText, categoryName, categoryIconUrl,
-                categoryIconBackgroundColor, amountText, amountColor, accountName, toAccountName,
-                accountIconUrl, billType, remarkText, locationText, imageUrls, originalBill, isFirstOfDay, isLastOfDay);
+                categoryIconBackgroundColor, amountText, amountColor, originalAmountText, discountText,
+                hasDiscount, accountName, toAccountName, accountIconUrl, billType, remarkText, locationText,
+                imageUrls, originalBill, isFirstOfDay, isLastOfDay);
     }
 
     public static Builder builder() { return new Builder(); }
@@ -117,6 +127,9 @@ public class BillUiModel {
         String locationText   = "";
         java.util.List<String> imageUrls = new java.util.ArrayList<>();
         com.example.my_project1.data.model.bill.Bill originalBill;
+        String originalAmountText = "";
+        String discountText   = "";
+        boolean hasDiscount   = false;
         boolean isFirstOfDay  = false;
         boolean isLastOfDay   = false;
 
@@ -136,6 +149,9 @@ public class BillUiModel {
         public Builder locationText(String v) { locationText = v != null ? v : ""; return this; }
         public Builder imageUrls(java.util.List<String> v){ imageUrls = v != null ? v : new java.util.ArrayList<>(); return this; }
         public Builder originalBill(com.example.my_project1.data.model.bill.Bill v) { originalBill = v; return this; }
+        public Builder originalAmountText(String v) { originalAmountText = v != null ? v : ""; return this; }
+        public Builder discountText(String v)       { discountText = v != null ? v : ""; return this; }
+        public Builder hasDiscount(boolean v)       { hasDiscount = v; return this; }
         public Builder isFirstOfDay(boolean v){ isFirstOfDay = v; return this; }
         public Builder isLastOfDay(boolean v) { isLastOfDay = v; return this; }
 

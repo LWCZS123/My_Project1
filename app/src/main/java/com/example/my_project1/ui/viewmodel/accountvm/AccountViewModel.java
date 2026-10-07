@@ -746,6 +746,16 @@ public class AccountViewModel extends AndroidViewModel {
                             timeNote.append(" · ").append(bill.getRemark());
                         }
 
+                        double discount = bill.getDiscount();
+                        boolean hasDiscount = discount > 0;
+                        String originalAmountText = "";
+                        String discountText = "";
+                        if (hasDiscount) {
+                            double originalAmount = bill.getAmount() + discount;
+                            originalAmountText = "¥" + MONEY_FMT.format(originalAmount);
+                            discountText = String.format(Locale.getDefault(), "优惠¥%s", MONEY_FMT.format(discount));
+                        }
+
                         AccountBillUiModel newBillModel = new AccountBillUiModel(
                                 bill.getId(),
                                 bill.getObjectId(),
@@ -755,7 +765,10 @@ public class AccountViewModel extends AndroidViewModel {
                                 prefix + "¥" + MONEY_FMT.format(bill.getAmount()),
                                 amountColor,
                                 balanceLabel + "¥" + MONEY_FMT.format(displayBalance),
-                                bill
+                                bill,
+                                originalAmountText,
+                                discountText,
+                                hasDiscount
                         );
                         billUiModelCache.put(billKey, newBillModel);
                         uiModels.add(newBillModel);

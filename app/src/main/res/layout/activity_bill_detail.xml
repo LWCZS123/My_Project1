@@ -341,6 +341,71 @@
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/tv_time_label" />
 
+                    <!-- 优惠金额行 -->
+                    <ImageView
+                        android:id="@+id/iv_discount_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_discount"
+                        app:tint="#636E72"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_3"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_discount_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="优惠金额"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_discount_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_discount_icon"
+                        app:layout_constraintBottom_toBottomOf="@id/iv_discount_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_discount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="¥0.00"
+                        android:textSize="14sp"
+                        android:textColor="#636E72"
+                        android:gravity="end"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintStart_toEndOf="@id/tv_discount_label"
+                        app:layout_constraintEnd_toStartOf="@id/iv_discount_arrow"
+                        app:layout_constraintTop_toTopOf="@id/tv_discount_label"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_discount_label"
+                        tools:ignore="HardcodedText" />
+
+                    <ImageView
+                        android:id="@+id/iv_discount_arrow"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_arrow_right"
+                        app:tint="#B0B0B0"
+                        android:layout_marginEnd="20dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/tv_discount"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_discount"
+                        tools:ignore="ContentDescription" />
+
+                    <!-- 分隔线 -->
+                    <View
+                        android:id="@+id/divider_discount"
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:background="#F0F0F0"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_discount_label" />
+
                     <!-- 预算行 -->
                     <ImageView
                         android:id="@+id/iv_budget_icon"
@@ -351,7 +416,7 @@
                         android:layout_marginStart="20dp"
                         android:layout_marginTop="20dp"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/divider_3"
+                        app:layout_constraintTop_toBottomOf="@id/divider_discount"
                         tools:ignore="ContentDescription" />
 
                     <TextView

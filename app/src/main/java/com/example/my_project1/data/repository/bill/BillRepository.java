@@ -784,6 +784,7 @@ public class BillRepository {
         local.setCategoryName(cloud.getCategoryName());
         local.setCategoryIconUrl(cloud.getCategoryIconUrl());
         local.setAmount(cloud.getAmount() != null ? cloud.getAmount() : 0);
+        local.setDiscount(cloud.getDiscount() != null ? cloud.getDiscount() : 0.0);
         local.setType(cloud.getType() != null ? cloud.getType() : 0);
         local.setExcludeBudget(cloud.getExcludeBudget() != null && cloud.getExcludeBudget());
         local.setRemark(cloud.getRemark());

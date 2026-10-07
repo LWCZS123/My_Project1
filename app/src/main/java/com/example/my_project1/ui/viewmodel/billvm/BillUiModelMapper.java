@@ -95,6 +95,16 @@ public class BillUiModelMapper {
 
             String amountText = prefix + amountFormatter.format(bill.getAmount());
 
+            double discount = bill.getDiscount();
+            boolean hasDiscount = discount > 0;
+            String originalAmountText = "";
+            String discountText = "";
+            if (hasDiscount) {
+                double originalAmount = bill.getAmount() + discount;
+                originalAmountText = "¥" + amountFormatter.format(originalAmount);
+                discountText = String.format(Locale.getDefault(), "优惠¥%s", amountFormatter.format(discount));
+            }
+
             Account account = accountMap.get(bill.getAccountId());
             Account toAccount = (billType == 2 || billType == 3) ? accountMap.get(bill.getToAccountId()) : null;
 
@@ -114,6 +124,9 @@ public class BillUiModelMapper {
                     .remarkText(bill.getRemark())
                     .imageUrls(bill.getImageUrls())
                     .originalBill(bill)
+                    .originalAmountText(originalAmountText)
+                    .discountText(discountText)
+                    .hasDiscount(hasDiscount)
                     .build();
 
             billUiCache.put(cacheKey, newModel);

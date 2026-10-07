@@ -183,7 +183,7 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
         private final ItemAccountBillMiddleBinding b;
         BillMiddleViewHolder(ItemAccountBillMiddleBinding binding) { super(binding.getRoot()); this.b = binding; }
         void bind(AccountBillUiModel m) { 
-            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout); 
+            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvOriginalAmount, b.tvDiscount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout); 
         }
     }
 
@@ -191,12 +191,12 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
         private final ItemAccountBillBottomBinding b;
         BillBottomViewHolder(ItemAccountBillBottomBinding binding) { super(binding.getRoot()); this.b = binding; }
         void bind(AccountBillUiModel m) { 
-            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout); 
+            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvOriginalAmount, b.tvDiscount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout); 
         }
     }
 
     private void bindData(AccountBillUiModel m, ImageView ivIcon, TextView tvName, TextView tvTime, 
-                          TextView tvAmount, TextView tvBalance, View content, View btnDel, 
+                          TextView tvAmount, TextView tvOriginalAmount, TextView tvDiscount, TextView tvBalance, View content, View btnDel, 
                           View btnRef, View btnEdit, SwipeMenuLayout swipe) {
         
         ImageLoaderUtils.loadThumbnail(context, m.categoryIconUrl, ivIcon);
@@ -215,6 +215,20 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
         tvTime.setText(m.timeNote);
         tvAmount.setText(m.amountText);
         tvAmount.setTextColor(m.amountColor);
+
+        if (m.hasDiscount) {
+            tvOriginalAmount.setVisibility(View.VISIBLE);
+            tvOriginalAmount.setText(m.originalAmountText);
+            tvOriginalAmount.setPaintFlags(tvOriginalAmount.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+
+            tvDiscount.setVisibility(View.VISIBLE);
+            tvDiscount.setText(m.discountText);
+        } else {
+            tvOriginalAmount.setVisibility(View.GONE);
+            tvOriginalAmount.setPaintFlags(tvOriginalAmount.getPaintFlags() & (~android.graphics.Paint.STRIKE_THRU_TEXT_FLAG));
+            tvDiscount.setVisibility(View.GONE);
+        }
+
         tvBalance.setText(m.balanceText);
 
         content.setOnClickListener(v -> { if (listener != null) listener.onBillClick(m.originalBill); });

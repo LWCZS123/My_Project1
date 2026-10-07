@@ -45,7 +45,7 @@ import com.example.my_project1.data.model.icon.DownloadRecord;
                 Wish.class, WishRecord.class,
                 SavingPlan.class, SavingRecord.class, DownloadRecord.class
         },
-        version = 41,
+        version = 42,
         exportSchema = true
 )
 
@@ -82,6 +82,12 @@ public abstract class AppDatabase extends RoomDatabase {
                     + "ON `bills` (`user_id`, `billTime`, `id`, `sync_state`)");
         }
     };
+    static final Migration MIGRATION_41_42 = new Migration(41, 42) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE `bills` ADD COLUMN `discount` REAL NOT NULL DEFAULT 0.0");
+        }
+    };
 
     public abstract CategoryDao categoryDao();
     public abstract SubCategoryDao subCategoryDao();
@@ -104,7 +110,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "accounting_app_db"
                     )
-                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41)
+                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41, MIGRATION_41_42)
                             .fallbackToDestructiveMigration() // 调试阶段允许重建数据库
                             .build();
                 }

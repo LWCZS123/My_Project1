@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -13,6 +14,7 @@ import androidx.core.content.ContextCompat;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.databinding.LayoutBalanceAdjustmentBottomSheetBinding;
+import com.example.my_project1.utils.BottomSheetNavigationBarUtils;
 import com.example.my_project1.utils.SnackbarUtils;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -40,6 +42,12 @@ public class BalanceAdjustmentBottomSheetFragment extends BottomSheetDialogFragm
         return newInstance(account, null);
     }
 
+    public static BalanceAdjustmentBottomSheetFragment newInstance(double initialAmount, String title) {
+        Account tempAccount = new Account();
+        tempAccount.setBalance(initialAmount);
+        return newInstance(tempAccount, title);
+    }
+
     public static BalanceAdjustmentBottomSheetFragment newInstance(Account account, String title) {
         BalanceAdjustmentBottomSheetFragment fragment = new BalanceAdjustmentBottomSheetFragment();
         Bundle args = new Bundle();
@@ -59,7 +67,7 @@ public class BalanceAdjustmentBottomSheetFragment extends BottomSheetDialogFragm
         if (getArguments() != null) {
             account = (Account) getArguments().getSerializable("account");
         }
-        setStyle(STYLE_NORMAL, R.style.CustomBottomSheetDialogTheme);
+        setStyle(STYLE_NORMAL, R.style.WhiteNavigationBottomSheetDialogTheme);
     }
 
     @NonNull
@@ -72,8 +80,20 @@ public class BalanceAdjustmentBottomSheetFragment extends BottomSheetDialogFragm
                 bottomSheet.setBackground(ContextCompat.getDrawable(requireContext(), R.drawable.bg_bottom_sheet1));
                 BottomSheetBehavior.from(bottomSheet).setState(BottomSheetBehavior.STATE_EXPANDED);
             }
+            BottomSheetNavigationBarUtils.setup(dialog);
         });
         return dialog;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getDialog() != null && getDialog().getWindow() != null) {
+            Window window = getDialog().getWindow();
+            BottomSheetNavigationBarUtils.applyLightAppearance(window);
+            window.getDecorView().post(() ->
+                    BottomSheetNavigationBarUtils.applyLightAppearance(window));
+        }
     }
 
     @Nullable
@@ -109,9 +129,7 @@ public class BalanceAdjustmentBottomSheetFragment extends BottomSheetDialogFragm
         setupKeyboard();
 
         binding.btnClose.setOnClickListener(v -> dismiss());
-        binding.btnClear.setOnClickListener(v -> {
-            resetCalculation();
-        });
+        binding.btnClear.setOnClickListener(v -> resetCalculation());
     }
 
     private void setupKeyboard() {
