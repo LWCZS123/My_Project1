@@ -195,6 +195,7 @@ public class HomeFragment extends Fragment {
                 intent.putExtra("remark", bill.getRemark());
                 intent.putExtra("location", bill.getLocation());
                 intent.putExtra("exclude_budget", bill.isExcludeBudget());
+                intent.putExtra("exclude_stat", bill.isExcludeStat());
                 
                 if (bill.getImageUrls() != null && !bill.getImageUrls().isEmpty()) {
                     intent.putStringArrayListExtra("image_urls", new java.util.ArrayList<>(bill.getImageUrls()));

@@ -4,7 +4,6 @@ import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,10 +20,13 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.my_project1.R;
+import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.databinding.ActivityBillDetailBinding;
 import com.example.my_project1.ui.adapter.photo.FullImagePagerAdapter;
@@ -77,6 +79,13 @@ public class BillDetailActivity extends AppCompatActivity {
 
     // 操作菜单
     private FilterPopupMenu actionMenu;
+
+    // 账户名称加载与防抖动相关
+    private String lastAccountId = null;
+    private long lastLocalAccountId = -1;
+    private LiveData<Account> currentAccountLiveData;
+    private Observer<Account> currentAccountObserver;
+    private List<String> lastImageUrls = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -221,21 +230,19 @@ public class BillDetailActivity extends AppCompatActivity {
 
         // 2. 分类信息
         binding.tvCategory.setText(bill.getCategoryName());
-        ImageLoaderUtils.loadThumbnail(this, bill.getCategoryIconUrl(), binding.ivCategoryIcon);
+        ImageLoaderUtils.loadHomeBillCategoryIcon(this, bill.getCategoryIconUrl(), binding.ivCategoryIcon);
+        binding.ivCategoryIcon.setBackground(null);
 
-        // 🎨 设置图标背景色
-        if (bill.getCategoryIconBackgroundColor() != null && !bill.getCategoryIconBackgroundColor().isEmpty()) {
+        // 🎨 设置 card_icon_container 整个 72x72 圆角卡片铺满分类背景色
+        if (bill.getCategoryIconBackgroundColor() != null && !bill.getCategoryIconBackgroundColor().trim().isEmpty()) {
             try {
-                int color = Color.parseColor(bill.getCategoryIconBackgroundColor());
-                GradientDrawable gd = new GradientDrawable();
-                gd.setShape(GradientDrawable.OVAL);
-                gd.setColor(color);
-                binding.ivCategoryIcon.setBackground(gd);
+                int color = Color.parseColor(bill.getCategoryIconBackgroundColor().trim());
+                binding.cardIconContainer.setCardBackgroundColor(color);
             } catch (Exception e) {
-                binding.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+                binding.cardIconContainer.setCardBackgroundColor(Color.parseColor("#EEF8FF"));
             }
         } else {
-            binding.ivCategoryIcon.setBackgroundResource(R.drawable.bg_circle_grey);
+            binding.cardIconContainer.setCardBackgroundColor(Color.parseColor("#EEF8FF"));
         }
 
         // 3. 类型和金额
@@ -279,6 +286,15 @@ public class BillDetailActivity extends AppCompatActivity {
             binding.tvBudget.setTextColor(getColor(R.color.green));
         }
 
+        // 7. 收支设置
+        if (bill.isExcludeStat()) {
+            binding.tvStat.setText("不计入收支");
+            binding.tvStat.setTextColor(getColor(R.color.orange_500));
+        } else {
+            binding.tvStat.setText("计入收支");
+            binding.tvStat.setTextColor(getColor(R.color.green));
+        }
+
         // 7. 备注（始终显示，没有内容则显示"无"）
         binding.tvRemark.setVisibility(View.VISIBLE);
         binding.ivRemarkIcon.setVisibility(View.VISIBLE);
@@ -314,41 +330,60 @@ public class BillDetailActivity extends AppCompatActivity {
     }
 
     /**
-     * 根据accountId加载账户名称
+     * 根据accountId加载账户名称（支持LiveData实时监听防刷新跳动）
      */
     private void loadAccountName(String accountId, long localAccountId) {
-        if ((accountId == null || accountId.isEmpty()) && localAccountId <= 0) {
+        String normalizedAccountId = (accountId != null && !accountId.trim().isEmpty()) ? accountId : null;
+
+        if (normalizedAccountId == null && localAccountId <= 0) {
+            if (currentAccountLiveData != null && currentAccountObserver != null) {
+                currentAccountLiveData.removeObserver(currentAccountObserver);
+                currentAccountLiveData = null;
+                currentAccountObserver = null;
+            }
+            lastAccountId = null;
+            lastLocalAccountId = -1;
             binding.tvAccount.setText("未设置");
             return;
         }
 
-        binding.tvAccount.setText("加载中...");
+        boolean sameAccount = (normalizedAccountId != null ? normalizedAccountId.equals(lastAccountId) : lastAccountId == null)
+                && localAccountId == lastLocalAccountId;
 
-        if (accountId != null && !accountId.isEmpty()) {
-            accountViewModel.getAccountNameById(accountId, new AccountViewModel.ResultCallback() {
-                @Override
-                public void onResult(boolean success, String accountName) {
-                    updateAccountNameUI(success, accountName, accountId);
-                }
-            });
-        } else {
-            accountViewModel.getAccountNameByLocalId(localAccountId, new AccountViewModel.ResultCallback() {
-                @Override
-                public void onResult(boolean success, String accountName) {
-                    updateAccountNameUI(success, accountName, String.valueOf(localAccountId));
-                }
-            });
-        }
-    }
+        CharSequence currentText = binding.tvAccount.getText();
+        boolean hasValidText = currentText != null && currentText.length() > 0 && !"加载中...".equals(currentText.toString());
 
-    private void updateAccountNameUI(boolean success, String accountName, String id) {
-        if (success && accountName != null) {
-            binding.tvAccount.setText(accountName);
-            Log.d(TAG, "✅ 账户名称加载成功: " + accountName);
-        } else {
-            binding.tvAccount.setText("未知账户");
-            Log.e(TAG, "❌ 账户名称加载失败: id=" + id);
+        if (sameAccount && hasValidText) {
+            // 账户标识未发生改变且已正常显示账户名，避免重新设为"加载中..."造成跳动
+            return;
         }
+
+        if (currentAccountLiveData != null && currentAccountObserver != null) {
+            currentAccountLiveData.removeObserver(currentAccountObserver);
+        }
+
+        lastAccountId = normalizedAccountId;
+        lastLocalAccountId = localAccountId;
+
+        if (!hasValidText) {
+            binding.tvAccount.setText("加载中...");
+        }
+
+        currentAccountLiveData = accountViewModel.getAccountLive(normalizedAccountId, localAccountId);
+        currentAccountObserver = account -> {
+            if (account != null && account.getName() != null && !account.getName().isEmpty()) {
+                binding.tvAccount.setText(account.getName());
+                Log.d(TAG, "✅ 账户名称实时加载成功: " + account.getName());
+            } else {
+                CharSequence text = binding.tvAccount.getText();
+                if (text == null || text.length() == 0 || "加载中...".equals(text.toString())) {
+                    binding.tvAccount.setText("未知账户");
+                }
+                Log.e(TAG, "❌ 账户名称未查到: accountId=" + normalizedAccountId + ", localAccountId=" + localAccountId);
+            }
+        };
+
+        currentAccountLiveData.observe(this, currentAccountObserver);
     }
 
     /**
@@ -358,10 +393,16 @@ public class BillDetailActivity extends AppCompatActivity {
         if (imageUrls == null || imageUrls.isEmpty()) {
             // 没有图片时，隐藏轮播卡片
             binding.cardImages.setVisibility(View.GONE);
+            lastImageUrls = null;
             return;
         }
 
         binding.cardImages.setVisibility(View.VISIBLE);
+
+        if (lastImageUrls != null && lastImageUrls.equals(imageUrls) && imagePagerAdapter != null) {
+            return;
+        }
+        lastImageUrls = new ArrayList<>(imageUrls);
 
         // 设置轮播适配器
         imagePagerAdapter = new ImagePagerAdapter(this, imageUrls, new ImagePagerAdapter.OnImageClickListener() {
@@ -602,6 +643,7 @@ public class BillDetailActivity extends AppCompatActivity {
             intent.putExtra("remark", currentBill.getRemark());
             intent.putExtra("location", currentBill.getLocation());
             intent.putExtra("exclude_budget", currentBill.isExcludeBudget());
+            intent.putExtra("exclude_stat", currentBill.isExcludeStat());
 
             if (currentBill.getImageUrls() != null && !currentBill.getImageUrls().isEmpty()) {
                 intent.putStringArrayListExtra("image_urls",

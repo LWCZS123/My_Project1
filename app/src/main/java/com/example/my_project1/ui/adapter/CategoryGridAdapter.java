@@ -1,6 +1,8 @@
 package com.example.my_project1.ui.adapter;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -205,8 +207,23 @@ public class CategoryGridAdapter extends ListAdapter<CategoryWithSubCategories, 
                 binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round_selected);
                 binding.tvCategoryName.setTextColor(context.getColor(R.color.accent_color));
             } else {
-                // 🎨 不再根据分类数据设置图标背景色，统一使用默认圆形背景
-                binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+                // 🎨 根据分类数据设置图标背景色，若未设置则使用默认圆形背景
+                String bgColor = (selectedSub != null && selectedSub.getIconBackgroundColor() != null && !selectedSub.getIconBackgroundColor().trim().isEmpty())
+                        ? selectedSub.getIconBackgroundColor()
+                        : categoryData.category.getIconBackgroundColor();
+                if (bgColor != null && !bgColor.trim().isEmpty()) {
+                    try {
+                        int color = Color.parseColor(bgColor.trim());
+                        GradientDrawable gd = new GradientDrawable();
+                        gd.setShape(GradientDrawable.OVAL);
+                        gd.setColor(color);
+                        binding.rlIconContainer.setBackground(gd);
+                    } catch (Exception e) {
+                        binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+                    }
+                } else {
+                    binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+                }
                 binding.tvCategoryName.setTextColor(context.getColor(R.color.black));
             }
 

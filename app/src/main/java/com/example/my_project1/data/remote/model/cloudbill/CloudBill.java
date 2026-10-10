@@ -39,6 +39,7 @@ public class CloudBill extends BmobObject {
     private Double discount;           // 优惠金额
     private Integer type;              // 0支出 1收入
     private Boolean excludeBudget;     // 是否不计入预算
+    private Boolean excludeStat;       // 是否不计入收支
     private String remark;             // 备注
     private BmobDate billTime;         // 账单时间
     private List<String> imageUrls;    // 图片URL
@@ -81,6 +82,9 @@ public class CloudBill extends BmobObject {
 
     public Boolean getExcludeBudget() { return excludeBudget; }
     public void setExcludeBudget(Boolean excludeBudget) { this.excludeBudget = excludeBudget; }
+
+    public Boolean getExcludeStat() { return excludeStat; }
+    public void setExcludeStat(Boolean excludeStat) { this.excludeStat = excludeStat; }
 
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }
@@ -178,6 +182,7 @@ public class CloudBill extends BmobObject {
         local.setDiscount(discount != null ? discount : 0.0);
         local.setType(type != null ? type : 0);
         local.setExcludeBudget(excludeBudget != null && excludeBudget);
+        local.setExcludeStat(excludeStat != null && excludeStat);
         local.setRemark(remark);
         local.setImageUrls(imageUrls);
         local.setLocation(location);
@@ -221,6 +226,7 @@ public class CloudBill extends BmobObject {
         cloud.setDiscount(local.getDiscount());
         cloud.setType(local.getType());
         cloud.setExcludeBudget(local.isExcludeBudget());
+        cloud.setExcludeStat(local.isExcludeStat());
         cloud.setRemark(local.getRemark());
         cloud.setImageUrls(local.getImageUrls());
         cloud.setLocation(local.getLocation());
@@ -259,6 +265,7 @@ public class CloudBill extends BmobObject {
                 ", amount=" + amount +
                 ", type=" + type +
                 ", excludeBudget=" + excludeBudget +
+                ", excludeStat=" + excludeStat +
                 ", remark='" + remark + '\'' +
                 ", billTime='" + billTime + '\'' +
                 ", location='" + location + '\'' +

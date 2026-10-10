@@ -140,6 +140,8 @@ public class AccountDetailActivity extends AppCompatActivity {
         // 我们在 observeData 中处理显示逻辑
     }
 
+    private boolean hasDismissedLoading = false;
+
     private void observeData() {
         detailViewModel.account.observe(this, account -> {
             if (account != null) {
@@ -169,20 +171,24 @@ public class AccountDetailActivity extends AppCompatActivity {
         detailViewModel.billPagingData.observe(this, pagingData -> {
             pagingAdapter.submitData(getLifecycle(), pagingData);
             
-            // 数据加载后，延迟一点点关闭动画，确保渲染完成
-            binding.getRoot().postDelayed(() -> {
-                if (binding.loadingLayout.getVisibility() == View.VISIBLE) {
-                    binding.loadingLayout.animate()
-                            .alpha(0f)
-                            .setDuration(300)
-                            .withEndAction(() -> {
-                                binding.loadingLayout.setVisibility(View.GONE);
-                                binding.rvTransactions.setVisibility(View.VISIBLE);
-                                binding.rvTransactions.setAlpha(0f);
-                                binding.rvTransactions.animate().alpha(1f).setDuration(200).start();
-                            }).start();
-                }
-            }, 500);
+            if (!hasDismissedLoading) {
+                hasDismissedLoading = true;
+                binding.getRoot().postDelayed(() -> {
+                    if (binding != null && binding.loadingLayout != null && binding.loadingLayout.getVisibility() == View.VISIBLE) {
+                        binding.loadingLayout.animate()
+                                .alpha(0f)
+                                .setDuration(300)
+                                .withEndAction(() -> {
+                                    if (binding == null) return;
+                                    binding.loadingLayout.setVisibility(View.GONE);
+                                    binding.lottieLoading.cancelAnimation();
+                                    binding.rvTransactions.setVisibility(View.VISIBLE);
+                                    binding.rvTransactions.setAlpha(0f);
+                                    binding.rvTransactions.animate().alpha(1f).setDuration(200).start();
+                                }).start();
+                    }
+                }, 500);
+            }
         });
     }
 
@@ -274,6 +280,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                 intent.putExtra("remark", bill.getRemark());
                 intent.putExtra("location", bill.getLocation());
                 intent.putExtra("exclude_budget", bill.isExcludeBudget());
+                intent.putExtra("exclude_stat", bill.isExcludeStat());
                 
                 if (bill.getImageUrls() != null && !bill.getImageUrls().isEmpty()) {
                     intent.putStringArrayListExtra("image_urls", new java.util.ArrayList<>(bill.getImageUrls()));

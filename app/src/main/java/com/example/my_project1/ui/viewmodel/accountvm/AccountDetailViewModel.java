@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import cn.bmob.v3.BmobUser;
@@ -61,6 +62,29 @@ public class AccountDetailViewModel extends AndroidViewModel {
 
     private static final int PAGE_SIZE = 50;
 
+    private static class AccountTarget {
+        final String cloudId;
+        final long localId;
+
+        AccountTarget(String cloudId, long localId) {
+            this.cloudId = cloudId;
+            this.localId = localId;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            AccountTarget that = (AccountTarget) o;
+            return localId == that.localId && Objects.equals(cloudId, that.cloudId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(cloudId, localId);
+        }
+    }
+
     private final ThreadLocal<SimpleDateFormat> monthKeyFmt = new ThreadLocal<SimpleDateFormat>() {
         @Override protected SimpleDateFormat initialValue() { return new SimpleDateFormat("yyyy-MM", Locale.getDefault()); }
     };
@@ -87,62 +111,52 @@ public class AccountDetailViewModel extends AndroidViewModel {
         accountDao = db.accountDao();
         userId = BmobUser.getCurrentUser() != null ? BmobUser.getCurrentUser().getObjectId() : null;
 
-        // 1. Account Info
-        account = Transformations.switchMap(refreshTrigger, t ->
-            Transformations.switchMap(accountId, id -> {
-                if (id != null && !id.isEmpty()) {
-                    return accountDao.getAccountByIdLive(id);
-                } else {
-                    return Transformations.switchMap(localAccountId, accountDao::getAccountByLocalIdLive);
-                }
-            })
+        LiveData<AccountTarget> targetSource = Transformations.switchMap(refreshTrigger, t ->
+            Transformations.switchMap(accountId, id ->
+                Transformations.map(localAccountId, localId -> new AccountTarget(id, localId))
+            )
         );
 
+        // 1. Account Info
+        account = Transformations.switchMap(targetSource, target -> {
+            if (target == null) return new MutableLiveData<>(null);
+            return accountDao.getAccountLive(target.cloudId, target.localId);
+        });
+
         // 2. Statistics
-        stats = Transformations.switchMap(refreshTrigger, t ->
-            Transformations.switchMap(accountId, id -> 
-                Transformations.switchMap(localAccountId, localId -> 
-                    Transformations.switchMap(dateRange, range -> 
-                        billDao.getAccountStatsLive(userId, id, localId, range.start, range.end))))
+        stats = Transformations.switchMap(targetSource, target ->
+            Transformations.switchMap(dateRange, range -> 
+                billDao.getAccountStatsLive(userId, target.cloudId, target.localId, range.start, range.end))
         );
 
         // 3. Category Summaries
-        expenseSummary = Transformations.switchMap(accountId, id -> 
-            Transformations.switchMap(localAccountId, localId -> 
-                Transformations.switchMap(dateRange, range -> 
-                    billDao.getAccountCategorySummaryLive(userId, id, localId, 0, range.start, range.end))));
+        expenseSummary = Transformations.switchMap(targetSource, target ->
+            Transformations.switchMap(dateRange, range -> 
+                billDao.getAccountCategorySummaryLive(userId, target.cloudId, target.localId, 0, range.start, range.end))
+        );
 
-        incomeSummary = Transformations.switchMap(accountId, id -> 
-            Transformations.switchMap(localAccountId, localId -> 
-                Transformations.switchMap(dateRange, range -> 
-                    billDao.getAccountCategorySummaryLive(userId, id, localId, 1, range.start, range.end))));
+        incomeSummary = Transformations.switchMap(targetSource, target ->
+            Transformations.switchMap(dateRange, range -> 
+                billDao.getAccountCategorySummaryLive(userId, target.cloudId, target.localId, 1, range.start, range.end))
+        );
 
         // 4. Monthly & Daily Stats
-        monthlyStats = Transformations.switchMap(accountId, id ->
-            Transformations.switchMap(localAccountId, localId ->
-                billDao.getAccountMonthlyStatsLive(userId, id, localId)));
+        monthlyStats = Transformations.switchMap(targetSource, target ->
+            billDao.getAccountMonthlyStatsLive(userId, target.cloudId, target.localId));
         
-        dailyStats = Transformations.switchMap(accountId, id ->
-            Transformations.switchMap(localAccountId, localId ->
-                billDao.getAccountDailyStatsLive(userId, id, localId)));
+        dailyStats = Transformations.switchMap(targetSource, target ->
+            billDao.getAccountDailyStatsLive(userId, target.cloudId, target.localId));
 
         // 5. Paging Data Flow
-        LiveData<PagingData<BillWithBalance>> rawPaging = Transformations.switchMap(refreshTrigger, t ->
-            Transformations.switchMap(accountId, id ->
-                Transformations.switchMap(localAccountId, localId ->
-                    Transformations.switchMap(dateRange, range -> 
-                        Transformations.switchMap(account, acc -> {
-                            double currentBal = acc != null ? acc.getBalance() : 0;
-                            Pager<Integer, BillWithBalance> pager = new Pager<>(
-                                new PagingConfig(PAGE_SIZE, PAGE_SIZE, false),
-                                () -> new AccountBillsPagingSource(billDao, userId, id, localId, currentBal, range.start, range.end)
-                            );
-                            LiveData<PagingData<BillWithBalance>> paged = PagingLiveData.getLiveData(pager);
-                            return PagingLiveData.cachedIn(paged, androidx.lifecycle.ViewModelKt.getViewModelScope(this));
-                        })
-                    )
-                )
-            )
+        LiveData<PagingData<BillWithBalance>> rawPaging = Transformations.switchMap(targetSource, target ->
+            Transformations.switchMap(dateRange, range -> {
+                Pager<Integer, BillWithBalance> pager = new Pager<>(
+                    new PagingConfig(PAGE_SIZE, PAGE_SIZE, false),
+                    () -> new AccountBillsPagingSource(billDao, accountDao, userId, target.cloudId, target.localId, range.start, range.end)
+                );
+                LiveData<PagingData<BillWithBalance>> paged = PagingLiveData.getLiveData(pager);
+                return PagingLiveData.cachedIn(paged, androidx.lifecycle.ViewModelKt.getViewModelScope(this));
+            })
         );
 
         // Combined data flow to ensure separators have access to latest stats
@@ -160,66 +174,65 @@ public class AccountDetailViewModel extends AndroidViewModel {
                 for (DailyStat s : stats.daily) dStatMap.put(s.day, s);
             }
             
-            return Transformations.switchMap(account, acc -> 
-                Transformations.switchMap(collapsedMonths, collapsed -> 
-                    Transformations.map(rawPaging, pagingData -> {
-                        PagingData<AccountBillUiModel> mapped = PagingDataTransforms.map(pagingData, AppExecutors.get().computation(), 
-                                bwb -> mapToUiModel(bwb.bill, acc, bwb.balanceAfter));
-                        
-                        // Pass 1: Insert Month Headers
-                        PagingData<AccountBillUiModel> monthPaged = PagingDataTransforms.insertSeparators(mapped, AppExecutors.get().computation(), 
-                            (before, after) -> {
-                                if (after == null) return null;
-                                Date afterDate = after.originalBill.getBillTime();
-                                if (afterDate == null) return null;
-                                String afterMonth = monthKeyFmt.get().format(afterDate);
-                                
-                                if (before == null) {
-                                    return createMonthHeader(afterDate, collapsed.contains(afterMonth), mStatMap.get(afterMonth));
-                                }
-                                
+            return Transformations.switchMap(collapsedMonths, collapsed -> 
+                Transformations.map(rawPaging, pagingData -> {
+                    Account currentAcc = account.getValue();
+                    PagingData<AccountBillUiModel> mapped = PagingDataTransforms.map(pagingData, AppExecutors.get().computation(), 
+                            bwb -> mapToUiModel(bwb.bill, currentAcc, bwb.balanceAfter));
+                    
+                    // Pass 1: Insert Month Headers
+                    PagingData<AccountBillUiModel> monthPaged = PagingDataTransforms.insertSeparators(mapped, AppExecutors.get().computation(), 
+                        (before, after) -> {
+                            if (after == null) return null;
+                            Date afterDate = after.originalBill.getBillTime();
+                            if (afterDate == null) return null;
+                            String afterMonth = monthKeyFmt.get().format(afterDate);
+                            
+                            if (before == null) {
+                                return createMonthHeader(afterDate, collapsed.contains(afterMonth), mStatMap.get(afterMonth));
+                            }
+                            
+                            Date beforeDate = before.originalBill.getBillTime();
+                            if (beforeDate == null) return null;
+                            String beforeMonth = monthKeyFmt.get().format(beforeDate);
+                            if (!beforeMonth.equals(afterMonth)) {
+                                return createMonthHeader(afterDate, collapsed.contains(afterMonth), mStatMap.get(afterMonth));
+                            }
+                            return null;
+                        }
+                    );
+
+                    // Pass 2: Insert Day Headers (ensuring the first day of each month also has a header)
+                    PagingData<AccountBillUiModel> withSeparators = PagingDataTransforms.insertSeparators(monthPaged, AppExecutors.get().computation(), 
+                        (before, after) -> {
+                            if (after == null || after.type != AccountBillUiModel.TYPE_BILL_ITEM) return null;
+                            Date afterDate = after.originalBill.getBillTime();
+                            if (afterDate == null) return null;
+                            String afterDay = dayKeyFmt.get().format(afterDate);
+
+                            if (before == null || before.type == AccountBillUiModel.TYPE_MONTH_HEADER) {
+                                return createDayHeader(afterDate, dStatMap.get(afterDay));
+                            }
+                            
+                            if (before.type == AccountBillUiModel.TYPE_BILL_ITEM) {
                                 Date beforeDate = before.originalBill.getBillTime();
                                 if (beforeDate == null) return null;
-                                String beforeMonth = monthKeyFmt.get().format(beforeDate);
-                                if (!beforeMonth.equals(afterMonth)) {
-                                    return createMonthHeader(afterDate, collapsed.contains(afterMonth), mStatMap.get(afterMonth));
-                                }
-                                return null;
-                            }
-                        );
-
-                        // Pass 2: Insert Day Headers (ensuring the first day of each month also has a header)
-                        PagingData<AccountBillUiModel> withSeparators = PagingDataTransforms.insertSeparators(monthPaged, AppExecutors.get().computation(), 
-                            (before, after) -> {
-                                if (after == null || after.type != AccountBillUiModel.TYPE_BILL_ITEM) return null;
-                                Date afterDate = after.originalBill.getBillTime();
-                                if (afterDate == null) return null;
-                                String afterDay = dayKeyFmt.get().format(afterDate);
-
-                                if (before == null || before.type == AccountBillUiModel.TYPE_MONTH_HEADER) {
+                                String beforeDay = dayKeyFmt.get().format(beforeDate);
+                                if (!beforeDay.equals(afterDay)) {
                                     return createDayHeader(afterDate, dStatMap.get(afterDay));
                                 }
-                                
-                                if (before.type == AccountBillUiModel.TYPE_BILL_ITEM) {
-                                    Date beforeDate = before.originalBill.getBillTime();
-                                    if (beforeDate == null) return null;
-                                    String beforeDay = dayKeyFmt.get().format(beforeDate);
-                                    if (!beforeDay.equals(afterDay)) {
-                                        return createDayHeader(afterDate, dStatMap.get(afterDay));
-                                    }
-                                }
-                                return null;
                             }
-                        );
+                            return null;
+                        }
+                    );
 
-                        return PagingDataTransforms.filter(withSeparators, AppExecutors.get().computation(), item -> {
-                            if (item == null) return false;
-                            if (item.type == AccountBillUiModel.TYPE_MONTH_HEADER) return true;
-                            // 使用预计算的 key 进行过滤，避免在此频繁调用 format()
-                            return item.key == null || !collapsed.contains(item.key);
-                        });
-                    })
-                )
+                    return PagingDataTransforms.filter(withSeparators, AppExecutors.get().computation(), item -> {
+                        if (item == null) return false;
+                        if (item.type == AccountBillUiModel.TYPE_MONTH_HEADER) return true;
+                        // 使用预计算的 key 进行过滤，避免在此频繁调用 format()
+                        return item.key == null || !collapsed.contains(item.key);
+                    });
+                })
             );
         });
     }

@@ -1,6 +1,8 @@
 package com.example.my_project1.ui.adapter;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -76,6 +78,20 @@ public class ArchivedCategoryAdapter extends ListAdapter<Object, ArchivedCategor
             
             Object source = ImageLoaderUtils.getGlideSource(context, cat.getIconUri());
             Glide.with(context).load(source).placeholder(R.drawable.ic_default_category).into(holder.ivIcon);
+
+            if (cat.getIconBackgroundColor() != null && !cat.getIconBackgroundColor().trim().isEmpty()) {
+                try {
+                    int color = Color.parseColor(cat.getIconBackgroundColor().trim());
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    holder.ivIcon.setBackground(gd);
+                } catch (Exception e) {
+                    holder.ivIcon.setBackgroundResource(R.drawable.category_icon_background);
+                }
+            } else {
+                holder.ivIcon.setBackgroundResource(R.drawable.category_icon_background);
+            }
         } else if (item instanceof SubCategory) {
             SubCategory sub = (SubCategory) item;
             holder.tvName.setText(sub.getName());
@@ -85,6 +101,20 @@ public class ArchivedCategoryAdapter extends ListAdapter<Object, ArchivedCategor
             
             Object source = ImageLoaderUtils.getGlideSource(context, sub.getIconUri());
             Glide.with(context).load(source).placeholder(R.drawable.ic_default_category).into(holder.ivIcon);
+
+            if (sub.getIconBackgroundColor() != null && !sub.getIconBackgroundColor().trim().isEmpty()) {
+                try {
+                    int color = Color.parseColor(sub.getIconBackgroundColor().trim());
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    holder.ivIcon.setBackground(gd);
+                } catch (Exception e) {
+                    holder.ivIcon.setBackgroundResource(R.drawable.category_icon_background);
+                }
+            } else {
+                holder.ivIcon.setBackgroundResource(R.drawable.category_icon_background);
+            }
         }
 
         holder.btnRestore.setOnClickListener(v -> {

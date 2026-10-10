@@ -1,6 +1,8 @@
 package com.example.my_project1.ui.adapter;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -82,6 +84,20 @@ public class CategoryAdapter extends ListAdapter<Category, CategoryAdapter.Categ
                 .placeholder(R.drawable.ic_default_category)
                 .error(R.drawable.ic_default_category)
                 .into(holder.ivIcon);
+
+        if (category.getIconBackgroundColor() != null && !category.getIconBackgroundColor().trim().isEmpty()) {
+            try {
+                int color = Color.parseColor(category.getIconBackgroundColor().trim());
+                GradientDrawable gd = new GradientDrawable();
+                gd.setShape(GradientDrawable.OVAL);
+                gd.setColor(color);
+                holder.ivIcon.setBackground(gd);
+            } catch (Exception e) {
+                holder.ivIcon.setBackgroundResource(R.drawable.category_icon_background);
+            }
+        } else {
+            holder.ivIcon.setBackgroundResource(R.drawable.category_icon_background);
+        }
 
         int subCount = category.getSubCategories() != null ? category.getSubCategories().size() : 0;
         String type = category.getType();

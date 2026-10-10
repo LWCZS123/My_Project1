@@ -85,6 +85,9 @@ public interface AccountDao {
     @Query("SELECT * FROM accounts WHERE object_id = :id LIMIT 1")
     LiveData<Account> getAccountByIdLive(String id);
 
+    @Query("SELECT * FROM accounts WHERE ((:cloudId IS NOT NULL AND object_id = :cloudId) OR (:localId > 0 AND id = :localId)) AND sync_state != 'TO_DELETE' LIMIT 1")
+    LiveData<Account> getAccountLive(String cloudId, long localId);
+
     @Query("SELECT * FROM accounts WHERE sync_state != 'TO_DELETE' ORDER BY createdAt ASC")
     List<Account> getAllAccountsSyncExcludeDeleted();
 

@@ -584,6 +584,10 @@ public class AccountRepository {
         return accountDao.getAccountByLocalIdLive(localId);
     }
 
+    public LiveData<com.example.my_project1.data.model.account.Account> getAccountLive(String cloudId, long localId) {
+        return accountDao.getAccountLive(cloudId, localId);
+    }
+
     // -------------------------------
     // 🟡 账户操作
     // ------------------------------

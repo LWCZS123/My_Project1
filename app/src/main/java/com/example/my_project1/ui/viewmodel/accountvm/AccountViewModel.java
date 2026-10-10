@@ -134,9 +134,19 @@ public class AccountViewModel extends AndroidViewModel {
     public LiveData<Account> getAccountByLocalId(long localId) {
         String key = "local_" + localId;
         if (!accountLiveDataMap.containsKey(key)) {
-            // Need a way to get LiveData by localId from repository
-            // I'll check if repository has it or add it to Dao
             LiveData<Account> accountLiveData = repository.getAccountByLocalId(localId);
+            accountLiveDataMap.put(key, accountLiveData);
+        }
+        return accountLiveDataMap.get(key);
+    }
+
+    /**
+     * 根据云端ID或本地ID获取账户 LiveData (支持双重查找与实时监听)
+     */
+    public LiveData<Account> getAccountLive(String cloudId, long localId) {
+        String key = "live_" + cloudId + "_" + localId;
+        if (!accountLiveDataMap.containsKey(key)) {
+            LiveData<Account> accountLiveData = repository.getAccountLive(cloudId, localId);
             accountLiveDataMap.put(key, accountLiveData);
         }
         return accountLiveDataMap.get(key);

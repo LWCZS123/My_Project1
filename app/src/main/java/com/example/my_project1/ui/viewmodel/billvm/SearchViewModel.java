@@ -239,8 +239,10 @@ public class SearchViewModel extends AndroidViewModel {
                 currentDayBills.clear();
             }
 
-            if (bill.getType() == 0) dayExp += bill.getAmount();
-            else if (bill.getType() == 1) dayInc += bill.getAmount();
+            if (!bill.isExcludeStat()) {
+                if (bill.getType() == 0) dayExp += bill.getAmount();
+                else if (bill.getType() == 1) dayInc += bill.getAmount();
+            }
 
             currentDayBills.add(buildUiModel(bill, accountMap, timeFmt, amtFmt));
             prevDateKey = dateKey;

@@ -45,7 +45,7 @@ import com.example.my_project1.data.model.icon.DownloadRecord;
                 Wish.class, WishRecord.class,
                 SavingPlan.class, SavingRecord.class, DownloadRecord.class
         },
-        version = 42,
+        version = 43,
         exportSchema = true
 )
 
@@ -88,6 +88,12 @@ public abstract class AppDatabase extends RoomDatabase {
             database.execSQL("ALTER TABLE `bills` ADD COLUMN `discount` REAL NOT NULL DEFAULT 0.0");
         }
     };
+    static final Migration MIGRATION_42_43 = new Migration(42, 43) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE `bills` ADD COLUMN `exclude_stat` INTEGER NOT NULL DEFAULT 0");
+        }
+    };
 
     public abstract CategoryDao categoryDao();
     public abstract SubCategoryDao subCategoryDao();
@@ -110,7 +116,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "accounting_app_db"
                     )
-                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41, MIGRATION_41_42)
+                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43)
                             .fallbackToDestructiveMigration() // 调试阶段允许重建数据库
                             .build();
                 }

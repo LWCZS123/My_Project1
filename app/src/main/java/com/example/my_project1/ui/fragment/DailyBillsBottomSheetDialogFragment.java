@@ -154,8 +154,10 @@ public class DailyBillsBottomSheetDialogFragment extends BottomSheetDialogFragme
         double income = 0;
         double expense = 0;
         for (Bill bill : safeBills) {
-            if (bill.getType() == 1) income += bill.getAmount();
-            else if (bill.getType() == 0) expense += bill.getAmount();
+            if (!bill.isExcludeStat()) {
+                if (bill.getType() == 1) income += bill.getAmount();
+                else if (bill.getType() == 0) expense += bill.getAmount();
+            }
         }
         updateStats(income, expense);
 

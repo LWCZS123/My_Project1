@@ -2,6 +2,8 @@ package com.example.my_project1.ui.adapter;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -60,6 +62,7 @@ public class SubCategoryAdapter extends ListAdapter<SubCategory, SubCategoryAdap
             Glide.with(context)
                     .load(R.drawable.ic_add_circle)
                     .into(holder.ivIcon);
+            holder.layoutIcon.setBackgroundResource(R.drawable.bg_category_round);
             holder.layoutIcon.setOnClickListener(v -> {
                 if (listener != null) listener.onAddSubCategoryClick();
             });
@@ -70,6 +73,20 @@ public class SubCategoryAdapter extends ListAdapter<SubCategory, SubCategoryAdap
                     .load(sub.getIconUri())
                     .error(R.drawable.ic_default_category)
                     .into(holder.ivIcon);
+
+            if (sub.getIconBackgroundColor() != null && !sub.getIconBackgroundColor().trim().isEmpty()) {
+                try {
+                    int color = Color.parseColor(sub.getIconBackgroundColor().trim());
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    holder.layoutIcon.setBackground(gd);
+                } catch (Exception e) {
+                    holder.layoutIcon.setBackgroundResource(R.drawable.bg_category_round);
+                }
+            } else {
+                holder.layoutIcon.setBackgroundResource(R.drawable.bg_category_round);
+            }
 
             holder.layoutIcon.setOnClickListener(v -> {
                 if (listener != null) listener.onSubCategoryClick(sub);

@@ -236,10 +236,12 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                 income = 0;
             }
 
-            if (bill.getType() == 0) {
-                expense += bill.getAmount();
-            } else if (bill.getType() == 1) {
-                income += bill.getAmount();
+            if (!bill.isExcludeStat()) {
+                if (bill.getType() == 0) {
+                    expense += bill.getAmount();
+                } else if (bill.getType() == 1) {
+                    income += bill.getAmount();
+                }
             }
 
             boolean isLastInDay = index + 1 == bills.size() || !isSameDay(bill, bills.get(index + 1));

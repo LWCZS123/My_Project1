@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -199,6 +200,20 @@ public class SubCategoryDialog extends Dialog {
         public void bind(SubCategory sub) {
             binding.tvSubcategoryName.setText(formatSubCategoryName(sub.getName()));
             loadIcon(sub.getIconUri(), binding.ivSubcategoryIcon);
+
+            if (sub.getIconBackgroundColor() != null && !sub.getIconBackgroundColor().trim().isEmpty()) {
+                try {
+                    int color = Color.parseColor(sub.getIconBackgroundColor().trim());
+                    GradientDrawable gd = new GradientDrawable();
+                    gd.setShape(GradientDrawable.OVAL);
+                    gd.setColor(color);
+                    binding.rlIconContainer.setBackground(gd);
+                } catch (Exception e) {
+                    binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+                }
+            } else {
+                binding.rlIconContainer.setBackgroundResource(R.drawable.bg_category_round);
+            }
 
             itemView.setOnClickListener(v -> {
                 if (listener != null) {

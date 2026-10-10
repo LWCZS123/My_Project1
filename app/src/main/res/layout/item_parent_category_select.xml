@@ -42,6 +42,7 @@
 
                 <!-- 图标背景圆 -->
                 <View
+                    android:id="@+id/v_icon_bg"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="@drawable/bg_icon_circle" />

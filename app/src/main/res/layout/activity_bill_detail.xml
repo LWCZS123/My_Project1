@@ -471,6 +471,71 @@
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/tv_budget_label" />
 
+                    <!-- 收支设置行 -->
+                    <ImageView
+                        android:id="@+id/iv_stat_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_tags"
+                        app:tint="#636E72"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/divider_4"
+                        tools:ignore="ContentDescription" />
+
+                    <TextView
+                        android:id="@+id/tv_stat_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="收支设置"
+                        android:textSize="15sp"
+                        android:textColor="#2D3436"
+                        android:layout_marginStart="10dp"
+                        app:layout_constraintStart_toEndOf="@id/iv_stat_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_stat_icon"
+                        app:layout_constraintBottom_toBottomOf="@id/iv_stat_icon"
+                        tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/tv_stat"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="计入收支"
+                        android:textSize="14sp"
+                        android:textColor="#636E72"
+                        android:gravity="end"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintStart_toEndOf="@id/tv_stat_label"
+                        app:layout_constraintEnd_toStartOf="@id/iv_stat_arrow"
+                        app:layout_constraintTop_toTopOf="@id/tv_stat_label"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_stat_label"
+                        tools:ignore="HardcodedText" />
+
+                    <ImageView
+                        android:id="@+id/iv_stat_arrow"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_arrow_right"
+                        app:tint="#B0B0B0"
+                        android:layout_marginEnd="20dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/tv_stat"
+                        app:layout_constraintBottom_toBottomOf="@id/tv_stat"
+                        tools:ignore="ContentDescription" />
+
+                    <!-- 分隔线 -->
+                    <View
+                        android:id="@+id/divider_stat"
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:background="#F0F0F0"
+                        android:layout_marginTop="20dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_stat_label" />
+
                     <!-- 备注行 -->
                     <ImageView
                         android:id="@+id/iv_remark_icon"
@@ -481,7 +546,7 @@
                         android:layout_marginStart="20dp"
                         android:layout_marginTop="20dp"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/divider_4"
+                        app:layout_constraintTop_toBottomOf="@id/divider_stat"
                         tools:ignore="ContentDescription" />
 
                     <TextView
@@ -580,8 +645,7 @@
                 android:layout_height="72dp"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="4dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="#795078E6"
+                app:strokeWidth="0dp"
                 app:cardBackgroundColor="#EEF8FF"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -590,9 +654,10 @@
 
                 <ImageView
                     android:id="@+id/iv_category_icon"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
                     android:layout_gravity="center"
+                    android:background="@null"
                     android:src="@drawable/ic_expense_shopping"
                     tools:ignore="ContentDescription" />
             </com.google.android.material.card.MaterialCardView>

@@ -126,7 +126,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
 
                 double spent = 0;
                 for (Bill b : bills) {
-                    if (!b.isExcludeBudget()) spent += b.getAmount();
+                    if (!b.isExcludeBudget() && !b.isExcludeStat()) spent += b.getAmount();
                 }
                 final double     finalSpent = spent;
                 final List<Bill> finalBills = bills;
@@ -247,7 +247,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
                 cursor.add(Calendar.DAY_OF_MONTH, 1);
             }
             for (Bill b : bills) {
-                if (b.isExcludeBudget()) continue;
+                if (b.isExcludeBudget() || b.isExcludeStat()) continue;
                 long billTime = b.getBillTime() != null ? b.getBillTime().getTime() : 0;
                 Calendar billDay = Calendar.getInstance();
                 billDay.setTimeInMillis(billTime);
@@ -274,7 +274,7 @@ public class CategoryBudgetDetailViewModel extends AndroidViewModel {
             if (bills == null) return result;
 
             for (Bill b : bills) {
-                if (b.isExcludeBudget() || b.getBillTime() == null) continue;
+                if (b.isExcludeBudget() || b.isExcludeStat() || b.getBillTime() == null) continue;
                 Calendar c = Calendar.getInstance();
                 c.setTime(b.getBillTime());
                 int month = c.get(Calendar.MONTH); // 0-11

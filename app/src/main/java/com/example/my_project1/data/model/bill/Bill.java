@@ -74,6 +74,9 @@ public class Bill implements Serializable {
 
     private boolean excludeBudget;   // 是否不计入预算
 
+    @ColumnInfo(name = "exclude_stat", defaultValue = "0")
+    private boolean excludeStat;     // 是否不计入收支
+
 
     private String remark;        // 备注
     private Date billTime;        // 账单时间
@@ -179,6 +182,14 @@ public class Bill implements Serializable {
         this.excludeBudget = excludeBudget;
     }
 
+    public boolean isExcludeStat() {
+        return excludeStat;
+    }
+
+    public void setExcludeStat(boolean excludeStat) {
+        this.excludeStat = excludeStat;
+    }
+
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }
 
@@ -222,6 +233,7 @@ public class Bill implements Serializable {
         if (Double.compare(bill.discount, discount) != 0) return false;
         if (type != bill.type) return false;
         if (excludeBudget != bill.excludeBudget) return false;
+        if (excludeStat != bill.excludeStat) return false;
         if (sourceWishId != bill.sourceWishId) return false;
         if (objectId != null ? !objectId.equals(bill.objectId) : bill.objectId != null)
             return false;
@@ -265,6 +277,7 @@ public class Bill implements Serializable {
         result = 31 * result + (int) (temp ^ (temp >>> 32));
         result = 31 * result + type;
         result = 31 * result + (excludeBudget ? 1 : 0);
+        result = 31 * result + (excludeStat ? 1 : 0);
         result = 31 * result + (remark != null ? remark.hashCode() : 0);
         result = 31 * result + (billTime != null ? billTime.hashCode() : 0);
         result = 31 * result + (imageUrls != null ? imageUrls.hashCode() : 0);
@@ -291,6 +304,7 @@ public class Bill implements Serializable {
                 ", discount=" + discount +
                 ", type=" + type +
                 ", excludeBudget=" + excludeBudget +
+                ", excludeStat=" + excludeStat +
                 ", remark='" + remark + '\'' +
                 ", billTime=" + billTime +
                 ", imageUrl='" + imageUrls + '\'' +

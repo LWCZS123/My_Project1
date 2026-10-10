@@ -337,6 +337,23 @@ public class SaveCategoryBottomSheet extends BottomSheetDialogFragment {
                     Glide.with(itemView.getContext()).load(item.category.getIconUri()).into(ivIcon);
                 }
 
+                View vIconBg = itemView.findViewById(R.id.v_icon_bg);
+                if (vIconBg != null) {
+                    if (item.category.getIconBackgroundColor() != null && !item.category.getIconBackgroundColor().trim().isEmpty()) {
+                        try {
+                            int color = android.graphics.Color.parseColor(item.category.getIconBackgroundColor().trim());
+                            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+                            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                            gd.setColor(color);
+                            vIconBg.setBackground(gd);
+                        } catch (Exception e) {
+                            vIconBg.setBackgroundResource(R.drawable.bg_icon_circle);
+                        }
+                    } else {
+                        vIconBg.setBackgroundResource(R.drawable.bg_icon_circle);
+                    }
+                }
+
                 if (selected) {
                     card.setStrokeColor(0xFF304FFE);
                     card.setCardBackgroundColor(0xFFEEF1FF);

@@ -59,8 +59,8 @@ public interface BillDao {
 
     @Query("SELECT strftime('%Y-%m-%d', billTime/1000, 'unixepoch', 'localtime') AS day, " +
             "COUNT(*) AS billCount, " +
-            "COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) AS incomeTotal, " +
-            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) AS expenseTotal " +
+            "COALESCE(SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) AS incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) AS expenseTotal " +
             "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' AND billTime IS NOT NULL " +
             "GROUP BY day ORDER BY day DESC")
     LiveData<List<DailyStat>> getUserDailyStatsLive(String userId);
@@ -79,21 +79,21 @@ public interface BillDao {
 
     /** 全量账单统计在 SQLite 聚合，避免为了 count/days 把所有账单实体加载到内存。 */
     @Query("SELECT " +
-            "COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
-            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
             "COUNT(*) as billCount, " +
             "COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
             "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE'")
     LiveData<SearchSummary> getUserBillSummaryLive(String userId);
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
-            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
             "COUNT(*) as billCount, COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
             "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE'")
     SearchSummary getUserBillSummarySync(String userId);
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
-            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as expenseTotal, " +
             "COUNT(*) as billCount, COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
             "FROM bills WHERE user_id = :userId AND sync_state != 'TO_DELETE' " +
             "AND billTime >= :start AND billTime < :endExclusive")
@@ -137,8 +137,8 @@ public interface BillDao {
     List<BillWithBalance> getAccountBillsWithBalancePaged(String userId, String accountId, long localAccountId, double currentBalance, java.util.Date startTime, java.util.Date endTime, int limit, int offset);
 
     @Query("SELECT " +
-            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
-            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal, " +
+            "SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END) as expenseTotal, " +
             "COUNT(*) as billCount, " +
             "COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
             "FROM bills WHERE user_id = :userId " +
@@ -154,6 +154,7 @@ public interface BillDao {
             "AND (account_id = :accountId OR local_account_id = :localAccountId " +
             "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
             "AND sync_state != 'TO_DELETE' " +
+            "AND exclude_stat = 0 " +
             "AND type = :type " +
             "AND (:startTime IS NULL OR billTime >= :startTime) " +
             "AND (:endTime IS NULL OR billTime <= :endTime) " +
@@ -163,8 +164,8 @@ public interface BillDao {
 
     @Query("SELECT strftime('%Y-%m-%d', billTime/1000, 'unixepoch', 'localtime') as day, " +
             "COUNT(*) as billCount, " +
-            "COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0) as incomeTotal, " +
-            "COALESCE(SUM(CASE WHEN type = 0 THEN amount ELSE 0 END), 0) as expenseTotal " +
+            "COALESCE(SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as incomeTotal, " +
+            "COALESCE(SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END), 0) as expenseTotal " +
             "FROM bills WHERE user_id = :userId " +
             "AND (account_id = :accountId OR local_account_id = :localAccountId " +
             "OR to_account_id = :accountId OR to_local_account_id = :localAccountId) " +
@@ -173,8 +174,8 @@ public interface BillDao {
    LiveData<List<DailyStat>> getAccountDailyStatsLive(String userId, String accountId, long localAccountId);
 
     @Query("SELECT strftime('%Y-%m', billTime/1000, 'unixepoch', 'localtime') as month, " +
-            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
-            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal, " +
+            "SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END) as expenseTotal, " +
             "SUM(CASE WHEN (type = 2 OR type = 3) AND (to_account_id = :accountId OR to_local_account_id = :localAccountId) THEN amount ELSE 0 END) as transferInTotal, " +
             "SUM(CASE WHEN (type = 2 OR type = 3) AND (account_id = :accountId OR local_account_id = :localAccountId) THEN amount ELSE 0 END) as transferOutTotal " +
             "FROM bills WHERE user_id = :userId " +
@@ -273,8 +274,8 @@ public interface BillDao {
      * 高级搜索汇总：直接在数据库层面计算聚合结果
      */
     @Query("SELECT " +
-            "SUM(CASE WHEN type = 1 THEN amount ELSE 0 END) as incomeTotal, " +
-            "SUM(CASE WHEN type = 0 THEN amount ELSE 0 END) as expenseTotal, " +
+            "SUM(CASE WHEN type = 1 AND exclude_stat = 0 THEN amount ELSE 0 END) as incomeTotal, " +
+            "SUM(CASE WHEN type = 0 AND exclude_stat = 0 THEN amount ELSE 0 END) as expenseTotal, " +
             "COUNT(*) as billCount, " +
             "COUNT(DISTINCT date(billTime/1000, 'unixepoch', 'localtime')) as billDays " +
             "FROM bills WHERE user_id = :userId " +
@@ -371,6 +372,7 @@ public interface BillDao {
             "AND category_id = :catCloudId " +
             "AND type = :billType " +
             "AND excludeBudget = 0 " +
+            "AND exclude_stat = 0 " +
             "AND billTime >= :startMs AND billTime <= :endMs " +
             "AND sync_state != 'TO_DELETE'")
     List<Bill> getBillsByCategoryInRange(String userId, String catCloudId,
@@ -380,6 +382,7 @@ public interface BillDao {
             "WHERE user_id = :userId " +
             "AND type = 0 " +
             "AND excludeBudget = 0 " +
+            "AND exclude_stat = 0 " +
             "AND billTime >= :startMs AND billTime <= :endMs " +
             "AND sync_state != 'TO_DELETE'")
     List<Bill> getExpenseBillsInRange(String userId, long startMs, long endMs);
@@ -388,18 +391,19 @@ public interface BillDao {
             "WHERE user_id = :userId " +
             "AND type = 1 " +
             "AND excludeBudget = 0 " +
+            "AND exclude_stat = 0 " +
             "AND billTime >= :startMs AND billTime <= :endMs " +
             "AND sync_state != 'TO_DELETE'")
     List<Bill> getIncomeBillsInRange(String userId, long startMs, long endMs);
 
     @Query("SELECT COALESCE(SUM(amount), 0) FROM bills " +
-            "WHERE user_id = :userId AND type = :type AND excludeBudget = 0 " +
+            "WHERE user_id = :userId AND type = :type AND excludeBudget = 0 AND exclude_stat = 0 " +
             "AND billTime >= :startMs AND billTime <= :endMs " +
             "AND sync_state != 'TO_DELETE'")
     double getBudgetAmountInRange(String userId, int type, long startMs, long endMs);
 
     @Query("SELECT category_id, COALESCE(SUM(amount), 0) AS total_amount FROM bills " +
-            "WHERE user_id = :userId AND type = :billType AND excludeBudget = 0 " +
+            "WHERE user_id = :userId AND type = :billType AND excludeBudget = 0 AND exclude_stat = 0 " +
             "AND billTime >= :startMs AND billTime <= :endMs " +
             "AND sync_state != 'TO_DELETE' AND category_id IS NOT NULL " +
             "GROUP BY category_id")

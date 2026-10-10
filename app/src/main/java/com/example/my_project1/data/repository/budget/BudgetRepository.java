@@ -422,7 +422,7 @@ public class BudgetRepository {
                             Budget.TYPE_INCOME.equals(transType) ? 1 : 0, startMs, endMs);
             if (bills == null) return 0;
             double sum = 0;
-            for (Bill b : bills) { if (!b.isExcludeBudget()) sum += b.getAmount(); }
+            for (Bill b : bills) { if (!b.isExcludeBudget() && !b.isExcludeStat()) sum += b.getAmount(); }
             return sum;
         } catch (Exception e) {
             Log.e(TAG, "统计分类支出失败：" + e.getMessage());
@@ -494,7 +494,7 @@ public class BudgetRepository {
                 cursor.add(Calendar.DAY_OF_MONTH, 1);
             }
             for (Bill b : bills) {
-                if (b.isExcludeBudget()) continue;
+                if (b.isExcludeBudget() || b.isExcludeStat()) continue;
                 long bt = b.getBillTime() != null ? b.getBillTime().getTime() : 0;
                 Calendar billDay = Calendar.getInstance();
                 billDay.setTimeInMillis(bt);

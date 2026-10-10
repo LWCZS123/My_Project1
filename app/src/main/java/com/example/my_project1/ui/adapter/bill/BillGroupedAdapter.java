@@ -123,8 +123,10 @@ public class BillGroupedAdapter extends ListAdapter<Object, RecyclerView.ViewHol
                 map.put(key, group);
             }
             group.bills.add(bill);
-            if (bill.getType() == 0) group.totalExpense += bill.getAmount();
-            else if (bill.getType() == 1) group.totalIncome += bill.getAmount();
+            if (!bill.isExcludeStat()) {
+                if (bill.getType() == 0) group.totalExpense += bill.getAmount();
+                else if (bill.getType() == 1) group.totalIncome += bill.getAmount();
+            }
         }
         groups.addAll(map.values());
         return groups;

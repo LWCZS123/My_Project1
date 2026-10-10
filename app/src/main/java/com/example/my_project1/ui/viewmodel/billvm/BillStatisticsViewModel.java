@@ -173,6 +173,7 @@ public class BillStatisticsViewModel extends AndroidViewModel {
 
             for (Bill b : all) {
                 if (!currentUserId.equals(b.getUserId())) continue;
+                if (b.isExcludeStat()) continue;
                 Date bt = b.getBillTime();
                 if (bt == null) continue;
                 if (!bt.before(start) && !bt.after(end)) filtered.add(b);

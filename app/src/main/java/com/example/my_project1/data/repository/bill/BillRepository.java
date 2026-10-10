@@ -12,7 +12,6 @@ import com.example.my_project1.data.model.SyncState;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
 import com.example.my_project1.data.model.bill.DailyStat;
-import com.example.my_project1.data.model.bill.MonthlyStat;
 import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.remote.model.cloudbill.BmobBillApiImpl;
 import com.example.my_project1.data.remote.model.cloudbill.CloudBill;
@@ -787,6 +786,7 @@ public class BillRepository {
         local.setDiscount(cloud.getDiscount() != null ? cloud.getDiscount() : 0.0);
         local.setType(cloud.getType() != null ? cloud.getType() : 0);
         local.setExcludeBudget(cloud.getExcludeBudget() != null && cloud.getExcludeBudget());
+        local.setExcludeStat(cloud.getExcludeStat() != null && cloud.getExcludeStat());
         local.setRemark(cloud.getRemark());
         local.setBillTime(DateConvertUtil.safeConvertToDate(cloud.getBillTime()));
         local.setImageUrls(cloud.getImageUrls());

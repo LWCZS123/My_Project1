@@ -110,8 +110,9 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private double selectedLat = 0;
     private double selectedLng = 0;
 
-    // 预算设置
+    // 预算与收支标记设置
     private boolean excludeBudget = false;
+    private boolean excludeStat = false;
 
     // 图片支持远程图片URL和本地Uri
     private List<Uri> selectedImages = new ArrayList<>();
@@ -422,8 +423,10 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
             binding.ivRecord.setVisibility(View.GONE);
         }
 
-        // 8. 预算设置
+        // 8. 预算与收支标记设置
         excludeBudget = intent.getBooleanExtra("exclude_budget", false);
+        excludeStat = intent.getBooleanExtra("exclude_stat", false);
+        updateMarkUi();
 
         // 9. 图片URLs
         ArrayList<String> imageUrls = intent.getStringArrayListExtra("image_urls");
@@ -604,6 +607,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
             selectedCategoryImageUrl = categoryImageUrl;
             selectedCategoryIconBackgroundColor = backgroundColor;
             this.excludeBudget = excludeBudget; // 🔑 修复：继承分类的预算排除状态
+            updateMarkUi();
         });
 
         // 页面切换监听
@@ -670,7 +674,8 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         binding.cardTargetAccount.setOnClickListener(v -> selectAccount(true)); // 🔑 选择转入账户
         binding.cardCalendar.setOnClickListener(v -> selectCalendar());
         binding.cardDiscount.setOnClickListener(v -> showDiscountDialog());
-        binding.cardLabel.setOnClickListener(v -> selectLabel());
+        binding.cardLabel.setOnClickListener(v -> selectMark());
+        binding.cardMark.setOnClickListener(v -> selectMark());
         binding.cardRecord.setOnClickListener(v -> selectLocation());
         binding.tvRemarkHint.setOnClickListener(v -> editRemark());
     }
@@ -1277,9 +1282,35 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         fragment.show(getSupportFragmentManager(), "date_time_picker");
     }
 
-    private void selectLabel() {
-        // TODO: 实现标签功能
-        showSnackbar("标签功能开发中", SnackbarUtils.Type.INFO);
+    private void selectMark() {
+        com.example.my_project1.ui.fragment.MoreSettingsBottomSheetFragment fragment =
+                com.example.my_project1.ui.fragment.MoreSettingsBottomSheetFragment.newInstance(excludeBudget, excludeStat);
+        fragment.setOnSettingsConfirmedListener((newExcludeBudget, newExcludeStat) -> {
+            this.excludeBudget = newExcludeBudget;
+            this.excludeStat = newExcludeStat;
+            updateMarkUi();
+        });
+        fragment.show(getSupportFragmentManager(), "more_settings_bottom_sheet");
+    }
+
+    private void updateMarkUi() {
+        if (excludeBudget && excludeStat) {
+            binding.tvMark.setText("不计预算/收支");
+            binding.tvMark.setTextColor(Color.parseColor("#3478F6"));
+            binding.ivMark.setColorFilter(Color.parseColor("#3478F6"));
+        } else if (excludeBudget) {
+            binding.tvMark.setText("不计预算");
+            binding.tvMark.setTextColor(Color.parseColor("#3478F6"));
+            binding.ivMark.setColorFilter(Color.parseColor("#3478F6"));
+        } else if (excludeStat) {
+            binding.tvMark.setText("不计收支");
+            binding.tvMark.setTextColor(Color.parseColor("#3478F6"));
+            binding.ivMark.setColorFilter(Color.parseColor("#3478F6"));
+        } else {
+            binding.tvMark.setText("标记");
+            binding.tvMark.setTextColor(Color.parseColor("#666666"));
+            binding.ivMark.setColorFilter(Color.parseColor("#666666"));
+        }
     }
 
     private void selectLocation() {
@@ -1325,6 +1356,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         bill.setBillTime(selectedBillTime);
         bill.setRemark(billRemark);
         bill.setExcludeBudget(excludeBudget);
+        bill.setExcludeStat(excludeStat);
 
         // 设置图片URL
         if (imageObjectKeys != null && !imageObjectKeys.isEmpty()) {
