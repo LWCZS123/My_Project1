@@ -744,9 +744,32 @@ public class AccountViewModel extends AndroidViewModel {
                         }
 
                         // 创建新对象并缓存
-                        boolean isIncome = isPositiveImpact(bill, currentAccountId, currentLocalAccountId);
-                        String prefix = isIncome ? "+" : "-";
-                        int amountColor = isIncome ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B");
+                        String categoryName = bill.getCategoryName() != null ? bill.getCategoryName() : "";
+                        boolean isReimburse = bill.isReimbursable() || bill.isReimbursed() || categoryName.contains("报销");
+                        boolean isAccountCreation = categoryName.contains("账户创建") || categoryName.contains("创建账户") || categoryName.contains("余额调整");
+                        boolean isTransfer = bill.getType() == 2 || bill.getType() == 3 || categoryName.contains("转账") || categoryName.contains("还款");
+
+                        String prefix;
+                        int amountColor;
+                        if (isReimburse || isAccountCreation) {
+                            prefix = "";
+                            amountColor = Color.parseColor("#FF9800");
+                        } else if (isTransfer) {
+                            boolean isTargetAccount = false;
+                            if (currentAccountId != null && !currentAccountId.isEmpty() && currentAccountId.equals(bill.getToAccountId())) {
+                                isTargetAccount = true;
+                            } else if (currentLocalAccountId > 0 && currentLocalAccountId == bill.getToLocalAccountId()) {
+                                isTargetAccount = true;
+                            }
+                            prefix = isTargetAccount ? "+" : "-";
+                            amountColor = Color.parseColor("#FF9800");
+                        } else if (bill.getType() == 1) {
+                            prefix = "+";
+                            amountColor = Color.parseColor("#00C48C");
+                        } else {
+                            prefix = "-";
+                            amountColor = Color.parseColor("#FF6B6B");
+                        }
                         
                         String balanceLabel = isCredit ? "欠款: " : "余额: ";
                         double displayBalance = isCredit ? Math.abs(balanceAfter) : balanceAfter;

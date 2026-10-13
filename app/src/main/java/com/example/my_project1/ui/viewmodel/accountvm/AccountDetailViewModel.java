@@ -308,14 +308,42 @@ public class AccountDetailViewModel extends AndroidViewModel {
     private AccountBillUiModel mapToUiModel(Bill bill, Account acc, double balanceAfter) {
         if (bill == null) return null;
         SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        boolean isIncome = bill.getType() == 1;
-        String prefix = isIncome ? "+" : "-";
-        int color = isIncome ? Color.parseColor("#00C48C") : Color.parseColor("#FF6B6B");
+        String categoryName = bill.getCategoryName() != null ? bill.getCategoryName() : "";
+        boolean isReimburse = bill.isReimbursable() || bill.isReimbursed() || categoryName.contains("报销");
+        boolean isAccountCreation = categoryName.contains("账户创建") || categoryName.contains("创建账户") || categoryName.contains("余额调整");
+        boolean isTransfer = bill.getType() == 2 || bill.getType() == 3 || categoryName.contains("转账") || categoryName.contains("还款");
+
+        String prefix;
+        int color;
+        if (isReimburse || isAccountCreation) {
+            prefix = "";
+            color = Color.parseColor("#FF9800");
+        } else if (isTransfer) {
+            boolean isTargetAccount = false;
+            if (acc != null) {
+                if (acc.getObjectId() != null && !acc.getObjectId().isEmpty() && acc.getObjectId().equals(bill.getToAccountId())) {
+                    isTargetAccount = true;
+                } else if (acc.getId() > 0 && acc.getId() == bill.getToLocalAccountId()) {
+                    isTargetAccount = true;
+                }
+            }
+            prefix = isTargetAccount ? "+" : "-";
+            color = Color.parseColor("#FF9800");
+        } else if (bill.getType() == 1) {
+            prefix = "+";
+            color = Color.parseColor("#00C48C");
+        } else {
+            prefix = "-";
+            color = Color.parseColor("#FF6B6B");
+        }
         
         String timeStr = bill.getBillTime() != null ? timeFmt.format(bill.getBillTime()) : "--:--";
         StringBuilder timeNote = new StringBuilder(timeStr);
         if (bill.getRemark() != null && !bill.getRemark().isEmpty()) {
             timeNote.append(" · ").append(bill.getRemark());
+        }
+        if (bill.isReimbursable() || categoryName.contains("报销")) {
+            timeNote.append(bill.isReimbursed() ? " · 已报销" : " · 未报销");
         }
 
         // 💡 动态余额逻辑：信用账户显示“欠款”，其他显示“余额”

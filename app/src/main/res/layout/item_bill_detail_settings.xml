@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_settings"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="6dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp">
+
+        <!-- 预算设置行 -->
+        <RelativeLayout
+            android:id="@+id/layout_row_budget"
+            android:layout_width="match_parent"
+            android:layout_height="52dp">
+
+            <FrameLayout
+                android:id="@+id/box_budget_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_icon_box_gray">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/iv_budget_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_money1"
+                    app:tint="#64748B"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_budget_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/box_budget_icon"
+                android:text="预算设置"
+                android:textColor="#1E293B"
+                android:textSize="15sp"
+                tools:ignore="HardcodedText" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/arrow_budget"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="#CBD5E1"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/tv_budget"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_budget"
+                android:text="计入月度预算"
+                android:textColor="#64748B"
+                android:textSize="14sp"
+                tools:ignore="HardcodedText" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#F1F5F9" />
+
+        <!-- 收支设置行 -->
+        <RelativeLayout
+            android:id="@+id/layout_row_stat"
+            android:layout_width="match_parent"
+            android:layout_height="52dp">
+
+            <FrameLayout
+                android:id="@+id/box_stat_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_icon_box_gray">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/iv_stat_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_tags"
+                    app:tint="#64748B"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_stat_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/box_stat_icon"
+                android:text="收支设置"
+                android:textColor="#1E293B"
+                android:textSize="15sp"
+                tools:ignore="HardcodedText" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/arrow_stat"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="#CBD5E1"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/tv_stat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_stat"
+                android:text="计入支出"
+                android:textColor="#64748B"
+                android:textSize="14sp"
+                tools:ignore="HardcodedText" />
+        </RelativeLayout>
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

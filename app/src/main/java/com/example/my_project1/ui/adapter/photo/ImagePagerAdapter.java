@@ -48,8 +48,12 @@ public class ImagePagerAdapter extends RecyclerView.Adapter<ImagePagerAdapter.Im
     public void onBindViewHolder(@NonNull ImageViewHolder holder, int position) {
         String imageUrl = imageUrls.get(position);
 
-        // 使用ImageLoaderUtils加载图片
-        ImageLoaderUtils.loadBillImage(context, imageUrl, holder.imageView);
+        // 获取精确宽高像素（以 180dp 固定卡片高度解码，避免加载巨大图导致 OOM）
+        int widthPx = context.getResources().getDisplayMetrics().widthPixels;
+        int heightPx = Math.round(180 * context.getResources().getDisplayMetrics().density);
+
+        // 使用 ImageLoaderUtils 精准解码加载
+        ImageLoaderUtils.loadBillCarouselImage(context, imageUrl, holder.imageView, widthPx, heightPx);
 
         // 设置点击事件
         holder.imageView.setOnClickListener(v -> {

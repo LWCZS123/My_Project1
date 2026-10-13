@@ -419,9 +419,6 @@ public class AssetsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // 🔴 onResume 时重新加载数据
-        viewModel.syncFromCloud();
-
         BmobUser currentUser = BmobUser.getCurrentUser();
         if (currentUser != null) {
             viewModel.loadAccountGroups(currentUser.getObjectId());

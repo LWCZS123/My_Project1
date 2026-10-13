@@ -204,14 +204,15 @@ public class AddAccountActivity extends AppCompatActivity {
                 IconAccountBottomSheet sheet = new IconAccountBottomSheet();
                 sheet.setOnlyBanks(true);
                 sheet.setOnIconSelectedListener(icon -> {
+                    if (icon == null) return;
                     iconRes = -1; // 不再使用本地资源
-                    // 这里可能需要一个字段存储网络 URL
-                    // ImageLoaderUtils.load(this, icon.getUrl(), binding.ivAccountIcon);
-                    // 为了简单，我们先用 icon.getName() 更新名称，并保存 URL
-                    binding.etAccountName.setText(icon.getName());
-                    // 假设我们有一个变量保存选中的图标 URL
+                    if (icon.getName() != null && !icon.getName().isEmpty()) {
+                        binding.etAccountName.setText(icon.getName());
+                    }
                     selectedIconUrl = icon.getUrl();
-                    com.example.my_project1.utils.ImageLoaderUtils.loadThumbnail(this, icon.getUrl(), binding.ivAccountIcon);
+                    if (!isFinishing() && !isDestroyed()) {
+                        com.example.my_project1.utils.ImageLoaderUtils.loadThumbnail(this, icon.getUrl(), binding.ivAccountIcon);
+                    }
                 });
                 sheet.show(getSupportFragmentManager(), "SelectBankIcon");
             }
@@ -256,7 +257,8 @@ public class AddAccountActivity extends AppCompatActivity {
             if (groups != null && selectedGroupId == null) {
                 for (AccountGroup group : groups) {
                     if (group.getName().equals(accountCategory)) {
-                        selectedGroupId = group.getObjectId();
+                        selectedGroupId = (group.getObjectId() != null && !group.getObjectId().isEmpty()) ?
+                                group.getObjectId() : group.getName();
                         binding.btnMoveGroup.setText("所属分组：" + group.getName());
                         break;
                     }
@@ -273,7 +275,8 @@ public class AddAccountActivity extends AppCompatActivity {
             }
             SelectGroupBottomSheetFragment fragment = SelectGroupBottomSheetFragment.newInstance(groups, selectedGroupId);
             fragment.setOnGroupSelectedListener(group -> {
-                selectedGroupId = group.getObjectId();
+                selectedGroupId = (group.getObjectId() != null && !group.getObjectId().isEmpty()) ?
+                        group.getObjectId() : group.getName();
                 binding.btnMoveGroup.setText("所属分组：" + group.getName());
             });
             fragment.show(getSupportFragmentManager(), "SelectGroup");

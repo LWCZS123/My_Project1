@@ -276,8 +276,26 @@ public class SearchViewModel extends AndroidViewModel {
 
     private BillUiModel buildUiModel(Bill bill, Map<String, Account> accountMap, SimpleDateFormat timeFmt, DecimalFormat amtFmt) {
         int type = bill.getType();
-        int color = getApplication().getColor(type == 0 ? R.color.red : (type == 1 ? R.color.green : R.color.orange_500));
-        String amountText = (type == 0 ? "- ¥" : (type == 1 ? "+ ¥" : "¥")) + amtFmt.format(bill.getAmount());
+        String categoryName = bill.getCategoryName() != null ? bill.getCategoryName() : "";
+        boolean isReimburse = bill.isReimbursable() || bill.isReimbursed() || categoryName.contains("报销");
+        boolean isAccountCreation = categoryName.contains("账户创建") || categoryName.contains("创建账户") || categoryName.contains("余额调整");
+        boolean isTransfer = type == 2 || type == 3 || categoryName.contains("转账") || categoryName.contains("还款");
+
+        int color;
+        String amountText;
+        if (isReimburse || isAccountCreation) {
+            color = getApplication().getColor(R.color.orange_500);
+            amountText = "¥" + amtFmt.format(bill.getAmount());
+        } else if (isTransfer) {
+            color = getApplication().getColor(R.color.orange_500);
+            amountText = "- ¥" + amtFmt.format(bill.getAmount());
+        } else if (type == 1) {
+            color = getApplication().getColor(R.color.green);
+            amountText = "+ ¥" + amtFmt.format(bill.getAmount());
+        } else {
+            color = getApplication().getColor(R.color.red);
+            amountText = "- ¥" + amtFmt.format(bill.getAmount());
+        }
 
         double discount = bill.getDiscount();
         boolean hasDiscount = discount > 0;

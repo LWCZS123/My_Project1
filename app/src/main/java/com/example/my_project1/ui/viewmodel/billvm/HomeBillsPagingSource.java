@@ -273,18 +273,28 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
         String amountPrefix;
         int amountColor;
         String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
+        String categoryName = bill.getCategoryName() != null ? bill.getCategoryName() : "";
 
-        if (billType == 0) {
+        boolean isReimburse = bill.isReimbursable() || bill.isReimbursed() || categoryName.contains("报销");
+        boolean isAccountCreation = categoryName.contains("账户创建") || categoryName.contains("创建账户") || categoryName.contains("余额调整");
+        boolean isTransfer = billType == 2 || billType == 3 || categoryName.contains("转账") || categoryName.contains("还款");
+
+        if (isReimburse || isAccountCreation) {
+            amountPrefix = "¥";
+            amountColor = application.getColor(R.color.orange_500);
+        } else if (isTransfer) {
             amountPrefix = "- ¥";
-            amountColor = application.getColor(R.color.red);
+            amountColor = application.getColor(R.color.orange_500);
+            if (categoryIcon.isEmpty()) {
+                categoryIcon = Uri.parse("android.resource://" + application.getPackageName()
+                        + "/" + R.drawable.ic_transference).toString();
+            }
         } else if (billType == 1) {
             amountPrefix = "+ ¥";
             amountColor = application.getColor(R.color.green);
         } else {
-            amountPrefix = "¥";
-            amountColor = application.getColor(R.color.orange_500);
-            categoryIcon = Uri.parse("android.resource://" + application.getPackageName()
-                    + "/" + R.drawable.ic_transference).toString();
+            amountPrefix = "- ¥";
+            amountColor = application.getColor(R.color.red);
         }
 
         Account account = findAccount(accountMap, bill.getAccountId(), bill.getLocalAccountId());

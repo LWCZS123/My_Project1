@@ -26,11 +26,11 @@ import cn.bmob.v3.listener.FindListener;
 /**
  * AccountRepository (修复同步问题版)
  * -------------------------------------------------------
- * 🔧 核心修复：
- * 1. ✅ 同步前优先上传本地待同步数据
- * 2. ✅ 避免云端数据覆盖本地未上传的修改
- * 3. ✅ 账户余额更新时立即触发同步
- * 4. ✅ 下载时跳过本地待同步的数据
+ * 核心修复：
+ * 1. 同步前优先上传本地待同步数据
+ * 2. 避免云端数据覆盖本地未上传的修改
+ * 3. 账户余额更新时立即触发同步
+ * 4. 下载时跳过本地待同步的数据
  */
 public class AccountRepository {
 
@@ -65,7 +65,7 @@ public class AccountRepository {
     }
 
     // -------------------------------
-    // 🟢 账户组操作
+    // 账户组操作
     // -------------------------------
 
     public void insertAccountGroup(com.example.my_project1.data.model.account.AccountGroup group,
@@ -78,7 +78,7 @@ public class AccountRepository {
                             accountDao.getGroupByName(group.getUserId(), group.getName());
 
                     if (existing != null) {
-                        Log.w(TAG, "⚠️ 插入失败，账户组重名：" + group.getName());
+                        Log.w(TAG, "插入失败，账户组重名：" + group.getName());
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -96,7 +96,8 @@ public class AccountRepository {
                     long insertedId = accountDao.insertGroup(group);
 
                     if (insertedId > 0) {
-                        Log.i(TAG, "✅ 插入账户组成功: " + group.getName() + " (Room ID: " + insertedId + ")");
+                        Log.i(TAG, "插入账户组成功: " + group.getName() + " (Room ID: " + insertedId + ")");
+                        uploadPendingChanges();
                         enqueueSync();
                         postOnMain(new Runnable() {
                             @Override
@@ -105,7 +106,7 @@ public class AccountRepository {
                             }
                         });
                     } else {
-                        Log.e(TAG, "❌ 插入失败,返回ID: " + insertedId);
+                        Log.e(TAG, "插入失败,返回ID: " + insertedId);
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -114,7 +115,7 @@ public class AccountRepository {
                         });
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 插入账户组异常：", e);
+                    Log.e(TAG, "插入账户组异常：", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -135,7 +136,7 @@ public class AccountRepository {
                             accountDao.getGroupByCloudId(group.getObjectId());
 
                     if (existingGroup == null) {
-                        Log.e(TAG, "❌ 更新失败,数据库中找不到该账户组: " + group.getObjectId());
+                        Log.e(TAG, "更新失败,数据库中找不到该账户组: " + group.getObjectId());
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -149,7 +150,7 @@ public class AccountRepository {
                             accountDao.getGroupByName(group.getUserId(), group.getName());
 
                     if (duplicateCheck != null && duplicateCheck.getId() != existingGroup.getId()) {
-                        Log.w(TAG, "⚠️ 更新失败,账户组名称重复: " + group.getName());
+                        Log.w(TAG, "更新失败,账户组名称重复: " + group.getName());
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -172,7 +173,8 @@ public class AccountRepository {
                     int rowsAffected = accountDao.updateGroup(existingGroup);
 
                     if (rowsAffected > 0) {
-                        Log.i(TAG, "✅ 更新账户组成功: " + existingGroup.getName());
+                        Log.i(TAG, "更新账户组成功: " + existingGroup.getName());
+                        uploadPendingChanges();
                         enqueueSync();
                         postOnMain(new Runnable() {
                             @Override
@@ -181,7 +183,7 @@ public class AccountRepository {
                             }
                         });
                     } else {
-                        Log.e(TAG, "❌ 更新失败,没有行被更新");
+                        Log.e(TAG, "更新失败,没有行被更新");
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -190,7 +192,7 @@ public class AccountRepository {
                         });
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 更新账户组异常：", e);
+                    Log.e(TAG, "更新账户组异常：", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -212,7 +214,7 @@ public class AccountRepository {
                             accountDao.getGroupByCloudId(group.getObjectId());
 
                     if (existing == null) {
-                        Log.w(TAG, "⚠️ 账户组不存在，可能已删除: " + group.getObjectId());
+                        Log.w(TAG, "账户组不存在，可能已删除: " + group.getObjectId());
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -233,7 +235,7 @@ public class AccountRepository {
                     }
 
                     if (activeCount > 0) {
-                        Log.e(TAG, "❌ 删除失败：组下还有 " + activeCount + " 个账户");
+                        Log.e(TAG, "删除失败：组下还有 " + activeCount + " 个账户");
                         final int count = activeCount;
                         postOnMain(new Runnable() {
                             @Override
@@ -250,7 +252,8 @@ public class AccountRepository {
                     int updated = accountDao.updateGroup(existing);
 
                     if (updated > 0) {
-                        Log.i(TAG, "✅ 账户组标记删除成功: " + existing.getName());
+                        Log.i(TAG, "账户组标记删除成功: " + existing.getName());
+                        uploadPendingChanges();
                         enqueueSync();
                         postOnMain(new Runnable() {
                             @Override
@@ -259,7 +262,7 @@ public class AccountRepository {
                             }
                         });
                     } else {
-                        Log.e(TAG, "❌ 标记删除失败");
+                        Log.e(TAG, "标记删除失败");
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -269,7 +272,7 @@ public class AccountRepository {
                     }
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 删除账户组异常:", e);
+                    Log.e(TAG, "删除账户组异常:", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -289,15 +292,16 @@ public class AccountRepository {
                     long now = System.currentTimeMillis();
                     // 1. 批量标记账户为删除状态
                     accountDao.markAccountsAsDeletedByGroup(group.getObjectId(), now);
-                    
+
                     // 2. 标记账户组为删除状态
                     group.setSyncState(SyncState.TO_DELETE);
                     group.setUpdatedAt(new Date(now));
                     accountDao.updateGroup(group);
-                    
+
+                    uploadPendingChanges();
                     enqueueSync();
 
-                    Log.i(TAG, "🗑 批量标记删除账户组及其账户：" + group.getName());
+                    Log.i(TAG, "批量标记删除账户组及其账户：" + group.getName());
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -306,7 +310,7 @@ public class AccountRepository {
                     });
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 批量确认删除失败：", e);
+                    Log.e(TAG, "批量确认删除失败：", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -327,7 +331,7 @@ public class AccountRepository {
                             accountDao.getGroupByCloudId(newGroupId);
 
                     if (newGroup == null) {
-                        Log.e(TAG, "❌ 新账户组不存在: " + newGroupId);
+                        Log.e(TAG, "新账户组不存在: " + newGroupId);
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -341,7 +345,7 @@ public class AccountRepository {
                             accountDao.getAccountsByGroupIdSync(oldGroupId);
 
                     if (accounts == null || accounts.isEmpty()) {
-                        Log.w(TAG, "⚠️ 旧组下没有账户需要移动");
+                        Log.w(TAG, "旧组下没有账户需要移动");
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -365,15 +369,16 @@ public class AccountRepository {
                         int updated = accountDao.update(acc);
                         if (updated > 0) {
                             movedCount++;
-                            Log.d(TAG, "📦 移动账户:" + acc.getName() + " [" + oldGroup + " → " + newGroupId + "]");
+                            Log.d(TAG, "移动账户:" + acc.getName() + " [" + oldGroup + " -> " + newGroupId + "]");
                         }
                     }
 
                     updateGroupAccountCountInternal(oldGroupId);
                     updateGroupAccountCountInternal(newGroupId);
+                    uploadPendingChanges();
                     enqueueSync();
 
-                    Log.i(TAG, "✅ 账户移动完成:共移动 " + movedCount + " 个账户");
+                    Log.i(TAG, "账户移动完成:共移动 " + movedCount + " 个账户");
                     final int finalMovedCount = movedCount;
                     postOnMain(new Runnable() {
                         @Override
@@ -383,7 +388,7 @@ public class AccountRepository {
                     });
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 移动账户失败:", e);
+                    Log.e(TAG, "移动账户失败:", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -404,7 +409,7 @@ public class AccountRepository {
                             accountDao.getGroupByCloudId(newGroupId);
 
                     if (newGroup == null) {
-                        Log.e(TAG, "❌ 目标账户组不存在: " + newGroupId);
+                        Log.e(TAG, "目标账户组不存在: " + newGroupId);
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -418,7 +423,7 @@ public class AccountRepository {
                             accountDao.getAccountByCloudId(accountId);
 
                     if (account == null) {
-                        Log.e(TAG, "❌ 账户不存在: " + accountId);
+                        Log.e(TAG, "账户不存在: " + accountId);
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -435,7 +440,7 @@ public class AccountRepository {
 
                     int updated = accountDao.update(account);
                     if (updated <= 0) {
-                        Log.e(TAG, "❌ 更新失败：" + account.getName());
+                        Log.e(TAG, "更新失败：" + account.getName());
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -445,14 +450,15 @@ public class AccountRepository {
                         return;
                     }
 
-                    Log.d(TAG, "📦 移动账户: " + account.getName()
-                            + " [" + oldGroupId + " → " + newGroupId + "]");
+                    Log.d(TAG, "移动账户: " + account.getName()
+                            + " [" + oldGroupId + " -> " + newGroupId + "]");
 
                     updateGroupAccountCountInternal(oldGroupId);
                     updateGroupAccountCountInternal(newGroupId);
+                    uploadPendingChanges();
                     enqueueSync();
 
-                    Log.i(TAG, "✅ 单个账户移动完成: " + account.getName());
+                    Log.i(TAG, "单个账户移动完成: " + account.getName());
 
                     postOnMain(new Runnable() {
                         @Override
@@ -462,7 +468,7 @@ public class AccountRepository {
                     });
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 移动单个账户失败:", e);
+                    Log.e(TAG, "移动单个账户失败:", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -480,7 +486,7 @@ public class AccountRepository {
                     accountDao.getAccountByCloudId(accountId);
             return account != null ? account.getGroupId() : null;
         } catch (Exception e) {
-            Log.e(TAG, "❌ 获取账户所属组失败: " + accountId, e);
+            Log.e(TAG, "获取账户所属组失败: " + accountId, e);
             return null;
         }
     }
@@ -503,7 +509,7 @@ public class AccountRepository {
                     });
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 获取账户所属组失败: " + groupId, e);
+                    Log.e(TAG, "获取账户所属组失败: " + groupId, e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -519,7 +525,7 @@ public class AccountRepository {
         try {
             return accountDao.getAccountById(accountId);
         } catch (Exception e) {
-            Log.e(TAG, "❌ 获取账户失败: " + accountId, e);
+            Log.e(TAG, "获取账户失败: " + accountId, e);
             return null;
         }
     }
@@ -528,7 +534,7 @@ public class AccountRepository {
         try {
             return accountDao.getAccountByLocalId(localId);
         } catch (Exception e) {
-            Log.e(TAG, "❌ 获取本地账户失败: " + localId, e);
+            Log.e(TAG, "获取本地账户失败: " + localId, e);
             return null;
         }
     }
@@ -543,7 +549,7 @@ public class AccountRepository {
 
                     final String accountName = account != null ? account.getName() : null;
 
-                    Log.d(TAG, "✅ 查询账户名称: accountId=" + accountId + ", name=" + accountName);
+                    Log.d(TAG, "查询账户名称: accountId=" + accountId + ", name=" + accountName);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -552,7 +558,7 @@ public class AccountRepository {
                     });
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 获取账户名称失败: " + accountId, e);
+                    Log.e(TAG, "获取账户名称失败: " + accountId, e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -588,14 +594,14 @@ public class AccountRepository {
         return accountDao.getAccountLive(cloudId, localId);
     }
 
-    // -------------------------------
-    // 🟡 账户操作
-    // ------------------------------
-
-
     public com.example.my_project1.data.model.account.AccountGroup getAccountGroupByIdSync(String groupId) {
         return accountDao.getById(groupId);
     }
+
+    // -------------------------------
+    // 账户操作
+    // -------------------------------
+
     public void insertAccount(com.example.my_project1.data.model.account.Account account, ResultCallback callback) {
         runInBackground(new Runnable() {
             @Override
@@ -605,22 +611,45 @@ public class AccountRepository {
                     account.setCreatedAt(now);
                     account.setUpdatedAt(now);
                     account.setSyncState(SyncState.TO_CREATE);
-                    accountDao.insertAccount(account);
-                    updateGroupAccountCountInternal(account.getGroupId());
-                    enqueueSync();
-                    Log.i(TAG, "✅ 插入账户：" + account.getName());
+
+                    // 1. 本地写入数据库，并更新本地组账户计数
+                    long localId = accountDao.insertAccount(account);
+                    account.setId(localId);
+
+                    if (account.getGroupId() != null && !account.getGroupId().isEmpty()) {
+                        updateGroupAccountCountInternal(account.getGroupId());
+                    }
+
+                    Log.i(TAG, "插入账户本地保存成功：" + account.getName());
+
+                    // 2. 优先通知 UI 保存成功，使得 Activity 能瞬间 finish 返回资产页，毫无停顿感
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
-                            callback.onResult(true, null);
+                            if (callback != null) {
+                                callback.onResult(true, null);
+                            }
                         }
                     });
+
+                    // 3. 在后台线程异步完成默认组校验、groupId 修正与云端同步上传（不阻塞 UI 返回）
+                    try {
+                        ensureDefaultGroupsAndSyncInternal(account.getUserId());
+                        checkAndResolveGroupIdInternal(account);
+                        uploadPendingChanges();
+                        enqueueSync();
+                    } catch (Exception syncEx) {
+                        Log.e(TAG, "后台云端同步出现异常：", syncEx);
+                    }
+
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 插入账户异常：", e);
+                    Log.e(TAG, "插入账户异常：", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
-                            callback.onResult(false, "新增账户失败");
+                            if (callback != null) {
+                                callback.onResult(false, "新增账户失败");
+                            }
                         }
                     });
                 }
@@ -629,7 +658,7 @@ public class AccountRepository {
     }
 
     /**
-     * 🔴 关键修复：更新账户时立即标记为待同步
+     * 关键修复：更新账户时立即标记为待同步
      */
     public void updateAccount(com.example.my_project1.data.model.account.Account account, ResultCallback callback) {
         runInBackground(new Runnable() {
@@ -644,7 +673,7 @@ public class AccountRepository {
                     }
 
                     if (existingAccount == null) {
-                        Log.e(TAG, "❌ 更新失败，账户不存在: " + (account.getObjectId() != null ? account.getObjectId() : account.getId()));
+                        Log.e(TAG, "更新失败，账户不存在: " + (account.getObjectId() != null ? account.getObjectId() : account.getId()));
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -672,16 +701,16 @@ public class AccountRepository {
                     existingAccount.setCanBeSelected(account.isCanBeSelected());
                     existingAccount.setUpdatedAt(new Date());
 
-                    // 🔴 关键：如果已同步，标记为需要更新
+                    // 关键：如果已同步，标记为需要更新
                     if (existingAccount.getSyncState() == SyncState.SYNCED) {
                         existingAccount.setSyncState(SyncState.TO_UPDATE);
                     }
 
                     boolean visibilityChanged = (existingAccount.isIncludeInTotal() != account.isIncludeInTotal());
-                    
+
                     accountDao.update(existingAccount);
 
-                    // 🔑 修复点：如果所属组发生变化，或者显隐状态发生变化，更新组计数
+                    // 修复点：如果所属组发生变化，或者显隐状态发生变化，更新组计数
                     if (oldGroupId != null && !oldGroupId.equals(account.getGroupId())) {
                         updateGroupAccountCountInternal(oldGroupId);
                         updateGroupAccountCountInternal(account.getGroupId());
@@ -689,10 +718,11 @@ public class AccountRepository {
                         updateGroupAccountCountInternal(account.getGroupId());
                     }
 
-                    // 🔴 关键：立即触发同步
+                    // 关键：立即触发同步
+                    uploadPendingChanges();
                     enqueueSync();
 
-                    Log.i(TAG, "🔄 更新账户：" + account.getName() + ", 状态: " + existingAccount.getSyncState());
+                    Log.i(TAG, "更新账户：" + account.getName() + ", 状态: " + existingAccount.getSyncState());
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -700,7 +730,7 @@ public class AccountRepository {
                         }
                     });
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 更新账户异常：", e);
+                    Log.e(TAG, "更新账户异常：", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -718,7 +748,7 @@ public class AccountRepository {
             public void run() {
                 try {
                     com.example.my_project1.data.model.account.Account existingAccount = null;
-                    
+
                     if (account.getObjectId() != null && !account.getObjectId().isEmpty()) {
                         existingAccount = accountDao.getAccountByCloudId(account.getObjectId());
                     } else if (account.getId() > 0) {
@@ -726,7 +756,7 @@ public class AccountRepository {
                     }
 
                     if (existingAccount == null) {
-                        Log.w(TAG, "⚠️ 账户不存在，可能已被删除: " + account.getName());
+                        Log.w(TAG, "账户不存在，可能已被删除: " + account.getName());
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -742,7 +772,7 @@ public class AccountRepository {
                         // 如果从未同步过，直接物理删除
                         int deleted = accountDao.delete(existingAccount);
                         if (deleted > 0) {
-                            Log.i(TAG, "✅ 物理删除本地账户: " + account.getName());
+                            Log.i(TAG, "物理删除本地账户: " + account.getName());
                             if (groupId != null && !groupId.isEmpty()) updateGroupAccountCountInternal(groupId);
                             postOnMain(() -> callback.onResult(true, "删除成功"));
                         } else {
@@ -757,12 +787,13 @@ public class AccountRepository {
                     int rowsAffected = accountDao.update(existingAccount);
 
                     if (rowsAffected > 0) {
-                        Log.i(TAG, "✅ 账户标记删除成功: " + account.getName());
+                        Log.i(TAG, "账户标记删除成功: " + account.getName());
 
                         if (groupId != null && !groupId.isEmpty()) {
                             updateGroupAccountCountInternal(groupId);
                         }
 
+                        uploadPendingChanges();
                         enqueueSync();
 
                         postOnMain(new Runnable() {
@@ -772,7 +803,7 @@ public class AccountRepository {
                             }
                         });
                     } else {
-                        Log.e(TAG, "❌ 账户标记删除失败");
+                        Log.e(TAG, "账户标记删除失败");
                         postOnMain(new Runnable() {
                             @Override
                             public void run() {
@@ -782,7 +813,7 @@ public class AccountRepository {
                     }
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 删除账户异常:", e);
+                    Log.e(TAG, "删除账户异常:", e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -803,11 +834,115 @@ public class AccountRepository {
     }
 
     // -------------------------------
-    // 内部工具：更新组计数
+    // 内部工具方法
     // -------------------------------
+
+    /**
+     * 内部辅助方法：确保默认账户组已初始化并同步上传到云端
+     */
+    private void ensureDefaultGroupsAndSyncInternal(String userId) {
+        try {
+            List<com.example.my_project1.data.model.account.AccountGroup> localGroups = accountDao.getAllGroupsSync();
+
+            if (localGroups == null || localGroups.isEmpty()) {
+                Log.d(TAG, "本地无账户组，开始创建系统默认账户组");
+                if (userId != null && !userId.isEmpty()) {
+                    List<com.example.my_project1.data.model.account.AccountGroup> defaultGroups =
+                            com.example.my_project1.data.provider.SystemAccountGroupProvider.getDefaultGroups(userId);
+
+                    for (com.example.my_project1.data.model.account.AccountGroup group : defaultGroups) {
+                        group.setSyncState(SyncState.TO_CREATE);
+                        group.setCreatedAt(new Date());
+                        group.setUpdatedAt(new Date());
+                        accountDao.insertGroup(group);
+                    }
+                    Log.d(TAG, "系统默认账户组已在本地创建完成");
+                }
+            }
+
+            // 检查是否有待同步上传的分组，如果有则立即上传到云端
+            List<com.example.my_project1.data.model.account.AccountGroup> pendingGroups = accountDao.getPendingSyncGroups();
+            if (pendingGroups != null && !pendingGroups.isEmpty()) {
+                Log.d(TAG, "发现待同步账户组，立即同步上传至云端");
+                uploadPendingChanges();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "确保默认账户组存在及同步出现异常：", e);
+        }
+    }
+
+    /**
+     * 内部辅助方法：检查并修正账户关联的 groupId，确保其指向有效的云端 objectId
+     */
+    private void checkAndResolveGroupIdInternal(com.example.my_project1.data.model.account.Account account) {
+        if (account == null) return;
+
+        String currentGroupId = account.getGroupId();
+
+        // 1. 如果 currentGroupId 已经是非空字符串，尝试匹配云端 objectId
+        if (currentGroupId != null && !currentGroupId.isEmpty()) {
+            com.example.my_project1.data.model.account.AccountGroup group =
+                    accountDao.getGroupByCloudId(currentGroupId);
+            if (group != null && group.getObjectId() != null && !group.getObjectId().isEmpty()) {
+                // 已匹配到有效的云端 objectId
+                return;
+            }
+
+            // 2. 尝试按本地数据库自增 ID 匹配
+            try {
+                long localId = Long.parseLong(currentGroupId);
+                List<com.example.my_project1.data.model.account.AccountGroup> allGroups = accountDao.getAllGroupsSync();
+                if (allGroups != null) {
+                    for (com.example.my_project1.data.model.account.AccountGroup g : allGroups) {
+                        if (g.getId() == localId) {
+                            if (g.getObjectId() != null && !g.getObjectId().isEmpty()) {
+                                account.setGroupId(g.getObjectId());
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (NumberFormatException ignored) {
+            }
+
+            // 3. 尝试按账户组名称匹配
+            if (account.getUserId() != null) {
+                com.example.my_project1.data.model.account.AccountGroup groupByName =
+                        accountDao.getGroupByName(account.getUserId(), currentGroupId);
+                if (groupByName != null && groupByName.getObjectId() != null && !groupByName.getObjectId().isEmpty()) {
+                    account.setGroupId(groupByName.getObjectId());
+                    return;
+                }
+            }
+        }
+
+        // 4. 如果未能找到有效云端 objectId，选取第一个包含有效 objectId 的账户组
+        List<com.example.my_project1.data.model.account.AccountGroup> allGroups = accountDao.getAllGroupsSync();
+        if (allGroups != null && !allGroups.isEmpty()) {
+            for (com.example.my_project1.data.model.account.AccountGroup g : allGroups) {
+                if (g.getObjectId() != null && !g.getObjectId().isEmpty()) {
+                    account.setGroupId(g.getObjectId());
+                    return;
+                }
+            }
+
+            // 如果本地所有账户组都尚未获得云端 objectId，先强制上传分组数据
+            uploadPendingChanges();
+            allGroups = accountDao.getAllGroupsSync();
+            if (allGroups != null && !allGroups.isEmpty()) {
+                for (com.example.my_project1.data.model.account.AccountGroup g : allGroups) {
+                    if (g.getObjectId() != null && !g.getObjectId().isEmpty()) {
+                        account.setGroupId(g.getObjectId());
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     private void updateGroupAccountCountInternal(String groupId) {
         if (groupId == null || groupId.isEmpty()) {
-            Log.w(TAG, "⚠️ groupId 为空,跳过计数更新");
+            Log.w(TAG, "groupId 为空,跳过计数更新");
             return;
         }
 
@@ -818,7 +953,7 @@ public class AccountRepository {
             int actualCount = 0;
             if (accounts != null) {
                 for (com.example.my_project1.data.model.account.Account acc : accounts) {
-                    // 🔑 修复点：账户计数仅包含未删除且未隐藏（includeInTotal为true）的账户
+                    // 修复点：账户计数仅包含未删除且未隐藏（includeInTotal为true）的账户
                     if (acc.getSyncState() != SyncState.TO_DELETE && acc.isIncludeInTotal()) {
                         actualCount++;
                     }
@@ -833,27 +968,29 @@ public class AccountRepository {
                     group.setAccountCount(actualCount);
                     group.setSyncState(SyncState.TO_UPDATE);
                     accountDao.updateGroup(group);
+                    uploadPendingChanges();
                     enqueueSync();
-                    Log.d(TAG, "📊 更新账户组计数: " + group.getName() + " = " + actualCount);
+                    Log.d(TAG, "更新账户组计数: " + group.getName() + " = " + actualCount);
                 }
             } else {
-                Log.w(TAG, "⚠️ 未找到账户组: " + groupId);
+                Log.w(TAG, "未找到账户组: " + groupId);
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ 更新账户组计数失败", e);
+            Log.e(TAG, "更新账户组计数失败", e);
         }
     }
 
     // -------------------------------
-    // ☁️ 云端同步（修复版）
+    // 云端同步
     // -------------------------------
+
     private void enqueueSync() {
         AccountSyncWorker.enqueue(context);
     }
 
     /**
-     * 🔧 关键修复：从云端同步
+     * 关键修复：从云端同步
      * 改进策略：
      * 1. 先上传本地待同步的数据
      * 2. 再从云端下载数据
@@ -866,16 +1003,16 @@ public class AccountRepository {
                 try {
                     Log.d(TAG, "========== 开始账户同步 ==========");
 
-                    // 🔴 步骤1：先上传本地待同步的数据
+                    // 步骤1：先上传本地待同步的数据
                     uploadPendingChanges();
 
-                    // 🔴 步骤2：再从云端下载
+                    // 步骤2：再从云端下载
                     downloadFromCloud(callback);
 
                     Log.d(TAG, "========== 账户同步完成 ==========");
 
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ 同步失败: " + e.getMessage(), e);
+                    Log.e(TAG, "同步失败: " + e.getMessage(), e);
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -888,7 +1025,7 @@ public class AccountRepository {
     }
 
     /**
-     * 🔴 新增：上传本地待同步的修改（含删除）
+     * 新增：上传本地待同步的修改（含删除）
      */
     private void uploadPendingChanges() {
         try {
@@ -897,7 +1034,7 @@ public class AccountRepository {
             // 1. 处理待删除的账户（优先处理删除，防止外键约束冲突）
             List<com.example.my_project1.data.model.account.Account> pendingAccounts =
                     accountDao.getPendingSyncAccounts();
-            
+
             if (pendingAccounts != null) {
                 for (com.example.my_project1.data.model.account.Account account : pendingAccounts) {
                     if (account.getSyncState() == SyncState.TO_DELETE) {
@@ -907,7 +1044,7 @@ public class AccountRepository {
                             boolean success = deleteAccountFromCloudSync(api, objectId);
                             if (success) {
                                 accountDao.delete(account);
-                                Log.d(TAG, "✅ 云端及本地删除账户成功: " + account.getName());
+                                Log.d(TAG, "云端及本地删除账户成功: " + account.getName());
                             }
                         } else {
                             accountDao.delete(account);
@@ -919,7 +1056,7 @@ public class AccountRepository {
             // 2. 处理待删除的账户组
             List<com.example.my_project1.data.model.account.AccountGroup> pendingGroups =
                     accountDao.getPendingSyncGroups();
-            
+
             if (pendingGroups != null) {
                 for (com.example.my_project1.data.model.account.AccountGroup group : pendingGroups) {
                     if (group.getSyncState() == SyncState.TO_DELETE) {
@@ -928,7 +1065,7 @@ public class AccountRepository {
                             boolean success = deleteGroupFromCloudSync(api, objectId);
                             if (success) {
                                 accountDao.deleteGroup(group);
-                                Log.d(TAG, "✅ 云端及本地删除账户组成功: " + group.getName());
+                                Log.d(TAG, "云端及本地删除账户组成功: " + group.getName());
                             }
                         } else {
                             accountDao.deleteGroup(group);
@@ -960,14 +1097,14 @@ public class AccountRepository {
                         if (success) {
                             account.setSyncState(SyncState.SYNCED);
                             accountDao.update(account);
-                            Log.d(TAG, "✅ 上传账户成功: " + account.getName());
+                            Log.d(TAG, "上传账户成功: " + account.getName());
                         }
                     }
                 }
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ 上传待同步数据失败: " + e.getMessage(), e);
+            Log.e(TAG, "上传待同步数据失败: " + e.getMessage(), e);
         }
     }
 
@@ -1006,7 +1143,7 @@ public class AccountRepository {
     }
 
     /**
-     * 🔴 修改：从云端下载数据（跳过待同步的数据）
+     * 修改：从云端下载数据（跳过待同步的数据）
      */
     private void downloadFromCloud(final ResultCallback callback) {
         BmobAccountApiImpl api = new BmobAccountApiImpl();
@@ -1014,7 +1151,7 @@ public class AccountRepository {
             @Override
             public void done(List<AccountGroup> cloudGroups, BmobException e) {
                 if (e != null) {
-                    Log.e(TAG, "❌ 拉取账户组失败：" + e.getMessage());
+                    Log.e(TAG, "拉取账户组失败：" + e.getMessage());
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -1039,37 +1176,44 @@ public class AccountRepository {
                             // 删除本地多余的组
                             for (com.example.my_project1.data.model.account.AccountGroup localGroup : localGroups) {
                                 if (!cloudGroupIds.contains(localGroup.getObjectId())) {
-                                    // 🔴 跳过待同步的数据
+                                    // 跳过待同步的数据
                                     if (localGroup.getSyncState() != SyncState.SYNCED) {
-                                        Log.d(TAG, "⏭️ 跳过待同步的账户组: " + localGroup.getName());
+                                        Log.d(TAG, "跳过待同步的账户组: " + localGroup.getName());
                                         continue;
                                     }
-                                    Log.d(TAG, "🗑️ 删除本地账户组（云端已删除）: " + localGroup.getName());
+                                    Log.d(TAG, "删除本地账户组（云端已删除）: " + localGroup.getName());
                                     accountDao.deleteAccountsByGroup(localGroup.getObjectId());
                                     accountDao.deleteGroup(localGroup);
                                 }
                             }
 
+                            cn.bmob.v3.BmobUser currentUser = cn.bmob.v3.BmobUser.getCurrentUser();
+                            String currentUserId = currentUser != null ? currentUser.getObjectId() : null;
+
                             // 更新/插入云端组
                             for (AccountGroup cloud : finalCloudGroups) {
                                 com.example.my_project1.data.model.account.AccountGroup local = accountDao.getGroupByCloudId(cloud.getObjectId());
 
-                                // 🔴 跳过待同步的数据
+                                // 跳过待同步的数据
                                 if (local != null && local.getSyncState() != SyncState.SYNCED) {
-                                    Log.d(TAG, "⏭️ 跳过待同步的账户组: " + local.getName());
+                                    Log.d(TAG, "跳过待同步的账户组: " + local.getName());
                                     continue;
                                 }
+
+                                String groupUserId = (cloud.getUser() != null && cloud.getUser().getObjectId() != null) ?
+                                        cloud.getUser().getObjectId() : currentUserId;
 
                                 if (local == null) {
                                     com.example.my_project1.data.model.account.AccountGroup newGroup = new com.example.my_project1.data.model.account.AccountGroup();
                                     newGroup.setObjectId(cloud.getObjectId());
-                                    if (cloud.getUser() != null) newGroup.setUserId(cloud.getUser().getObjectId());
+                                    newGroup.setUserId(groupUserId);
                                     newGroup.setName(cloud.getName());
                                     newGroup.setIconUrl(cloud.getIconUrl());
                                     newGroup.setSyncState(SyncState.SYNCED);
                                     accountDao.insertGroup(newGroup);
-                                    Log.d(TAG, "🆕 新增账户组：" + newGroup.getName());
+                                    Log.d(TAG, "新增账户组：" + newGroup.getName());
                                 } else {
+                                    local.setUserId(groupUserId);
                                     local.setName(cloud.getName());
                                     local.setIconUrl(cloud.getIconUrl());
                                     local.setAccountCount(cloud.getAccountCount());
@@ -1077,18 +1221,18 @@ public class AccountRepository {
                                     local.setUpdatedAt(DateConvertUtil.safeConvertToDate(cloud.getUpdatedAt()));
                                     local.setSyncState(SyncState.SYNCED);
                                     accountDao.updateGroup(local);
-                                    Log.d(TAG, "🔄 更新账户组：" + local.getName());
+                                    Log.d(TAG, "更新账户组：" + local.getName());
                                 }
                             }
 
-                            Log.d(TAG, "✅ 账户组同步完成，开始同步账户");
+                            Log.d(TAG, "账户组同步完成，开始同步账户");
 
                             // 同步账户
                             List<String> cloudGroupIdsCopy = new ArrayList<>(cloudGroupIds);
                             syncFromAccountsCloud(cloudGroupIdsCopy, callback);
 
                         } catch (Exception ex) {
-                            Log.e(TAG, "❌ 同步账户组失败", ex);
+                            Log.e(TAG, "同步账户组失败", ex);
                             postOnMain(new Runnable() {
                                 @Override
                                 public void run() {
@@ -1103,7 +1247,7 @@ public class AccountRepository {
     }
 
     /**
-     * 🔴 修改：同步账户（跳过待同步的数据）
+     * 修改：同步账户（跳过待同步的数据）
      */
     private void syncFromAccountsCloud(List<String> cloudGroupIds, final ResultCallback callback) {
         BmobAccountApiImpl api = new BmobAccountApiImpl();
@@ -1111,7 +1255,7 @@ public class AccountRepository {
             @Override
             public void done(List<Account> cloudAccounts, BmobException e) {
                 if (e != null) {
-                    Log.e(TAG, "❌ 拉取账户失败：" + e.getMessage());
+                    Log.e(TAG, "拉取账户失败：" + e.getMessage());
                     postOnMain(new Runnable() {
                         @Override
                         public void run() {
@@ -1136,39 +1280,47 @@ public class AccountRepository {
                             // 删除本地多余账户
                             for (com.example.my_project1.data.model.account.Account localAccount : localAccounts) {
                                 if (!cloudAccountIds.contains(localAccount.getObjectId())) {
-                                    // 🔴 跳过待同步的数据
+                                    // 跳过待同步的数据
                                     if (localAccount.getSyncState() != SyncState.SYNCED) {
-                                        Log.d(TAG, "⏭️ 跳过待同步的账户: " + localAccount.getName());
+                                        Log.d(TAG, "跳过待同步的账户: " + localAccount.getName());
                                         continue;
                                     }
-                                    Log.d(TAG, "🗑️ 删除本地账户（云端已删除）: " + localAccount.getName());
+                                    Log.d(TAG, "删除本地账户（云端已删除）: " + localAccount.getName());
                                     accountDao.delete(localAccount);
                                 }
                             }
+
+                            cn.bmob.v3.BmobUser currentUser = cn.bmob.v3.BmobUser.getCurrentUser();
+                            String currentUserId = currentUser != null ? currentUser.getObjectId() : null;
 
                             // 更新/插入云端账户
                             for (Account cloud : finalCloudAccounts) {
                                 com.example.my_project1.data.model.account.Account local = accountDao.getAccountByCloudId(cloud.getObjectId());
 
-                                // 🔴 关键：跳过待同步的账户
+                                // 关键：跳过待同步的账户
                                 if (local != null && local.getSyncState() != SyncState.SYNCED) {
-                                    Log.d(TAG, "⏭️ 跳过待同步的账户: " + local.getName() +
+                                    Log.d(TAG, "跳过待同步的账户: " + local.getName() +
                                             ", 状态: " + local.getSyncState() +
                                             ", 本地余额: " + local.getBalance());
                                     continue;
                                 }
 
+                                String accountUserId = (cloud.getUserId() != null && !cloud.getUserId().isEmpty()) ?
+                                        cloud.getUserId() : currentUserId;
+                                String groupId = (cloud.getGroupId() != null && !cloud.getGroupId().isEmpty()) ?
+                                        cloud.getGroupId() : null;
+
                                 if (local == null) {
                                     com.example.my_project1.data.model.account.Account acc = new com.example.my_project1.data.model.account.Account();
                                     acc.setObjectId(cloud.getObjectId());
-                                    acc.setGroupId(cloud.getGroupId());
-                                    acc.setUserId(cloud.getUserId());
+                                    acc.setGroupId(groupId);
+                                    acc.setUserId(accountUserId);
                                     acc.setName(cloud.getName());
-                                    acc.setBalance(cloud.getBalance());
+                                    acc.setBalance(cloud.getBalance() != null ? cloud.getBalance() : 0.0);
                                     acc.setIconUrl(cloud.getIconUrl());
                                     acc.setRemark(cloud.getRemark());
                                     acc.setCardNumber(cloud.getCardNumber());
-                                    acc.setCreditLimit(cloud.getCreditLimit());
+                                    acc.setCreditLimit(cloud.getCreditLimit() != null ? cloud.getCreditLimit() : 0.0);
                                     acc.setAccountType(cloud.getAccountType());
                                     acc.setCategory(cloud.getCategory());
                                     acc.setBillingDay(cloud.getBillingDay() != null ? cloud.getBillingDay() : 0);
@@ -1178,16 +1330,17 @@ public class AccountRepository {
                                     acc.setCanBeSelected(cloud.getCanBeSelected() != null ? cloud.getCanBeSelected() : true);
                                     acc.setSyncState(SyncState.SYNCED);
                                     accountDao.insertAccount(acc);
-                                    Log.d(TAG, "🆕 新增账户：" + acc.getName());
+                                    Log.d(TAG, "新增账户：" + acc.getName());
                                 } else {
-                                    local.setGroupId(cloud.getGroupId());
+                                    local.setGroupId(groupId);
+                                    local.setUserId(accountUserId);
                                     local.setName(cloud.getName());
-                                    local.setBalance(cloud.getBalance());
+                                    local.setBalance(cloud.getBalance() != null ? cloud.getBalance() : 0.0);
                                     local.setIconUrl(cloud.getIconUrl());
                                     local.setCredit(cloud.getIsCredit() != null && cloud.getIsCredit());
                                     local.setRemark(cloud.getRemark());
                                     local.setCardNumber(cloud.getCardNumber());
-                                    local.setCreditLimit(cloud.getCreditLimit());
+                                    local.setCreditLimit(cloud.getCreditLimit() != null ? cloud.getCreditLimit() : 0.0);
                                     local.setAccountType(cloud.getAccountType());
                                     local.setCategory(cloud.getCategory());
                                     local.setBillingDay(cloud.getBillingDay() != null ? cloud.getBillingDay() : 0);
@@ -1199,11 +1352,17 @@ public class AccountRepository {
                                     local.setUpdatedAt(DateConvertUtil.safeConvertToDate(cloud.getUpdatedAt()));
                                     local.setSyncState(SyncState.SYNCED);
                                     accountDao.update(local);
-                                    Log.d(TAG, "🔄 更新账户：" + local.getName() + ", 余额: " + local.getBalance());
+                                    Log.d(TAG, "更新账户：" + local.getName() + ", 余额: " + local.getBalance());
                                 }
                             }
 
-                            Log.d(TAG, "✅ 完全同步成功！");
+                            if (cloudGroupIds != null) {
+                                for (String gId : cloudGroupIds) {
+                                    updateGroupAccountCountInternal(gId);
+                                }
+                            }
+
+                            Log.d(TAG, "完全同步成功！");
                             postOnMain(new Runnable() {
                                 @Override
                                 public void run() {
@@ -1212,7 +1371,7 @@ public class AccountRepository {
                             });
 
                         } catch (Exception ex) {
-                            Log.e(TAG, "❌ 同步账户失败", ex);
+                            Log.e(TAG, "同步账户失败", ex);
                             postOnMain(new Runnable() {
                                 @Override
                                 public void run() {
@@ -1229,20 +1388,25 @@ public class AccountRepository {
     private boolean isInitializingDefaults = false;
 
     /**
-     * 初始化系统预设账户组
+     * 初始化系统预设账户组并确保同步上传至云端
      */
     public void initDefaultAccountGroups(String userId) {
         if (userId == null || isInitializingDefaults) return;
         isInitializingDefaults = true;
-        
+
         runInBackground(() -> {
             try {
                 // 1. 本地检查
-                List<com.example.my_project1.data.model.account.AccountGroup> localGroups = 
+                List<com.example.my_project1.data.model.account.AccountGroup> localGroups =
                         accountDao.getAllGroupsSync();
-                
+
                 if (localGroups != null && !localGroups.isEmpty()) {
-                    Log.d(TAG, "本地已有账户组，跳过系统预设初始化");
+                    Log.d(TAG, "本地已有账户组，检查是否有未同步数据");
+                    List<com.example.my_project1.data.model.account.AccountGroup> pendingGroups = accountDao.getPendingSyncGroups();
+                    if (pendingGroups != null && !pendingGroups.isEmpty()) {
+                        Log.d(TAG, "本地存在待同步账户组，立即上传云端");
+                        uploadPendingChanges();
+                    }
                     isInitializingDefaults = false;
                     return;
                 }
@@ -1253,23 +1417,23 @@ public class AccountRepository {
                     @Override
                     public void done(List<AccountGroup> cloudGroups, BmobException e) {
                         if (e != null) {
-                            Log.e(TAG, "❌ 查询云端账户组失败：" + e.getMessage());
+                            Log.e(TAG, "查询云端账户组失败：" + e.getMessage());
                             isInitializingDefaults = false;
                             return;
                         }
 
                         if (cloudGroups != null && !cloudGroups.isEmpty()) {
-                            Log.d(TAG, "云端已有账户组，开始下载同步...");
+                            Log.d(TAG, "云端已有账户组，开始下载同步");
                             syncFromAccountGroupCloud((success, message) -> {
                                 isInitializingDefaults = false;
                             });
                             return;
                         }
 
-                        // 3. 云端也没有，初始化本地并标记为待同步
+                        // 3. 云端也没有，初始化本地并立即同步上传至云端
                         runInBackground(() -> {
                             try {
-                                List<com.example.my_project1.data.model.account.AccountGroup> defaultGroups = 
+                                List<com.example.my_project1.data.model.account.AccountGroup> defaultGroups =
                                         com.example.my_project1.data.provider.SystemAccountGroupProvider.getDefaultGroups(userId);
 
                                 for (com.example.my_project1.data.model.account.AccountGroup group : defaultGroups) {
@@ -1278,7 +1442,8 @@ public class AccountRepository {
                                     group.setUpdatedAt(new Date());
                                     accountDao.insertGroup(group);
                                 }
-                                Log.d(TAG, "✅ 已创建本地系统预设账户组，准备同步到云端");
+                                Log.d(TAG, "已创建本地系统预设账户组，开始同步上传至云端");
+                                uploadPendingChanges();
                                 enqueueSync();
                             } finally {
                                 isInitializingDefaults = false;
@@ -1287,7 +1452,7 @@ public class AccountRepository {
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "❌ 初始化预设组异常", e);
+                Log.e(TAG, "初始化预设组异常", e);
                 isInitializingDefaults = false;
             }
         });

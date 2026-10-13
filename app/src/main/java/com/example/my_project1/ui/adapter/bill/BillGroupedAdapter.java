@@ -269,12 +269,24 @@ public class BillGroupedAdapter extends ListAdapter<Object, RecyclerView.ViewHol
             bind.tvTime.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(bill.getBillTime()));
             // 金额
             DecimalFormat df = new DecimalFormat("#,##0.00");
+            String catName = bill.getCategoryName() != null ? bill.getCategoryName() : "";
+            boolean isReimburse = bill.isReimbursable() || bill.isReimbursed() || catName.contains("报销");
+            boolean isAccountCreation = catName.contains("账户创建") || catName.contains("创建账户") || catName.contains("余额调整");
+            boolean isTransfer = bill.getType() == 2 || bill.getType() == 3 || catName.contains("转账") || catName.contains("还款");
+
             String amt; int color;
-            switch (bill.getType()) {
-                case 0: amt = "- ¥" + df.format(bill.getAmount()); color = mContext.getColor(R.color.red); break;
-                case 1: amt = "+ ¥" + df.format(bill.getAmount()); color = mContext.getColor(R.color.green); break;
-                case 3: amt = "¥" + df.format(bill.getAmount()); color = mContext.getColor(R.color.accent_color); break;
-                default: amt = "¥" + df.format(bill.getAmount()); color = mContext.getColor(android.R.color.black); break;
+            if (isReimburse || isAccountCreation) {
+                amt = "¥" + df.format(bill.getAmount());
+                color = mContext.getColor(R.color.orange_500);
+            } else if (isTransfer) {
+                amt = "- ¥" + df.format(bill.getAmount());
+                color = mContext.getColor(R.color.orange_500);
+            } else if (bill.getType() == 1) {
+                amt = "+ ¥" + df.format(bill.getAmount());
+                color = mContext.getColor(R.color.green);
+            } else {
+                amt = "- ¥" + df.format(bill.getAmount());
+                color = mContext.getColor(R.color.red);
             }
             bind.tvAmount.setText(amt);
             bind.tvAmount.setTextColor(color);

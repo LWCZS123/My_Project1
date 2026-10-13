@@ -91,6 +91,28 @@ public class Bill implements Serializable {
     @ColumnInfo(name = "source_wish_id", defaultValue = "-1")
     private long sourceWishId = -1;
 
+    // 报销相关字段
+    @ColumnInfo(name = "is_reimbursable", defaultValue = "0")
+    private boolean isReimbursable;   // 是否需要报销
+
+    @ColumnInfo(name = "is_reimbursed", defaultValue = "0")
+    private boolean isReimbursed;     // 是否已完成报销
+
+    @ColumnInfo(name = "reimburse_amount", defaultValue = "0.0")
+    private double reimburseAmount = 0.0;   // 报销金额
+
+    @ColumnInfo(name = "reimburse_time")
+    private Date reimburseTime;       // 报销时间
+
+    @ColumnInfo(name = "reimburse_account_id")
+    private String reimburseAccountId;// 入账账户ID
+
+    @ColumnInfo(name = "reimburse_account_name")
+    private String reimburseAccountName;// 入账账户名称
+
+    @ColumnInfo(name = "reimburse_remark")
+    private String reimburseRemark;   // 报销备注
+
 
     @ColumnInfo(name = "sync_state")
     private SyncState syncState = SyncState.SYNCED;
@@ -215,6 +237,27 @@ public class Bill implements Serializable {
 
     public Date getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+
+    public boolean isReimbursable() { return isReimbursable; }
+    public void setReimbursable(boolean reimbursable) { isReimbursable = reimbursable; }
+
+    public boolean isReimbursed() { return isReimbursed; }
+    public void setReimbursed(boolean reimbursed) { isReimbursed = reimbursed; }
+
+    public double getReimburseAmount() { return reimburseAmount; }
+    public void setReimburseAmount(double reimburseAmount) { this.reimburseAmount = reimburseAmount; }
+
+    public Date getReimburseTime() { return reimburseTime; }
+    public void setReimburseTime(Date reimburseTime) { this.reimburseTime = reimburseTime; }
+
+    public String getReimburseAccountId() { return reimburseAccountId; }
+    public void setReimburseAccountId(String reimburseAccountId) { this.reimburseAccountId = reimburseAccountId; }
+
+    public String getReimburseAccountName() { return reimburseAccountName; }
+    public void setReimburseAccountName(String reimburseAccountName) { this.reimburseAccountName = reimburseAccountName; }
+
+    public String getReimburseRemark() { return reimburseRemark; }
+    public void setReimburseRemark(String reimburseRemark) { this.reimburseRemark = reimburseRemark; }
 
 
     public long getSourceWishId() { return sourceWishId; }

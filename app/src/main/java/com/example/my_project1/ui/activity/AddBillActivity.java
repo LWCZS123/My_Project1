@@ -149,6 +149,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         if (selectedLocationAddress != null) outState.putString("saved_location_address", selectedLocationAddress);
         outState.putDouble("saved_lat", selectedLat);
         outState.putDouble("saved_lng", selectedLng);
+        outState.putBoolean("saved_is_reimburse", isReimburse);
     }
 
     @Override
@@ -167,6 +168,8 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
             selectedLocationAddress = savedInstanceState.getString("saved_location_address");
             selectedLat = savedInstanceState.getDouble("saved_lat", 0);
             selectedLng = savedInstanceState.getDouble("saved_lng", 0);
+            isReimburse = savedInstanceState.getBoolean("saved_is_reimburse", false);
+            updateReimburseUi();
         }
 
 
@@ -251,6 +254,15 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         binding.cardAccount.setVisibility(isTransfer ? View.GONE : View.VISIBLE);
         binding.ivTransferArrow.setVisibility(View.GONE);
         binding.cardTargetAccount.setVisibility(View.GONE);
+
+        // 只有支出模式 (billType == 0) 显示优惠和报销按钮，收入/转账模式隐藏
+        boolean isExpense = (billType == 0);
+        if (binding.cardDiscount != null) {
+            binding.cardDiscount.setVisibility(isExpense ? View.VISIBLE : View.GONE);
+        }
+        if (binding.cardReimburse != null) {
+            binding.cardReimburse.setVisibility(isExpense ? View.VISIBLE : View.GONE);
+        }
 
         if (isTransfer) {
             syncTransferUi();
@@ -427,6 +439,10 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         excludeBudget = intent.getBooleanExtra("exclude_budget", false);
         excludeStat = intent.getBooleanExtra("exclude_stat", false);
         updateMarkUi();
+
+        // 8.1 报销标记设置
+        isReimburse = intent.getBooleanExtra("is_reimbursable", false);
+        updateReimburseUi();
 
         // 9. 图片URLs
         ArrayList<String> imageUrls = intent.getStringArrayListExtra("image_urls");
@@ -608,6 +624,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
             selectedCategoryIconBackgroundColor = backgroundColor;
             this.excludeBudget = excludeBudget; // 🔑 修复：继承分类的预算排除状态
             updateMarkUi();
+            updateAmountDisplay();
         });
 
         // 页面切换监听
@@ -618,6 +635,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
                 billType = position;
                 updateTabSelection(position);
                 updateTransferUi(); // 🔑 修复：滑动切换时也更新转账 UI 状态
+                updateAmountDisplay();
 
                 // ⭐ 编辑模式下切换类型时保持分类选择
                 if (isEditMode && position == getIntent().getIntExtra("bill_type", 0)) {
@@ -674,10 +692,37 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         binding.cardTargetAccount.setOnClickListener(v -> selectAccount(true)); // 🔑 选择转入账户
         binding.cardCalendar.setOnClickListener(v -> selectCalendar());
         binding.cardDiscount.setOnClickListener(v -> showDiscountDialog());
+        binding.cardReimburse.setOnClickListener(v -> toggleReimburse());
         binding.cardLabel.setOnClickListener(v -> selectMark());
         binding.cardMark.setOnClickListener(v -> selectMark());
         binding.cardRecord.setOnClickListener(v -> selectLocation());
         binding.tvRemarkHint.setOnClickListener(v -> editRemark());
+    }
+
+    private boolean isReimburse = false;
+
+    private void toggleReimburse() {
+        isReimburse = !isReimburse;
+        updateReimburseUi();
+        if (isReimburse) {
+            showSnackbar("已标记为待报销", SnackbarUtils.Type.INFO);
+        } else {
+            showSnackbar("已取消待报销标记", SnackbarUtils.Type.INFO);
+        }
+    }
+
+    private void updateReimburseUi() {
+        if (binding == null) return;
+        if (isReimburse) {
+            binding.tvReimburse.setText("待报销");
+            binding.tvReimburse.setTextColor(Color.parseColor("#7C3AED"));
+            binding.ivReimburse.setColorFilter(Color.parseColor("#7C3AED"));
+        } else {
+            binding.tvReimburse.setText("报销");
+            binding.tvReimburse.setTextColor(Color.parseColor("#666666"));
+            binding.ivReimburse.setColorFilter(Color.parseColor("#666666"));
+        }
+        updateAmountDisplay();
     }
 
     private double getCurrentInputAmount() {
@@ -1016,6 +1061,16 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
             display = "0";
         } else {
             display = currentInput.toString();
+        }
+
+        boolean isReimburseMode = isReimburse || (selectedCategoryName != null && selectedCategoryName.contains("报销"));
+        boolean isTransferMode = (billType == 2 || billType == 3) || (selectedCategoryName != null && (selectedCategoryName.contains("转账") || selectedCategoryName.contains("还款")));
+        boolean isAccountCreationMode = selectedCategoryName != null && (selectedCategoryName.contains("账户创建") || selectedCategoryName.contains("创建账户") || selectedCategoryName.contains("余额调整"));
+
+        if (isReimburseMode || isTransferMode || isAccountCreationMode) {
+            binding.tvAmount.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.orange_500));
+        } else {
+            binding.tvAmount.setTextColor(Color.parseColor("#3478F6"));
         }
 
         binding.tvAmount.setText(display);
@@ -1357,6 +1412,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         bill.setRemark(billRemark);
         bill.setExcludeBudget(excludeBudget);
         bill.setExcludeStat(excludeStat);
+        bill.setReimbursable(billType == 0 && isReimburse);
 
         // 设置图片URL
         if (imageObjectKeys != null && !imageObjectKeys.isEmpty()) {

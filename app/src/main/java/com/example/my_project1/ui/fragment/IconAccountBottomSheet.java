@@ -86,7 +86,7 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void loadData() {
-        if (!isAdded()) return;
+        if (!isAdded() || binding == null) return;
 
         showLoading();
 
@@ -97,22 +97,34 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
         currentCall.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                AppExecutors.get().mainThread().execute(() -> showError());
+                AppExecutors.get().mainThread().execute(() -> {
+                    if (isAdded() && binding != null) {
+                        showError();
+                    }
+                });
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (!isAdded() || response == null) return;
+                if (!isAdded() || binding == null || response == null) return;
 
                 if (!response.isSuccessful()) {
-                    AppExecutors.get().mainThread().execute(() -> showError());
+                    AppExecutors.get().mainThread().execute(() -> {
+                        if (isAdded() && binding != null) {
+                            showError();
+                        }
+                    });
                     response.close();
                     return;
                 }
 
                 try (ResponseBody body = response.body()) {
                     if (body == null) {
-                        AppExecutors.get().mainThread().execute(() -> showError());
+                        AppExecutors.get().mainThread().execute(() -> {
+                            if (isAdded() && binding != null) {
+                                showError();
+                            }
+                        });
                         return;
                     }
 
@@ -125,15 +137,21 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
                     }
 
                     if (res == null || res.getCategories() == null) {
-                        AppExecutors.get().mainThread().execute(() -> showError());
+                        AppExecutors.get().mainThread().execute(() -> {
+                            if (isAdded() && binding != null) {
+                                showError();
+                            }
+                        });
                         return;
                     }
 
                     fullList = res.getCategories();
 
                     AppExecutors.get().mainThread().execute(() -> {
-                        showContent();
-                        updateUI();
+                        if (isAdded() && binding != null) {
+                            showContent();
+                            updateUI();
+                        }
                     });
                 }
             }
@@ -141,7 +159,7 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void updateUI() {
-        if (fullList == null) return;
+        if (!isAdded() || binding == null || fullList == null) return;
 
         List<Object> items = new ArrayList<>();
 
@@ -168,6 +186,7 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void showLoading() {
+        if (binding == null) return;
         binding.rvIcons.setVisibility(View.GONE);
         binding.lottieLoading.setVisibility(View.VISIBLE);
         binding.lottieLoading.playAnimation();
@@ -175,6 +194,7 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void showContent() {
+        if (binding == null) return;
         binding.rvIcons.setVisibility(View.VISIBLE);
         binding.lottieLoading.setVisibility(View.GONE);
         binding.lottieLoading.pauseAnimation();
@@ -182,6 +202,7 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void showError() {
+        if (binding == null) return;
         binding.rvIcons.setVisibility(View.GONE);
         binding.lottieLoading.setVisibility(View.GONE);
         binding.lottieError.setVisibility(View.VISIBLE);
@@ -221,8 +242,16 @@ public class IconAccountBottomSheet extends BottomSheetDialogFragment {
 
     @Override
     public void onDestroyView() {
+        if (currentCall != null && !currentCall.isCanceled()) {
+            currentCall.cancel();
+        }
+        if (binding != null) {
+            try {
+                binding.lottieLoading.pauseAnimation();
+                binding.lottieError.pauseAnimation();
+            } catch (Exception ignored) {}
+        }
         super.onDestroyView();
-        if (currentCall != null && !currentCall.isCanceled()) currentCall.cancel();
         binding = null;
     }
 

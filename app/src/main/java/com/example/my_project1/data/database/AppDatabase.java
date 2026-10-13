@@ -45,7 +45,7 @@ import com.example.my_project1.data.model.icon.DownloadRecord;
                 Wish.class, WishRecord.class,
                 SavingPlan.class, SavingRecord.class, DownloadRecord.class
         },
-        version = 43,
+        version = 44,
         exportSchema = true
 )
 

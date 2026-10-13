@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_attributes"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="6dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp">
+
+        <!-- 1. 付款账户行 -->
+        <RelativeLayout
+            android:id="@+id/layout_row_account"
+            android:layout_width="match_parent"
+            android:layout_height="52dp">
+
+            <FrameLayout
+                android:id="@+id/box_account_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_icon_box_gray">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/iv_account_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_liability1"
+                    app:tint="#64748B"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_account_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/box_account_icon"
+                android:text="付款账户"
+                android:textColor="#1E293B"
+                android:textSize="15sp"
+                tools:ignore="HardcodedText" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/arrow_account"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="#CBD5E1"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/tv_account"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_account"
+                android:text="微信支付"
+                android:textColor="#64748B"
+                android:textSize="14sp"
+                tools:ignore="HardcodedText" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#F1F5F9" />
+
+        <!-- 2. 账单时间行 -->
+        <RelativeLayout
+            android:id="@+id/layout_row_time"
+            android:layout_width="match_parent"
+            android:layout_height="52dp">
+
+            <FrameLayout
+                android:id="@+id/box_time_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_icon_box_gray">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/iv_time_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_time1"
+                    app:tint="#64748B"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_time_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/box_time_icon"
+                android:text="账单时间"
+                android:textColor="#1E293B"
+                android:textSize="15sp"
+                tools:ignore="HardcodedText" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/arrow_time"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="#CBD5E1"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/tv_bill_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_time"
+                android:text="2025-12-29 14:30"
+                android:textColor="#64748B"
+                android:textSize="14sp"
+                tools:ignore="HardcodedText" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#F1F5F9" />
+
+        <!-- 3. 消费位置行 -->
+        <RelativeLayout
+            android:id="@+id/layout_row_location"
+            android:layout_width="match_parent"
+            android:layout_height="52dp">
+
+            <FrameLayout
+                android:id="@+id/box_location_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_icon_box_gray">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/iv_location_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_location"
+                    app:tint="#64748B"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_location_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/box_location_icon"
+                android:text="消费位置"
+                android:textColor="#1E293B"
+                android:textSize="15sp"
+                tools:ignore="HardcodedText" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/arrow_location"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="#CBD5E1"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/tv_location"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_location"
+                android:layout_toEndOf="@id/tv_location_label"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
+                android:text="海底捞火锅（国贸店）"
+                android:textColor="#64748B"
+                android:textSize="14sp"
+                tools:ignore="HardcodedText" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#F1F5F9" />
+
+        <!-- 4. 优惠金额行 -->
+        <RelativeLayout
+            android:id="@+id/layout_row_discount"
+            android:layout_width="match_parent"
+            android:layout_height="52dp">
+
+            <FrameLayout
+                android:id="@+id/box_discount_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_icon_box_gray">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/iv_discount_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_discount"
+                    app:tint="#64748B"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_discount_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_toEndOf="@id/box_discount_icon"
+                android:text="优惠金额"
+                android:textColor="#1E293B"
+                android:textSize="15sp"
+                tools:ignore="HardcodedText" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/arrow_discount"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="#CBD5E1"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/tv_discount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_discount"
+                android:text="¥0.00"
+                android:textColor="#64748B"
+                android:textSize="14sp"
+                tools:ignore="HardcodedText" />
+        </RelativeLayout>
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

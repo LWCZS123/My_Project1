@@ -28,6 +28,7 @@ import com.example.my_project1.ui.viewmodel.accountvm.AccountDetailViewModel;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.SnackbarUtils;
+import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
 
 import java.util.Date;
 
@@ -248,6 +249,10 @@ public class AccountDetailActivity extends AppCompatActivity {
             @Override
             public void onBillEdit(Bill bill) {
                 if (bill == null) return;
+                if (bill.getCategoryName() != null && bill.getCategoryName().contains("报销入账")) {
+                    SnackbarUtils.showInfo(binding.getRoot(), "报销入账账单不能编辑");
+                    return;
+                }
                 Intent intent = new Intent(AccountDetailActivity.this, com.example.my_project1.ui.activity.AddBillActivity.class);
                 intent.putExtra("mode", "edit");
                 
@@ -292,6 +297,8 @@ public class AccountDetailActivity extends AppCompatActivity {
 
         ConcatAdapter concatAdapter = new ConcatAdapter(headerAdapter, pagingAdapter);
         binding.rvTransactions.setLayoutManager(new LinearLayoutManager(this));
+        binding.rvTransactions.setItemViewCacheSize(20);
+        ElasticOverScrollHelper.attach(binding.rvTransactions);
         
         // Optimize folding animation speed
         androidx.recyclerview.widget.RecyclerView.ItemAnimator animator = binding.rvTransactions.getItemAnimator();

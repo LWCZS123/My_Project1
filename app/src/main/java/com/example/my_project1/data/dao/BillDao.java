@@ -409,4 +409,10 @@ public interface BillDao {
             "GROUP BY category_id")
     List<CategoryAmount> getBudgetAmountsByCategoryInRange(
             String userId, int billType, long startMs, long endMs);
+
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND category_name LIKE '%报销入账%' AND sync_state != 'TO_DELETE' ORDER BY id DESC")
+    List<Bill> getReimburseIncomeBills(String userId);
+
+    @Query("SELECT * FROM bills WHERE user_id = :userId AND is_reimbursed = 1 AND sync_state != 'TO_DELETE' ORDER BY id DESC")
+    List<Bill> getReimbursedBillsByUserSync(String userId);
 }

@@ -21,18 +21,23 @@ import java.util.List;
 import io.reactivex.annotations.NonNull;
 
 /**
- * BillSyncWorker - 账单同步Worker (优化修复版)
+ * BillSyncWorker - 账单同步Worker (分批次并发控制版)
  * -------------------------------------------------------
  * 优化重点:
- * 1. 在 doWork 开始时增加当前用户登录检查，未登录直接返回 success，避免无意义重试与多用户混淆
- * 2. 隔离用户数据，使用 getPendingSyncBillsByUser 与 getToDeleteBillsByUser
- * 3. 简化删除逻辑，复用 BmobBillApiImpl.deleteBillSync(objectId)
+ * 1. 分批次上传（BATCH_SIZE = 20），控制 Bmob 云端并发频次，防止超过 2000 并发限制
+ * 2. 批次与单条之间增加平滑停顿与重试退避机制，保障长时间高并发写入的稳定性
+ * 3. 在 doWork 开始时增加当前用户登录检查，隔离多用户数据
  * 4. BmobBillApiImpl.uploadBillSync 已同步更新 SQLite，确保 Worker 线程事务写盘
  */
 public class BillSyncWorker extends Worker {
 
     private static final String TAG = "BillSyncWorker";
     private static final int MAX_RETRIES = 3;
+
+    // 分批与并发频次控制参数
+    private static final int BATCH_SIZE = 20;            // 每批次处理数量
+    private static final long BATCH_INTERVAL_MS = 200;    // 批次之间的平滑停顿时间(ms)
+    private static final long ITEM_INTERVAL_MS = 20;      // 单条上传后的微小停顿时间(ms)
 
     private final AppDatabase db;
     private final BmobBillApiImpl api;
@@ -47,7 +52,7 @@ public class BillSyncWorker extends Worker {
     @Override
     public Result doWork() {
         try {
-            Log.i(TAG, "========== 开始账单同步 ==========");
+            Log.i(TAG, "========== 开始账单分批同步 ==========");
 
             String currentUserId = api.getCurrentUserId();
             if (currentUserId == null || currentUserId.isEmpty()) {
@@ -55,21 +60,16 @@ public class BillSyncWorker extends Worker {
                 return Result.success();
             }
 
-            // 关键:先处理删除，再处理创建和更新
+            // 处理删除、创建与更新
             boolean okDelete = syncDeleteBills(currentUserId);
-            if (!okDelete) {
-                Log.w(TAG, "账单删除同步未完全成功，将重试");
-                return Result.retry();
-            }
-
-            // 同步创建和更新
             boolean okSync = syncBills(currentUserId);
-            if (!okSync) {
-                Log.w(TAG, "账单同步未完全成功，将重试");
+
+            if (!okDelete || !okSync) {
+                Log.w(TAG, "账单分批同步未完全成功 (删除: " + okDelete + ", 同步: " + okSync + ")，将重试");
                 return Result.retry();
             }
 
-            Log.i(TAG, "========== 账单同步完成 ==========");
+            Log.i(TAG, "========== 账单分批同步完成 ==========");
             return Result.success();
 
         } catch (Exception e) {
@@ -82,9 +82,6 @@ public class BillSyncWorker extends Worker {
 
     /**
      * 同步删除账单
-     * - 云端删除成功 → 物理删除本地数据
-     * - 云端删除失败 → 保留 TO_DELETE 状态，下次重试
-     * - 云端对象不存在(404/101) → 视为成功，物理删除本地
      */
     private boolean syncDeleteBills(String userId) {
         List<Bill> deletedBills = db.billDao().getToDeleteBillsByUser(userId);
@@ -102,42 +99,43 @@ public class BillSyncWorker extends Worker {
 
         for (Bill bill : deletedBills) {
             String objectId = bill.getObjectId();
-            Log.d(TAG, "处理待删除账单: " + bill.getAmount() + " (ID: " + objectId + ")");
 
             if (objectId == null || objectId.isEmpty()) {
-                // 本地账单没有云端ID，直接物理删除
                 try {
                     db.billDao().delete(bill);
                     successCount++;
-                    Log.i(TAG, "   无云端ID，直接物理删除本地数据");
                 } catch (Exception e) {
                     failCount++;
-                    Log.e(TAG, "   本地删除失败: " + e.getMessage(), e);
+                    Log.e(TAG, "本地删除失败: " + e.getMessage(), e);
                 }
                 continue;
             }
 
-            // 直接调用 API 提供的同步删除（内置重试、超时与 101 错误码兼容）
             boolean cloudDeleteSuccess = false;
             for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
                 cloudDeleteSuccess = api.deleteBillSync(objectId);
                 if (cloudDeleteSuccess) break;
+                try {
+                    Thread.sleep(200 * attempt);
+                } catch (InterruptedException ignored) {}
             }
 
-            // 根据云端删除结果决定本地操作
             if (cloudDeleteSuccess) {
                 try {
                     db.billDao().delete(bill);
-                    Log.i(TAG, "   本地账单物理删除成功");
                     successCount++;
                 } catch (Exception e) {
-                    Log.e(TAG, "   本地物理删除失败: " + e.getMessage(), e);
+                    Log.e(TAG, "本地物理删除失败: " + e.getMessage(), e);
                     failCount++;
                 }
             } else {
-                Log.w(TAG, "   云端删除失败，保留待删除标记");
+                Log.w(TAG, "云端删除失败，保留待删除标记");
                 failCount++;
             }
+
+            try {
+                Thread.sleep(ITEM_INTERVAL_MS);
+            } catch (InterruptedException ignored) {}
         }
 
         Log.i(TAG, String.format("syncDeleteBills 完成 - 总计:%d, 成功:%d, 失败:%d",
@@ -146,10 +144,10 @@ public class BillSyncWorker extends Worker {
         return failCount == 0;
     }
 
-    // ======================== 账单同步(创建/更新) ========================
+    // ======================== 账单同步(分批创建与更新) ========================
 
     /**
-     * 同步账单(创建和更新)
+     * 分批次同步账单(创建和更新)
      */
     private boolean syncBills(String userId) {
         List<Bill> bills = db.billDao().getPendingSyncBillsByUser(userId);
@@ -159,38 +157,74 @@ public class BillSyncWorker extends Worker {
             return true;
         }
 
-        Log.i(TAG, "syncBills - 待同步账单数量: " + bills.size() + " (userId=" + userId + ")");
+        int totalBills = bills.size();
+        int totalBatches = (int) Math.ceil((double) totalBills / BATCH_SIZE);
+
+        Log.i(TAG, String.format("开始分批同步账单: 总数=%d 条, 每批=%d 条, 共%d 批 (userId=%s)",
+                totalBills, BATCH_SIZE, totalBatches, userId));
 
         int successCount = 0;
         int failCount = 0;
 
-        for (Bill bill : bills) {
-            boolean ok = false;
-            for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                try {
-                    SyncState state = bill.getSyncState();
-                    if (state == SyncState.TO_CREATE || state == SyncState.TO_UPDATE) {
-                        ok = api.uploadBillSync(bill);
-                    } else {
-                        ok = true;
-                    }
+        for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+            int start = batchIndex * BATCH_SIZE;
+            int end = Math.min(start + BATCH_SIZE, totalBills);
+            List<Bill> batch = bills.subList(start, end);
 
-                    if (ok) break;
-                    Log.w(TAG, "syncBills - 第 " + attempt + " 次失败: " + bill.getAmount());
-                } catch (Throwable t) {
-                    Log.e(TAG, "syncBills - 异常 attempt=" + attempt, t);
+            Log.i(TAG, String.format("正在处理第 %d/%d 批 (本批包含 %d 条账单)", batchIndex + 1, totalBatches, batch.size()));
+
+            for (Bill bill : batch) {
+                boolean ok = false;
+                for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                    try {
+                        SyncState state = bill.getSyncState();
+                        if (state == SyncState.TO_CREATE || state == SyncState.TO_UPDATE) {
+                            ok = api.uploadBillSync(bill);
+                        } else {
+                            ok = true;
+                        }
+
+                        if (ok) break;
+
+                        Log.w(TAG, "syncBills - 第 " + attempt + " 次上传失败: " + bill.getAmount() + "，将稍后重试");
+                        Thread.sleep(300 * attempt); // 失败避让机制
+                    } catch (Throwable t) {
+                        Log.e(TAG, "syncBills - 异常 attempt=" + attempt, t);
+                    }
+                }
+
+                if (ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                    Log.e(TAG, "账单分批同步单条最终失败: ID=" + bill.getId() + ", amount=" + bill.getAmount());
+                }
+
+                // 单条间隔控制
+                try {
+                    Thread.sleep(ITEM_INTERVAL_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
             }
 
-            if (ok) {
-                successCount++;
-            } else {
-                failCount++;
-                Log.e(TAG, "账单同步最终失败: " + bill.getAmount());
+            Log.i(TAG, String.format("第 %d/%d 批同步完成, 当前累积成功: %d, 失败: %d",
+                    batchIndex + 1, totalBatches, successCount, failCount));
+
+            // 批次之间的平滑停顿，规避 Bmob 并发限制
+            if (batchIndex < totalBatches - 1) {
+                try {
+                    Thread.sleep(BATCH_INTERVAL_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
 
-        Log.i(TAG, String.format("syncBills 完成 - 成功:%d, 失败:%d", successCount, failCount));
+        Log.i(TAG, String.format("syncBills 全部分批同步结束 - 总计:%d, 成功:%d, 失败:%d",
+                totalBills, successCount, failCount));
 
         return failCount == 0;
     }
@@ -208,6 +242,6 @@ public class BillSyncWorker extends Worker {
                 .setConstraints(getDefaultConstraints())
                 .build();
         WorkManager.getInstance(context)
-                .enqueueUniqueWork("BillSync", ExistingWorkPolicy.KEEP, request);
+                .enqueueUniqueWork("BillSync", ExistingWorkPolicy.REPLACE, request);
     }
 }

@@ -219,6 +219,31 @@ public class ImageLoaderUtils {
     }
 
     /**
+     * 🚀 新增：精准解码账单轮播图片（按固定像素宽高解码，防止大图 OOM 与滑动卡顿）
+     */
+    public static void loadBillCarouselImage(Context context, String url, ImageView imageView, int widthPx, int heightPx) {
+        if (context == null || imageView == null) return;
+
+        RequestOptions options = new RequestOptions()
+                .placeholder(R.drawable.ic_placeholder)
+                .error(R.drawable.ic_load_error)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .skipMemoryCache(false)
+                .priority(Priority.HIGH)
+                .dontAnimate()
+                .centerCrop();
+
+        if (widthPx > 0 && heightPx > 0) {
+            options = options.override(widthPx, heightPx);
+        }
+
+        Glide.with(context.getApplicationContext())
+                .load(getGlideSource(context, url))
+                .apply(options)
+                .into(imageView);
+    }
+
+    /**
      * 🚀 新增：加载大图（用于查看大图）
      * 适用场景：点击查看原图
      */
@@ -341,30 +366,31 @@ public class ImageLoaderUtils {
     }
 
     /**
-     * 自动识别 URI 来源 - 原有方法保持不变
-     * - 网络 URL（http/https）
-     * - 本地资源 URI（android.resource://...）
-     * - 其他：返回默认图标
+     * 自动识别 URI 来源（支持网络URL、Resource URI、Content/File URI以及本地磁盘绝对路径）
      */
     public static Object getGlideSource(Context context, String uri) {
-        if (uri == null || uri.isEmpty()) {
+        if (uri == null || uri.trim().isEmpty()) {
             return R.drawable.ic_default_category;
         }
 
-        if (uri.startsWith("http") || uri.startsWith("https")) {
+        String trimmed = uri.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
             // ✅ 网络图片
-            return uri;
-        } else if (uri.startsWith("android.resource://")) {
-            // ✅ 系统资源 URI —— 一定要返回 Uri 对象！
-            return Uri.parse(uri);
-        } else if (uri.startsWith("ic_")) {
+            return trimmed;
+        } else if (trimmed.startsWith("android.resource://") || trimmed.startsWith("content://") || trimmed.startsWith("file://")) {
+            // ✅ 系统资源 URI 或 Content/File URI
+            return Uri.parse(trimmed);
+        } else if (trimmed.startsWith("/") || trimmed.contains("\\")) {
+            // ✅ 本地磁盘绝对路径
+            return new java.io.File(trimmed);
+        } else if (trimmed.startsWith("ic_")) {
             // ✅ 识别简单的本地资源名称 (如 ic_transference)
-            int resId = context.getResources().getIdentifier(uri, "drawable", context.getPackageName());
+            int resId = context.getResources().getIdentifier(trimmed, "drawable", context.getPackageName());
             if (resId != 0) return resId;
             return R.drawable.ic_default_category;
         } else {
-            // ✅ 默认占位图
-            return R.drawable.ic_default_category;
+            // ✅ 默认传递原始字符串供 Glide 解析
+            return trimmed;
         }
     }
 

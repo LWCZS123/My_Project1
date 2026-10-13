@@ -309,7 +309,8 @@ public class AddAccountFragment extends BottomSheetDialogFragment {
                     SelectGroupBottomSheetFragment.newInstance(groups, selectedGroupId);
 
             sheet.setOnGroupSelectedListener(group -> {
-                selectedGroupId = group.getObjectId();
+                selectedGroupId = (group.getObjectId() != null && !group.getObjectId().isEmpty()) ?
+                        group.getObjectId() : group.getName();
                 binding.tvGroupName.setText(group.getName());
             });
 

@@ -7,7 +7,7 @@ import java.io.Serializable;
  * -------------------------------------------------------
  * 用于 SQLite 数据库按天聚合查询输出的结果对象。
  */
-public class DailyStat implements Serializable {
+public  class DailyStat implements Serializable {
 
     public String day;
     public int billCount;

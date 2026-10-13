@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tvAccountName"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="8dp"
+    android:background="@drawable/bg_test_generator_chip_selected"
+    android:paddingHorizontal="18dp"
+    android:paddingVertical="9dp"
+    android:text="微信"
+    android:textColor="#FFFFFF"
+    android:textSize="13sp"
+    android:textStyle="bold" />

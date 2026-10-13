@@ -10,13 +10,14 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
 
-import java.util.List;
 import com.example.my_project1.data.model.CategoryWithSubCategories;
 import com.example.my_project1.databinding.FragmentCategoryGridBinding;
 import com.example.my_project1.ui.adapter.CategoryGridAdapter;
 import com.example.my_project1.ui.viewmodel.CategoryViewModel;
 
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 import io.reactivex.annotations.NonNull;
 

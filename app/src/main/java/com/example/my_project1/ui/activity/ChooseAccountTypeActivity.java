@@ -1,15 +1,19 @@
 package com.example.my_project1.ui.activity;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -29,34 +33,50 @@ public class ChooseAccountTypeActivity extends AppCompatActivity {
         binding = ActivityChooseAccountTypeBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        initSystemBars();
+
         binding.btnBack.setOnClickListener(v -> finish());
 
         setupRecyclerView();
     }
 
+    private void initSystemBars() {
+        int bgColor = Color.parseColor("#F4F4F4");
+        getWindow().setStatusBarColor(bgColor);
+        getWindow().setNavigationBarColor(bgColor);
+
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(true);
+        controller.setAppearanceLightNavigationBars(true);
+    }
+
     private void setupRecyclerView() {
         String groupId = getIntent().getStringExtra("groupId");
-        List<Object> items = new ArrayList<>();
+
+        List<AccountGroupSection> sections = new ArrayList<>();
 
         // 资金账户
-        items.add("资金账户");
-        items.add(new AccountType("现金钱包", R.drawable.ic_wallet, "资金账户"));
-        items.add(new AccountType("储蓄卡", R.drawable.ic_debit_card, "资金账户"));
-        items.add(new AccountType("支付宝", R.drawable.ic_wallet, "资金账户")); // 保持 ic_wallet 如果没有 ic_alipay
-        items.add(new AccountType("微信钱包", R.drawable.ic_wechat, "资金账户"));
+        List<AccountType> fundingTypes = new ArrayList<>();
+        fundingTypes.add(new AccountType("现金钱包", R.drawable.ic_wallet, "资金账户"));
+        fundingTypes.add(new AccountType("储蓄卡", R.drawable.ic_debit_card, "资金账户"));
+        fundingTypes.add(new AccountType("支付宝", R.drawable.ic_wallet, "资金账户"));
+        fundingTypes.add(new AccountType("微信钱包", R.drawable.ic_wechat, "资金账户"));
+        sections.add(new AccountGroupSection("资金账户", fundingTypes));
 
         // 信用账户
-        items.add("信用账户");
-        items.add(new AccountType("信用卡", R.drawable.ic_debit_card, "信用账户"));
-        items.add(new AccountType("京东白条", R.drawable.ic_wallet, "信用账户"));
+        List<AccountType> creditTypes = new ArrayList<>();
+        creditTypes.add(new AccountType("信用卡", R.drawable.ic_debit_card, "信用账户"));
+        creditTypes.add(new AccountType("京东白条", R.drawable.ic_wallet, "信用账户"));
+        sections.add(new AccountGroupSection("信用账户", creditTypes));
 
         // 充值账户
-        items.add("充值账户");
-        items.add(new AccountType("公交卡", R.drawable.ic_wallet, "充值账户"));
-        items.add(new AccountType("饭卡", R.drawable.ic_wallet, "充值账户"));
-        items.add(new AccountType("会员卡", R.drawable.ic_wallet, "充值账户"));
+        List<AccountType> topupTypes = new ArrayList<>();
+        topupTypes.add(new AccountType("公交卡", R.drawable.ic_wallet, "充值账户"));
+        topupTypes.add(new AccountType("饭卡", R.drawable.ic_wallet, "充值账户"));
+        topupTypes.add(new AccountType("会员卡", R.drawable.ic_wallet, "充值账户"));
+        sections.add(new AccountGroupSection("充值账户", topupTypes));
 
-        AccountTypeAdapter adapter = new AccountTypeAdapter(items, type -> {
+        AccountGroupSectionAdapter adapter = new AccountGroupSectionAdapter(sections, type -> {
             Intent intent = new Intent(this, AddAccountActivity.class);
             intent.putExtra("accountName", type.name);
             intent.putExtra("accountIconRes", type.iconRes);
@@ -81,72 +101,82 @@ public class ChooseAccountTypeActivity extends AppCompatActivity {
         }
     }
 
-    private static class AccountTypeAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-        private static final int TYPE_HEADER = 0;
-        private static final int TYPE_ITEM = 1;
+    public static class AccountGroupSection {
+        String title;
+        List<AccountType> items;
 
-        private final List<Object> items;
+        public AccountGroupSection(String title, List<AccountType> items) {
+            this.title = title;
+            this.items = items;
+        }
+    }
+
+    private static class AccountGroupSectionAdapter extends RecyclerView.Adapter<AccountGroupSectionAdapter.ViewHolder> {
+        private final List<AccountGroupSection> sections;
         private final OnItemClickListener listener;
 
         public interface OnItemClickListener {
             void onItemClick(AccountType type);
         }
 
-        public AccountTypeAdapter(List<Object> items, OnItemClickListener listener) {
-            this.items = items;
+        public AccountGroupSectionAdapter(List<AccountGroupSection> sections, OnItemClickListener listener) {
+            this.sections = sections;
             this.listener = listener;
-        }
-
-        @Override
-        public int getItemViewType(int position) {
-            return items.get(position) instanceof String ? TYPE_HEADER : TYPE_ITEM;
         }
 
         @NonNull
         @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            if (viewType == TYPE_HEADER) {
-                View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_account_type_header, parent, false);
-                return new HeaderViewHolder(view);
-            } else {
-                View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_account_type, parent, false);
-                return new ItemViewHolder(view);
-            }
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_account_type_group_card, parent, false);
+            return new ViewHolder(view);
         }
 
         @Override
-        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            if (holder instanceof HeaderViewHolder) {
-                ((HeaderViewHolder) holder).tvTitle.setText((String) items.get(position));
-            } else {
-                AccountType type = (AccountType) items.get(position);
-                ItemViewHolder itemHolder = (ItemViewHolder) holder;
-                itemHolder.tvName.setText(type.name);
-                itemHolder.ivIcon.setImageResource(type.iconRes);
-                itemHolder.itemView.setOnClickListener(v -> listener.onItemClick(type));
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            AccountGroupSection section = sections.get(position);
+            holder.tvGroupTitle.setText(section.title);
+            holder.containerItems.removeAllViews();
+
+            LayoutInflater inflater = LayoutInflater.from(holder.itemView.getContext());
+            for (int i = 0; i < section.items.size(); i++) {
+                AccountType type = section.items.get(i);
+                View itemView = inflater.inflate(R.layout.item_account_type, holder.containerItems, false);
+
+                TextView tvName = itemView.findViewById(R.id.tv_name);
+                ImageView ivIcon = itemView.findViewById(R.id.iv_icon);
+
+                tvName.setText(type.name);
+                ivIcon.setImageResource(type.iconRes);
+                itemView.setOnClickListener(v -> listener.onItemClick(type));
+
+                holder.containerItems.addView(itemView);
+
+                // 如果不是最后一条，添加分割线
+                if (i < section.items.size() - 1) {
+                    View divider = new View(holder.itemView.getContext());
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, 1);
+                    lp.setMargins(16, 0, 16, 0);
+                    divider.setLayoutParams(lp);
+                    divider.setBackgroundColor(Color.parseColor("#F0F0F0"));
+                    holder.containerItems.addView(divider);
+                }
             }
         }
 
         @Override
         public int getItemCount() {
-            return items.size();
+            return sections.size();
         }
 
-        static class HeaderViewHolder extends RecyclerView.ViewHolder {
-            TextView tvTitle;
-            HeaderViewHolder(View itemView) {
-                super(itemView);
-                tvTitle = itemView.findViewById(R.id.tv_header_title);
-            }
-        }
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView tvGroupTitle;
+            LinearLayout containerItems;
 
-        static class ItemViewHolder extends RecyclerView.ViewHolder {
-            TextView tvName;
-            ImageView ivIcon;
-            ItemViewHolder(View itemView) {
+            ViewHolder(View itemView) {
                 super(itemView);
-                tvName = itemView.findViewById(R.id.tv_name);
-                ivIcon = itemView.findViewById(R.id.iv_icon);
+                tvGroupTitle = itemView.findViewById(R.id.tv_group_title);
+                containerItems = itemView.findViewById(R.id.container_items);
             }
         }
     }

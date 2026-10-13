@@ -25,7 +25,7 @@
             android:layout_centerVertical="true"
             android:padding="4dp"
             android:src="@drawable/ic_back3"
-            android:tint="#333333" />
+            app:tint="#333333" />
 
         <!-- 设置按钮（右） -->
         <ImageView
@@ -33,7 +33,7 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:src="@drawable/ic_setting1"
-            android:tint="#333333"
+            app:tint="#333333"
             android:padding="4dp"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true" />
@@ -217,7 +217,7 @@
                         android:layout_width="16dp"
                         android:layout_height="16dp"
                         android:src="@drawable/ic_calendar_heart"
-                        android:tint="#666666" />
+                        app:tint="#666666" />
 
                     <TextView
                         android:id="@+id/tv_calendar"
@@ -268,6 +268,44 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- 报销 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_reimburse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp">
+
+                    <ImageView
+                        android:id="@+id/iv_reimburse"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_btn_reimburse"
+                        app:tint="#666666" />
+
+                    <TextView
+                        android:id="@+id/tv_reimburse"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="5dp"
+                        android:text="报销"
+                        android:textColor="#666666"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- 标签 -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/card_label"
@@ -293,7 +331,7 @@
                         android:layout_width="16dp"
                         android:layout_height="16dp"
                         android:src="@drawable/ic_tags"
-                        android:tint="#666666" />
+                        app:tint="#666666" />
 
                     <TextView
                         android:id="@+id/tv_label"
@@ -368,7 +406,7 @@
                         android:layout_width="16dp"
                         android:layout_height="16dp"
                         android:src="@drawable/ic_marker"
-                        android:tint="#666666" />
+                        app:tint="#666666" />
 
                     <TextView
                         android:id="@+id/tv_record"

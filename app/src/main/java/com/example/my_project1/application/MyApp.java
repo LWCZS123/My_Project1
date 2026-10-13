@@ -39,7 +39,7 @@ public class MyApp extends Application {
 
 
         // 初始化 Bmob
-        Bmob.initialize(this, "06602b7805aefe310720f1a2ed13fcea");
+        Bmob.initialize(this, "c15d55f6a0b938a656684ec71124a3d3");
         Log.d(TAG, "✅ Bmob 初始化成功");
 
         BmobUser currentUser = BmobUser.getCurrentUser();

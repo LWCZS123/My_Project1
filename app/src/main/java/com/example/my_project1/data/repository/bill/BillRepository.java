@@ -76,8 +76,15 @@ public class BillRepository {
                 long id = billDao.insert(bill);
 
                 if (id > 0) {
+                    bill.setId(id);
                     Log.d(TAG, "插入账单成功: ID=" + id);
                     updateAccountBalanceForNewBill(bill);
+
+                    try {
+                        com.example.my_project1.work.BillSyncWorker.enqueue(context);
+                    } catch (Exception e) {
+                        Log.e(TAG, "触发同步失败: " + e.getMessage());
+                    }
 
                     executors.mainThread().execute(() ->
                             callback.onComplete(ApiResponse.success(id, "添加成功"))
@@ -113,11 +120,24 @@ public class BillRepository {
                 List<Long> ids = billDao.insertBills(bills);
                 int count = ids != null ? ids.size() : 0;
 
+                if (ids != null && ids.size() == bills.size()) {
+                    for (int i = 0; i < bills.size(); i++) {
+                        bills.get(i).setId(ids.get(i));
+                    }
+                }
+
                 for (Bill bill : bills) {
                     updateAccountBalanceForNewBill(bill);
                 }
 
                 Log.d(TAG, "批量插入成功: " + count + " 条");
+
+                try {
+                    com.example.my_project1.work.BillSyncWorker.enqueue(context);
+                } catch (Exception e) {
+                    Log.e(TAG, "触发同步失败: " + e.getMessage());
+                }
+
                 executors.mainThread().execute(() ->
                         callback.onComplete(ApiResponse.success(count, "批量添加成功"))
                 );
@@ -161,6 +181,14 @@ public class BillRepository {
                 }
 
                 Log.d(TAG, "更新账单: " + rows + " 行");
+                if (rows > 0) {
+                    try {
+                        com.example.my_project1.work.BillSyncWorker.enqueue(context);
+                    } catch (Exception e) {
+                        Log.e(TAG, "触发同步失败: " + e.getMessage());
+                    }
+                }
+
                 if (rows == 0) {
                     postUpdateResult(callback, ApiResponse.error("账单未发生更新"));
                 } else {
@@ -213,6 +241,15 @@ public class BillRepository {
 
                 restoreAccountBalanceForDeletedBill(stored);
 
+                // 如果删除的是“报销入账”账单，恢复对应的原支出账单为未报销状态
+                boolean isReimburseIncome = (stored.getType() == 1) &&
+                        ("reimburse_income".equals(stored.getCategoryId()) ||
+                         (stored.getCategoryName() != null && stored.getCategoryName().contains("报销入账")));
+
+                if (isReimburseIncome) {
+                    restoreOriginalBillToUnreimbursed(stored);
+                }
+
                 stored.setSyncState(SyncState.TO_DELETE);
                 stored.setUpdatedAt(new Date());
 
@@ -237,6 +274,63 @@ public class BillRepository {
                 );
             }
         });
+    }
+
+    /**
+     * 删除报销入账账单时，将对应的原支出账单恢复为未报销状态
+     */
+    private void restoreOriginalBillToUnreimbursed(Bill reimburseIncomeBill) {
+        try {
+            Bill originalBill = null;
+            String remark = reimburseIncomeBill.getReimburseRemark();
+
+            // 1. 优先解析关联的原账单 ID
+            if (remark != null && remark.contains("REF_BILL_ID:")) {
+                try {
+                    String idStr = remark.substring(remark.indexOf("REF_BILL_ID:") + "REF_BILL_ID:".length()).trim();
+                    long refId = Long.parseLong(idStr);
+                    if (refId > 0) {
+                        originalBill = billDao.getBillByIdSync(refId);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "解析关联原账单ID失败: " + e.getMessage());
+                }
+            }
+
+            // 2. 如果未通过关联ID找到，模糊匹配该用户下的已报销账单
+            if (originalBill == null && reimburseIncomeBill.getUserId() != null) {
+                List<Bill> reimbursedBills = billDao.getReimbursedBillsByUserSync(reimburseIncomeBill.getUserId());
+                if (reimbursedBills != null && !reimbursedBills.isEmpty()) {
+                    for (Bill b : reimbursedBills) {
+                        if (Math.abs(b.getReimburseAmount() - reimburseIncomeBill.getAmount()) < 0.001 ||
+                            Math.abs(b.getAmount() - reimburseIncomeBill.getAmount()) < 0.001) {
+                            originalBill = b;
+                            break;
+                        }
+                    }
+                    if (originalBill == null) {
+                        originalBill = reimbursedBills.get(0);
+                    }
+                }
+            }
+
+            // 3. 将找到的原支出账单重置为未报销状态并触发更新
+            if (originalBill != null && originalBill.isReimbursed()) {
+                originalBill.setReimbursed(false);
+                originalBill.setReimburseAmount(0.0);
+                originalBill.setReimburseTime(null);
+                originalBill.setReimburseAccountId(null);
+                originalBill.setReimburseAccountName(null);
+                originalBill.setReimburseRemark(null);
+                originalBill.setSyncState(SyncState.TO_UPDATE);
+                originalBill.setUpdatedAt(new Date());
+
+                billDao.update(originalBill);
+                Log.d(TAG, "删除报销账单，成功将原账单(ID=" + originalBill.getId() + ")恢复为未报销状态");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "恢复原账单为未报销状态异常: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -683,18 +777,12 @@ public class BillRepository {
                                     fetchCloudBillPage(userId, skip + page.size(), cloudObjectIdSet, counts, callback)
                             );
                         } else {
-                            finishFullSync(userId, cloudObjectIdSet, counts, skip == 0 ? null : callback);
+                            finishFullSync(userId, cloudObjectIdSet, counts, callback);
                         }
                     });
                 } else {
                     executors.diskIO().execute(() -> {
-                        if (skip == 0 && callback != null) {
-                            executors.mainThread().execute(() ->
-                                    callback.onComplete(ApiResponse.success(new SyncResult(0, 0, 0), "云端无账单"))
-                            );
-                        } else {
-                            finishFullSync(userId, cloudObjectIdSet, counts, skip == 0 ? null : callback);
-                        }
+                        finishFullSync(userId, cloudObjectIdSet, counts, callback);
                     });
                 }
             }
@@ -755,6 +843,7 @@ public class BillRepository {
                     if (objectId != null && !objectId.isEmpty()
                             && local.getSyncState() == SyncState.SYNCED
                             && !cloudObjectIdSet.contains(objectId)) {
+                        restoreAccountBalanceForDeletedBill(local);
                         billDao.delete(local);
                         deleteCount++;
                     }
@@ -772,27 +861,45 @@ public class BillRepository {
             }
         } catch (Exception e) {
             Log.e(TAG, "全量同步收尾异常", e);
+            if (callback != null) {
+                executors.mainThread().execute(() ->
+                        callback.onComplete(ApiResponse.error(e.getMessage()))
+                );
+            }
         }
     }
 
     private void updateLocalBillFromCloud(Bill local, CloudBill cloud) {
-        local.setUserId(cloud.getUserId());
-        local.setBookId(cloud.getBookId());
-        local.setAccountId(cloud.getAccountId());
-        local.setCategoryId(cloud.getCategoryId());
-        local.setCategoryName(cloud.getCategoryName());
-        local.setCategoryIconUrl(cloud.getCategoryIconUrl());
-        local.setAmount(cloud.getAmount() != null ? cloud.getAmount() : 0);
-        local.setDiscount(cloud.getDiscount() != null ? cloud.getDiscount() : 0.0);
-        local.setType(cloud.getType() != null ? cloud.getType() : 0);
-        local.setExcludeBudget(cloud.getExcludeBudget() != null && cloud.getExcludeBudget());
-        local.setExcludeStat(cloud.getExcludeStat() != null && cloud.getExcludeStat());
-        local.setRemark(cloud.getRemark());
-        local.setBillTime(DateConvertUtil.safeConvertToDate(cloud.getBillTime()));
-        local.setImageUrls(cloud.getImageUrls());
-        local.setLocation(cloud.getLocation());
-        local.setCreatedAt(DateConvertUtil.safeConvertToDate(cloud.getCreatedAt()));
-        local.setUpdatedAt(DateConvertUtil.safeConvertToDate(cloud.getUpdatedAt()));
+        Bill cloudEntity = cloud.toLocalEntity();
+        local.setUserId(cloudEntity.getUserId());
+        local.setBookId(cloudEntity.getBookId());
+        local.setAccountId(cloudEntity.getAccountId());
+        local.setToAccountId(cloudEntity.getToAccountId());
+        local.setCategoryId(cloudEntity.getCategoryId());
+        local.setCategoryName(cloudEntity.getCategoryName());
+        local.setCategoryIconUrl(cloudEntity.getCategoryIconUrl());
+        local.setCategoryIconBackgroundColor(cloudEntity.getCategoryIconBackgroundColor());
+        local.setAmount(cloudEntity.getAmount());
+        local.setDiscount(cloudEntity.getDiscount());
+        local.setType(cloudEntity.getType());
+        local.setExcludeBudget(cloudEntity.isExcludeBudget());
+        local.setExcludeStat(cloudEntity.isExcludeStat());
+        local.setRemark(cloudEntity.getRemark());
+        local.setBillTime(cloudEntity.getBillTime());
+        local.setImageUrls(cloudEntity.getImageUrls());
+        local.setLocation(cloudEntity.getLocation());
+        local.setSourceWishId(cloudEntity.getSourceWishId());
+        local.setCreatedAt(cloudEntity.getCreatedAt());
+        local.setUpdatedAt(cloudEntity.getUpdatedAt());
+
+        // 报销相关字段云端同步
+        local.setReimbursable(cloudEntity.isReimbursable());
+        local.setReimbursed(cloudEntity.isReimbursed());
+        local.setReimburseAmount(cloudEntity.getReimburseAmount());
+        local.setReimburseTime(cloudEntity.getReimburseTime());
+        local.setReimburseAccountId(cloudEntity.getReimburseAccountId());
+        local.setReimburseAccountName(cloudEntity.getReimburseAccountName());
+        local.setReimburseRemark(cloudEntity.getReimburseRemark());
     }
 
     /**

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_images"
+    android:layout_width="match_parent"
+    android:layout_height="180dp"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="6dp"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- 嵌套滑动处理容器，解决 ViewPager2 与 RecyclerView 横纵向冲突 -->
+        <com.example.my_project1.ui.view.NestedScrollableHost
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/vp_images"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </com.example.my_project1.ui.view.NestedScrollableHost>
+
+        <!-- 半透明黑色渐变阴影遮罩 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_image_overlay_gradient"
+            android:clickable="false"
+            android:focusable="false" />
+
+        <!-- 左下角文字描述 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="16dp"
+            android:clickable="false"
+            android:focusable="false"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_memory_tag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="消费记忆"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_memory_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="账单凭证"
+                android:textColor="@color/white"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_memory_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="账单附件图片"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- 右上角图片指示器 -->
+        <LinearLayout
+            android:id="@+id/layout_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="12dp"
+            android:orientation="horizontal"
+            android:padding="4dp" />
+
+    </FrameLayout>
+</com.google.android.material.card.MaterialCardView>

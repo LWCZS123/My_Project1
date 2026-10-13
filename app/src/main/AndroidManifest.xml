@@ -164,6 +164,12 @@
 
             />
         <activity
+            android:name=".ui.activity.TestBillGeneratorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+
+            />
+        <activity
             android:name=".ui.activity.AccountChartActivity"
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar"

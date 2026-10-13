@@ -45,7 +45,7 @@ public interface AccountDao {
     @Query("SELECT * FROM account_groups ORDER BY createdAt ASC")
     List<AccountGroup> getAllGroupsSync();
 
-    @Query("SELECT * FROM account_groups WHERE sync_state != 'SYNCED'")
+    @Query("SELECT * FROM account_groups WHERE sync_state != 'SYNCED' OR object_id IS NULL OR object_id = ''")
     List<AccountGroup> getPendingSyncGroups();
 
     @Query("SELECT * FROM account_groups WHERE sync_state != :state")
@@ -100,7 +100,7 @@ public interface AccountDao {
     @Query("SELECT * FROM accounts WHERE group_id = :groupId ORDER BY createdAt ASC")
     List<Account> getAccountsByGroupIdSync(String groupId);
 
-    @Query("SELECT * FROM accounts WHERE sync_state != 'SYNCED'")
+    @Query("SELECT * FROM accounts WHERE sync_state != 'SYNCED' OR object_id IS NULL OR object_id = ''")
     List<Account> getPendingSyncAccounts();
 
     @Query("SELECT * FROM accounts WHERE sync_state != :state")

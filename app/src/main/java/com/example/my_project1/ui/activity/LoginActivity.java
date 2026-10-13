@@ -130,6 +130,12 @@ public class LoginActivity extends AppCompatActivity {
                                 CategoryDownloadWorker.enqueue(getApplicationContext(), userId);
                             }
                         });
+
+                        // 🔑 初始化/同步账户组与账户，确保清除数据重新登录后从云端拉取账户
+                        com.example.my_project1.data.repository.account.AccountRepository accountRepository =
+                                new com.example.my_project1.data.repository.account.AccountRepository(getApplicationContext());
+                        accountRepository.initDefaultAccountGroups(userId);
+
                         startActivity(new Intent(LoginActivity.this, MainActivity.class));
                         finish();
 

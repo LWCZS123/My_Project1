@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import cn.bmob.v3.BmobQuery;
 import cn.bmob.v3.BmobUser;
+import cn.bmob.v3.datatype.BmobPointer;
 import cn.bmob.v3.exception.BmobException;
 import cn.bmob.v3.listener.FindListener;
 import cn.bmob.v3.listener.SaveListener;
@@ -64,10 +65,16 @@ public class BmobBillApiImpl {
         }
 
         CloudBill cloud = CloudBill.fromLocal(local);
-        cloud.setUser(BmobPointerUtil.user(userId));
+        BmobPointer userPointer = BmobPointerUtil.user(userId);
+        if (userPointer != null) {
+            cloud.setUser(userPointer);
+        }
 
-        if (local.getAccountId() != null) {
-            cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));
+        if (local.getAccountId() != null && !local.getAccountId().isEmpty()) {
+            BmobPointer accountPointer = BmobPointerUtil.account(local.getAccountId());
+            if (accountPointer != null) {
+                cloud.setAccount(accountPointer);
+            }
         }
 
         cloud.save(new SaveListener<String>() {
@@ -291,14 +298,40 @@ public class BmobBillApiImpl {
                 return false;
             }
 
+            // 账户信息互补关联校验
+            if (db != null) {
+                try {
+                    if ((local.getAccountId() == null || local.getAccountId().isEmpty()) && local.getLocalAccountId() > 0) {
+                        com.example.my_project1.data.model.account.Account acc = db.accountDao().getAccountByLocalId(local.getLocalAccountId());
+                        if (acc != null && acc.getObjectId() != null && !acc.getObjectId().isEmpty()) {
+                            local.setAccountId(acc.getObjectId());
+                        }
+                    } else if (local.getAccountId() != null && !local.getAccountId().isEmpty() && local.getLocalAccountId() <= 0) {
+                        com.example.my_project1.data.model.account.Account acc = db.accountDao().getAccountByCloudId(local.getAccountId());
+                        if (acc != null) {
+                            local.setLocalAccountId(acc.getId());
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "账户关联信息互补失败: " + e.getMessage());
+                }
+            }
+
             CloudBill cloud = CloudBill.fromLocal(local);
-            cloud.setUser(BmobPointerUtil.user(userId));
+            BmobPointer userPointer = BmobPointerUtil.user(userId);
+            if (userPointer != null) {
+                cloud.setUser(userPointer);
+            }
+
             Log.d(TAG, "uploadBillSync() 调用 amount=" + local.getAmount()
                     + " state=" + local.getSyncState()
                     + " objectId=" + local.getObjectId());
 
-            if (local.getAccountId() != null) {
-                cloud.setAccount(BmobPointerUtil.account(local.getAccountId()));
+            if (local.getAccountId() != null && !local.getAccountId().isEmpty()) {
+                BmobPointer accountPointer = BmobPointerUtil.account(local.getAccountId());
+                if (accountPointer != null) {
+                    cloud.setAccount(accountPointer);
+                }
             }
 
             String cloudId;

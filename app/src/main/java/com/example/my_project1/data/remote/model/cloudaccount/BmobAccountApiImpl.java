@@ -102,6 +102,7 @@ public class BmobAccountApiImpl {
         }
         BmobQuery<AccountGroup> query = new BmobQuery<>();
         query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
+        query.include("user");
         query.order("order");
         query.findObjects(listener);
     }
@@ -115,17 +116,26 @@ public class BmobAccountApiImpl {
             String userId = getCurrentUserId();
             if (userId == null) return false;
 
+            if (local.getUserId() == null || local.getUserId().isEmpty()) {
+                local.setUserId(userId);
+            }
+
             AccountGroup cloud = AccountGroup.fromLocal(local);
             cloud.setUser(BmobPointerUtil.user(userId));
 
             String cloudId = local.getObjectId();
             if (cloudId == null || cloudId.isEmpty()) {
                 // 1. 去重检查：根据名称查找该用户下是否已存在同名组
-                BmobQuery<AccountGroup> query = new BmobQuery<>();
-                query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
-                query.addWhereEqualTo("name", local.getName());
-                List<AccountGroup> existing = query.findObjectsSync(AccountGroup.class);
-                
+                List<AccountGroup> existing = null;
+                try {
+                    BmobQuery<AccountGroup> query = new BmobQuery<>();
+                    query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
+                    query.addWhereEqualTo("name", local.getName());
+                    existing = query.findObjectsSync(AccountGroup.class);
+                } catch (Exception e) {
+                    Log.d(TAG, "云端去重查询未命中或表尚未建立: " + e.getMessage());
+                }
+
                 if (existing != null && !existing.isEmpty()) {
                     cloudId = existing.get(0).getObjectId();
                     Log.d(TAG, "♻️ 云端已存在同名账户组: " + local.getName() + " -> " + cloudId);
@@ -207,7 +217,7 @@ public class BmobAccountApiImpl {
         }
         BmobQuery<Account> query = new BmobQuery<>();
         query.addWhereEqualTo("user", BmobPointerUtil.user(userId));
-        query.include("group");
+        query.include("group,user");
         query.order("createdAt");
         query.findObjects(listener);
     }
@@ -221,15 +231,38 @@ public class BmobAccountApiImpl {
             Account cloud = Account.fromLocal(local);
             cloud.setUser(BmobPointerUtil.user(userId));
 
-            // 关联账户组 (确保使用 objectId)
-            if (local.getGroupId() != null && !local.getGroupId().isEmpty()) {
-                cloud.setGroup(BmobPointerUtil.group(local.getGroupId()));
+            // 关联账户组 (解析 objectId 或通过 groupName 匹配)
+            String targetGroupId = local.getGroupId();
+
+            if (db != null) {
+                com.example.my_project1.data.model.account.AccountGroup g = null;
+                if (targetGroupId != null && !targetGroupId.isEmpty()) {
+                    g = db.accountDao().getGroupByCloudId(targetGroupId);
+                    if (g == null) {
+                        g = db.accountDao().getGroupByName(userId, targetGroupId);
+                    }
+                }
+                if (g == null && local.getCategory() != null && !local.getCategory().isEmpty()) {
+                    g = db.accountDao().getGroupByName(userId, local.getCategory());
+                }
+                if (g != null && g.getObjectId() != null && !g.getObjectId().isEmpty()) {
+                    targetGroupId = g.getObjectId();
+                    if (!targetGroupId.equals(local.getGroupId())) {
+                        local.setGroupId(targetGroupId);
+                        db.accountDao().update(local);
+                    }
+                }
+            }
+
+            if (targetGroupId != null && !targetGroupId.isEmpty()) {
+                cn.bmob.v3.datatype.BmobPointer groupPointer = BmobPointerUtil.group(targetGroupId);
+                if (groupPointer != null) {
+                    cloud.setGroup(groupPointer);
+                }
             }
 
             String cloudId = local.getObjectId();
             if (cloudId == null || cloudId.isEmpty()) {
-                // 🔴 关键逻辑：如果 group 还是本地临时 ID，上传会失败。
-                // 但 Worker 逻辑保证了 Group 先同步，所以此时 groupId 应该是 objectId。
                 cloudId = cloud.saveSync();
                 if (cloudId == null || cloudId.isEmpty()) return false;
                 local.setObjectId(cloudId);

@@ -102,6 +102,12 @@ public class BillViewModel extends AndroidViewModel {
     private String currentUserId;
     private String lastUserId;
 
+    public String getCurrentUserId() {
+        if (currentUserId != null) return currentUserId;
+        cn.bmob.v3.BmobUser u = cn.bmob.v3.BmobUser.getCurrentUser();
+        return u != null ? u.getObjectId() : null;
+    }
+
     // 触发器与 LiveData 依赖
     private final MutableLiveData<Long> _refreshTrigger = new MutableLiveData<>(System.currentTimeMillis());
     private LiveData<List<Account>> allAccountsLive;
@@ -603,9 +609,10 @@ public class BillViewModel extends AndroidViewModel {
     }
 
     public void insertBill(Bill bill) {
-        if (currentUserId == null) { _toastMessage.setValue("请先登录"); return; }
+        String userId = getCurrentUserId();
+        if (userId == null) { _toastMessage.setValue("请先登录"); return; }
         if (bill == null) { _toastMessage.setValue("账单数据为空"); return; }
-        bill.setUserId(currentUserId);
+        bill.setUserId(userId);
         _operationState.setValue(ApiResponse.loading("正在添加..."));
         repository.insertBill(bill, r -> {
             if (r.isSuccess()) {
@@ -683,16 +690,13 @@ public class BillViewModel extends AndroidViewModel {
 
     public void updateBill(Bill bill) {
         if (bill == null) { _toastMessage.setValue("账单数据为空"); return; }
-        if (currentUserId == null) {
+        String userId = getCurrentUserId();
+        if (userId == null) {
             _toastMessage.setValue("请先登录");
             return;
         }
         if (bill.getUserId() == null) {
-            bill.setUserId(currentUserId);
-        }
-        if (!Objects.equals(currentUserId, bill.getUserId())) {
-            _toastMessage.setValue("账单所属用户无效");
-            return;
+            bill.setUserId(userId);
         }
         _operationState.setValue(ApiResponse.loading("正在更新..."));
         repository.updateBill(bill, r -> {
@@ -704,6 +708,36 @@ public class BillViewModel extends AndroidViewModel {
             } else {
                 _operationState.setValue(ApiResponse.error(r.message));
                 _toastMessage.setValue("更新失败: " + r.message);
+            }
+        });
+    }
+
+    public void cancelReimburse(Bill bill) {
+        if (bill == null) return;
+        bill.setReimbursed(false);
+        bill.setReimburseAmount(0.0);
+        bill.setReimburseAccountId(null);
+        bill.setReimburseAccountName(null);
+        bill.setReimburseTime(null);
+        bill.setReimburseRemark(null);
+
+        updateBill(bill);
+
+        executors.diskIO().execute(() -> {
+            try {
+                if (currentUserId != null) {
+                    List<Bill> incomeBills = database.billDao().getReimburseIncomeBills(currentUserId);
+                    if (incomeBills != null && !incomeBills.isEmpty()) {
+                        for (Bill b : incomeBills) {
+                            repository.deleteBill(b, r -> {
+                                refreshData();
+                            });
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "删除报销入账账单失败: " + e.getMessage());
             }
         });
     }

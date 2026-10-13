@@ -75,22 +75,28 @@ public class BillUiModelMapper {
             String prefix;
             int amountColor;
             String categoryIcon = bill.getCategoryIconUrl() != null ? bill.getCategoryIconUrl() : "";
+            String categoryName = bill.getCategoryName() != null ? bill.getCategoryName() : "";
 
-            switch (billType) {
-                case 0: // 支出
-                    prefix = "- ¥";
-                    amountColor = context.getColor(R.color.red);
-                    break;
-                case 1: // 收入
-                    prefix = "+ ¥";
-                    amountColor = context.getColor(R.color.green);
-                    break;
-                default: // 转账/借还款
-                    prefix = "¥";
-                    amountColor = context.getColor(R.color.orange_500);
+            boolean isReimburse = bill.isReimbursable() || bill.isReimbursed() || categoryName.contains("报销");
+            boolean isAccountCreation = categoryName.contains("账户创建") || categoryName.contains("创建账户") || categoryName.contains("余额调整");
+            boolean isTransfer = billType == 2 || billType == 3 || categoryName.contains("转账") || categoryName.contains("还款");
+
+            if (isReimburse || isAccountCreation) {
+                prefix = "¥";
+                amountColor = context.getColor(R.color.orange_500);
+            } else if (isTransfer) {
+                prefix = "- ¥";
+                amountColor = context.getColor(R.color.orange_500);
+                if (categoryIcon.isEmpty()) {
                     Uri uri = Uri.parse("android.resource://" + context.getPackageName() + "/" + R.drawable.ic_transference);
                     categoryIcon = uri.toString();
-                    break;
+                }
+            } else if (billType == 1) { // 收入
+                prefix = "+ ¥";
+                amountColor = context.getColor(R.color.green);
+            } else { // 支出
+                prefix = "- ¥";
+                amountColor = context.getColor(R.color.red);
             }
 
             String amountText = prefix + amountFormatter.format(bill.getAmount());
