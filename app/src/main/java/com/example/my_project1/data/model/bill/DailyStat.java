@@ -1,5 +1,7 @@
 package com.example.my_project1.data.model.bill;
 
+import androidx.room.Ignore;
+
 import java.io.Serializable;
 
 /**
@@ -16,6 +18,7 @@ public  class DailyStat implements Serializable {
 
     public DailyStat() {}
 
+    @Ignore
     public DailyStat(String day, int billCount, double incomeTotal, double expenseTotal) {
         this.day = day;
         this.billCount = billCount;

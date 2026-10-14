@@ -22,6 +22,7 @@ import com.example.my_project1.data.model.user.UserProfile;
 import com.example.my_project1.databinding.FragmentProfileBinding;
 import com.example.my_project1.ui.activity.BudgetActivity;
 import com.example.my_project1.ui.activity.ChangePasswordActivity;
+import com.example.my_project1.ui.activity.DailyReceiptActivity;
 import com.example.my_project1.ui.activity.EditProfileActivity;
 import com.example.my_project1.ui.activity.IconMarketActivity;
 import com.example.my_project1.ui.activity.IconSelectionActivity;
@@ -197,7 +198,7 @@ public class ProfileFragment extends Fragment {
 
         // 其他点击项 (根据需要添加)
         binding.llCloudBackup.setOnClickListener(v -> Toast.makeText(getContext(), "云端备份功能即将上线", Toast.LENGTH_SHORT).show());
-        binding.llDailyReceipt.setOnClickListener(v -> Toast.makeText(getContext(), "每日小票功能即将上线", Toast.LENGTH_SHORT).show());
+        binding.llDailyReceipt.setOnClickListener(v -> DailyReceiptActivity.start(requireContext()));
     }
 
     private void testBillGeneratorActivity() {

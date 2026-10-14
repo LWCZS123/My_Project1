@@ -53,38 +53,42 @@ public class ElasticOverScrollHelper implements View.OnTouchListener {
                 // 判断是否处于边界并继续同向拖动
                 boolean isTopBoundary = !canScrollUp && deltaY > 0;
                 boolean isBottomBoundary = !canScrollDown && deltaY < 0;
+                boolean hasTranslation = Math.abs(targetView.getTranslationY()) > 0.1f;
 
-                if (isTopBoundary || isBottomBoundary || isOverScrolling) {
+                if (isTopBoundary || isBottomBoundary || isOverScrolling || hasTranslation) {
                     if (!isOverScrolling) {
                         isOverScrolling = true;
                         currentTranslationY = targetView.getTranslationY();
                     }
 
-                    // 阻尼系数 (随着位移增大阻力变大)
-                    float damping = 0.45f;
-                    float maxDistance = targetView.getResources().getDisplayMetrics().density * 160f; // 最大拉伸 160dp
+                    // 调小阻尼阻力，基础系数提升至 0.6f，拉伸更轻盈顺滑
+                    float density = targetView.getResources().getDisplayMetrics().density;
+                    float maxDistance = density * 220f; // 最大拉伸距离 220dp
+                    float progress = Math.min(Math.abs(currentTranslationY) / maxDistance, 1.0f);
+                    float damping = 0.6f * (1.0f - progress * 0.5f);
 
                     currentTranslationY += deltaY * damping;
 
                     if (currentTranslationY > maxDistance) currentTranslationY = maxDistance;
                     if (currentTranslationY < -maxDistance) currentTranslationY = -maxDistance;
 
-                    targetView.setTranslationY(currentTranslationY);
-
-                    // 越界回退归零逻辑
-                    if ((currentTranslationY > 0 && deltaY < 0 && targetView.getTranslationY() <= 0) ||
-                        (currentTranslationY < 0 && deltaY > 0 && targetView.getTranslationY() >= 0)) {
+                    // 越界回退归零逻辑：当滑动回退至原点时无缝衔接正常滚动
+                    if ((currentTranslationY <= 0 && deltaY < 0 && targetView.getTranslationY() > 0) ||
+                        (currentTranslationY >= 0 && deltaY > 0 && targetView.getTranslationY() < 0)) {
                         targetView.setTranslationY(0f);
                         isOverScrolling = false;
                         currentTranslationY = 0f;
+                        return false;
                     }
+
+                    targetView.setTranslationY(currentTranslationY);
                     return true;
                 }
                 break;
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                if (isOverScrolling || targetView.getTranslationY() != 0) {
+                if (isOverScrolling || Math.abs(targetView.getTranslationY()) > 0.1f) {
                     startBounceAnimation();
                     isOverScrolling = false;
                     currentTranslationY = 0f;
@@ -100,9 +104,14 @@ public class ElasticOverScrollHelper implements View.OnTouchListener {
         }
 
         float startVal = targetView.getTranslationY();
+        if (Math.abs(startVal) < 0.1f) {
+            targetView.setTranslationY(0f);
+            return;
+        }
+
         bounceAnimator = ValueAnimator.ofFloat(startVal, 0f);
-        bounceAnimator.setDuration(300);
-        bounceAnimator.setInterpolator(new DecelerateInterpolator(1.8f));
+        bounceAnimator.setDuration(320);
+        bounceAnimator.setInterpolator(new DecelerateInterpolator(2.0f));
         bounceAnimator.addUpdateListener(animation -> {
             float val = (float) animation.getAnimatedValue();
             targetView.setTranslationY(val);

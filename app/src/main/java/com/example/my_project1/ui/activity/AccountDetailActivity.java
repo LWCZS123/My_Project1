@@ -32,6 +32,7 @@ import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
 
 import java.util.Date;
 
+
 /**
  * AccountDetailActivity - 账户详情页（优化版）
  * ----------------------------------------------------------------
@@ -196,6 +197,7 @@ public class AccountDetailActivity extends AppCompatActivity {
     private void setupRecyclerView() {
         headerAdapter = new AccountHeaderAdapter(this);
         pagingAdapter = new AccountBillPagingAdapter(this);
+        pagingAdapter.setCollapsedMonths(detailViewModel.getCollapsedMonths());
 
         headerAdapter.setOnHeaderActionListener(new AccountHeaderAdapter.OnHeaderActionListener() {
             @Override public void onEditBalance() { showBalanceAdjustmentBottomSheet(); }
@@ -212,7 +214,7 @@ public class AccountDetailActivity extends AppCompatActivity {
             }
         });
 
-        pagingAdapter.setOnMonthToggleListener(detailViewModel::toggleMonth);
+        pagingAdapter.setOnMonthToggleListener(detailViewModel::setMonthCollapsed);
 
         pagingAdapter.setOnBillClickListener(new AccountBillPagingAdapter.OnBillClickListener() {
             @Override
@@ -300,15 +302,7 @@ public class AccountDetailActivity extends AppCompatActivity {
         binding.rvTransactions.setItemViewCacheSize(20);
         ElasticOverScrollHelper.attach(binding.rvTransactions);
         
-        // Optimize folding animation speed
-        androidx.recyclerview.widget.RecyclerView.ItemAnimator animator = binding.rvTransactions.getItemAnimator();
-        if (animator instanceof androidx.recyclerview.widget.DefaultItemAnimator) {
-            androidx.recyclerview.widget.DefaultItemAnimator defaultAnimator = (androidx.recyclerview.widget.DefaultItemAnimator) animator;
-            defaultAnimator.setRemoveDuration(200);
-            defaultAnimator.setAddDuration(200);
-            defaultAnimator.setMoveDuration(200);
-            defaultAnimator.setChangeDuration(200);
-        }
+        binding.rvTransactions.setItemAnimator(null);
 
         binding.rvTransactions.setAdapter(concatAdapter);
     }

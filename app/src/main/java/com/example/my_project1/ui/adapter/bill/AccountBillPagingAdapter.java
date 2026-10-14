@@ -3,6 +3,8 @@ package com.example.my_project1.ui.adapter.bill;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,8 +12,11 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.paging.PagingDataAdapter;
+import androidx.lifecycle.Lifecycle;
+import androidx.paging.AsyncPagingDataDiffer;
+import androidx.paging.PagingData;
 import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListUpdateCallback;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.my_project1.R;
@@ -24,7 +29,11 @@ import com.example.my_project1.ui.viewmodel.accountvm.AccountBillUiModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.ui.SwipeMenuLayout;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * AccountBillPagingAdapter - 高性能卡片拼接版 (全功能版)
@@ -34,14 +43,58 @@ import java.util.Objects;
  * 2. 动态余额/欠款标签。
  * 3. 完美对齐的加深分割线。
  */
-public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiModel, RecyclerView.ViewHolder> {
+public class AccountBillPagingAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private static final int TYPE_MONTH_HEADER = 0;
     private static final int TYPE_DAY_HEADER = 1;
     private static final int TYPE_BILL_MIDDLE = 2;
     private static final int TYPE_BILL_BOTTOM = 3;
 
+    private static final DiffUtil.ItemCallback<AccountBillUiModel> DIFF_CALLBACK =
+            new DiffUtil.ItemCallback<AccountBillUiModel>() {
+                @Override
+                public boolean areItemsTheSame(@NonNull AccountBillUiModel oldItem,
+                                               @NonNull AccountBillUiModel newItem) {
+                    if (oldItem.type != newItem.type) return false;
+                    if (oldItem.type == AccountBillUiModel.TYPE_BILL_ITEM) {
+                        if (oldItem.id > 0 && newItem.id > 0) return oldItem.id == newItem.id;
+                        return oldItem.objectId != null && !oldItem.objectId.isEmpty()
+                                && oldItem.objectId.equals(newItem.objectId);
+                    }
+                    if (oldItem.type == AccountBillUiModel.TYPE_DAY_HEADER) {
+                        return Objects.equals(oldItem.key, newItem.key)
+                                && Objects.equals(oldItem.title, newItem.title);
+                    }
+                    return Objects.equals(oldItem.key, newItem.key);
+                }
+
+                @Override
+                public boolean areContentsTheSame(@NonNull AccountBillUiModel oldItem,
+                                                  @NonNull AccountBillUiModel newItem) {
+                    return oldItem.equals(newItem);
+                }
+            };
+
+    private static class Row {
+        final int rawPosition;
+        final AccountBillUiModel item;
+
+        Row(int rawPosition, AccountBillUiModel item) {
+            this.rawPosition = rawPosition;
+            this.item = item;
+        }
+    }
+
     private final Context context;
+    private final AsyncPagingDataDiffer<AccountBillUiModel> differ;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean rebuildPending;
+    private final Runnable rebuildRunnable = () -> {
+        rebuildPending = false;
+        rebuildVisibleItems();
+    };
+    private final List<Row> visibleRows = new ArrayList<>();
+    private final Set<String> collapsedMonths = new HashSet<>();
     private OnBillClickListener listener;
     private OnMonthToggleListener monthToggleListener;
 
@@ -53,26 +106,17 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
     }
 
     public interface OnMonthToggleListener {
-        void onMonthToggle(String monthKey);
+        void onMonthToggle(String monthKey, boolean collapsed);
     }
 
     public AccountBillPagingAdapter(Context context) {
-        super(new DiffUtil.ItemCallback<AccountBillUiModel>() {
-            @Override
-            public boolean areItemsTheSame(@NonNull AccountBillUiModel oldItem, @NonNull AccountBillUiModel newItem) {
-                if (oldItem.type != newItem.type) return false;
-                if (oldItem.type == AccountBillUiModel.TYPE_BILL_ITEM) {
-                    return oldItem.id == newItem.id || Objects.equals(oldItem.objectId, newItem.objectId);
-                }
-                return Objects.equals(oldItem.key, newItem.key);
-            }
-
-            @Override
-            public boolean areContentsTheSame(@NonNull AccountBillUiModel oldItem, @NonNull AccountBillUiModel newItem) {
-                return oldItem.equals(newItem);
-            }
-        });
         this.context = context;
+        differ = new AsyncPagingDataDiffer<>(DIFF_CALLBACK, new ListUpdateCallback() {
+            @Override public void onInserted(int position, int count) { scheduleRebuild(); }
+            @Override public void onRemoved(int position, int count) { scheduleRebuild(); }
+            @Override public void onMoved(int fromPosition, int toPosition) { scheduleRebuild(); }
+            @Override public void onChanged(int position, int count, Object payload) { scheduleRebuild(); }
+        });
     }
 
     public void setOnBillClickListener(OnBillClickListener listener) {
@@ -83,22 +127,149 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
         this.monthToggleListener = listener;
     }
 
+    public void setCollapsedMonths(Set<String> monthKeys) {
+        collapsedMonths.clear();
+        collapsedMonths.addAll(monthKeys);
+        rebuildVisibleItems();
+    }
+
+    public void submitData(Lifecycle lifecycle, PagingData<AccountBillUiModel> pagingData) {
+        differ.submitData(lifecycle, pagingData);
+    }
+
+    private void scheduleRebuild() {
+        rebuildPending = true;
+        mainHandler.removeCallbacks(rebuildRunnable);
+        mainHandler.post(rebuildRunnable);
+    }
+
+    private void rebuildVisibleItems() {
+        List<Row> oldRows = new ArrayList<>(visibleRows);
+        List<Row> newRows = new ArrayList<>();
+        for (int i = 0; i < differ.getItemCount(); i++) {
+            AccountBillUiModel item = differ.peek(i);
+            if (item != null && (item.type == AccountBillUiModel.TYPE_MONTH_HEADER
+                    || !collapsedMonths.contains(item.key))) {
+                newRows.add(new Row(i, item));
+            }
+        }
+        boolean appended = newRows.size() >= oldRows.size();
+        for (int i = 0; appended && i < oldRows.size(); i++) {
+            Row oldRow = oldRows.get(i);
+            Row newRow = newRows.get(i);
+            appended = oldRow.rawPosition == newRow.rawPosition
+                    && DIFF_CALLBACK.areItemsTheSame(oldRow.item, newRow.item)
+                    && DIFF_CALLBACK.areContentsTheSame(oldRow.item, newRow.item);
+        }
+        if (appended) {
+            int oldCount = oldRows.size();
+            boolean lastTypeChanged = oldCount > 0
+                    && viewTypeAt(oldRows, oldCount - 1) != viewTypeAt(newRows, oldCount - 1);
+            visibleRows.clear();
+            visibleRows.addAll(newRows);
+            if (lastTypeChanged) notifyItemChanged(oldCount - 1);
+            if (newRows.size() > oldCount) notifyItemRangeInserted(oldCount, newRows.size() - oldCount);
+            requestMoreIfHiddenTail();
+            return;
+        }
+        DiffUtil.DiffResult changes = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return oldRows.size(); }
+            @Override public int getNewListSize() { return newRows.size(); }
+            @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                return DIFF_CALLBACK.areItemsTheSame(oldRows.get(oldPosition).item,
+                        newRows.get(newPosition).item);
+            }
+            @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                return DIFF_CALLBACK.areContentsTheSame(oldRows.get(oldPosition).item,
+                        newRows.get(newPosition).item)
+                        && viewTypeAt(oldRows, oldPosition) == viewTypeAt(newRows, newPosition);
+            }
+        });
+        visibleRows.clear();
+        visibleRows.addAll(newRows);
+        changes.dispatchUpdatesTo(this);
+        requestMoreIfHiddenTail();
+    }
+
+    private void requestMoreIfHiddenTail() {
+        int rawCount = differ.getItemCount();
+        if (!visibleRows.isEmpty() && visibleRows.get(visibleRows.size() - 1).rawPosition < rawCount - 1) {
+            differ.getItem(rawCount - 1);
+        }
+    }
+
+    private void toggleMonth(String monthKey, MonthViewHolder holder) {
+        boolean collapsed = !collapsedMonths.contains(monthKey);
+        if (collapsed) collapsedMonths.add(monthKey);
+        else collapsedMonths.remove(monthKey);
+        holder.showCollapsed(collapsed);
+
+        for (int header = 0; header < visibleRows.size(); header++) {
+            Row row = visibleRows.get(header);
+            if (row.item.type != AccountBillUiModel.TYPE_MONTH_HEADER
+                    || !Objects.equals(row.item.key, monthKey)) continue;
+
+            if (collapsed) {
+                int end = header + 1;
+                while (end < visibleRows.size()
+                        && visibleRows.get(end).item.type != AccountBillUiModel.TYPE_MONTH_HEADER) end++;
+                int count = end - header - 1;
+                if (count > 0) {
+                    visibleRows.subList(header + 1, end).clear();
+                    notifyItemRangeRemoved(header + 1, count);
+                }
+            } else {
+                List<Row> added = new ArrayList<>();
+                int rawHeader = row.rawPosition;
+                if (rebuildPending) {
+                    rawHeader = -1;
+                    for (int raw = 0; raw < differ.getItemCount(); raw++) {
+                        AccountBillUiModel item = differ.peek(raw);
+                        if (item != null && item.type == AccountBillUiModel.TYPE_MONTH_HEADER
+                                && Objects.equals(item.key, monthKey)) {
+                            rawHeader = raw;
+                            break;
+                        }
+                    }
+                }
+                for (int raw = rawHeader + 1; rawHeader >= 0 && raw < differ.getItemCount(); raw++) {
+                    AccountBillUiModel item = differ.peek(raw);
+                    if (item == null || item.type == AccountBillUiModel.TYPE_MONTH_HEADER) break;
+                    added.add(new Row(raw, item));
+                }
+                if (!added.isEmpty()) {
+                    visibleRows.addAll(header + 1, added);
+                    notifyItemRangeInserted(header + 1, added.size());
+                }
+            }
+            break;
+        }
+        if (collapsed) requestMoreIfHiddenTail();
+        if (monthToggleListener != null) monthToggleListener.onMonthToggle(monthKey, collapsed);
+    }
+
     @Override
     public int getItemViewType(int position) {
-        AccountBillUiModel item = getItem(position);
-        if (item == null) return TYPE_BILL_MIDDLE;
+        return viewTypeAt(visibleRows, position);
+    }
+
+    private static int viewTypeAt(List<Row> rows, int position) {
+        AccountBillUiModel item = rows.get(position).item;
         
         if (item.type == AccountBillUiModel.TYPE_MONTH_HEADER) return TYPE_MONTH_HEADER;
         if (item.type == AccountBillUiModel.TYPE_DAY_HEADER) return TYPE_DAY_HEADER;
         
         boolean isLast = true;
-        if (position + 1 < getItemCount()) {
-            AccountBillUiModel next = getItem(position + 1);
-            if (next != null && next.type != AccountBillUiModel.TYPE_MONTH_HEADER) {
-                isLast = false;
-            }
+        if (position + 1 < rows.size()) {
+            AccountBillUiModel next = rows.get(position + 1).item;
+            if (next.type != AccountBillUiModel.TYPE_MONTH_HEADER) isLast = false;
         }
         return isLast ? TYPE_BILL_BOTTOM : TYPE_BILL_MIDDLE;
+    }
+
+    @Override
+    public int getItemCount() {
+        return visibleRows.size();
     }
 
     @NonNull
@@ -119,8 +290,9 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        AccountBillUiModel item = getItem(position);
-        if (item == null) return;
+        Row row = visibleRows.get(position);
+        if (row.rawPosition < differ.getItemCount()) differ.getItem(row.rawPosition);
+        AccountBillUiModel item = row.item;
 
         if (holder instanceof MonthViewHolder) {
             ((MonthViewHolder) holder).bind(item);
@@ -133,6 +305,19 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
         }
     }
 
+    @Override
+    public void onAttachedToRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onAttachedToRecyclerView(recyclerView);
+        scheduleRebuild();
+    }
+
+    @Override
+    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        mainHandler.removeCallbacks(rebuildRunnable);
+        rebuildPending = false;
+        super.onDetachedFromRecyclerView(recyclerView);
+    }
+
     // --- ViewHolders ---
 
     class MonthViewHolder extends RecyclerView.ViewHolder {
@@ -143,9 +328,7 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
             super(binding.getRoot());
             this.b = binding;
             b.getRoot().setOnClickListener(v -> {
-                if (currentItem != null && monthToggleListener != null) {
-                    monthToggleListener.onMonthToggle(currentItem.key);
-                }
+                if (currentItem != null) toggleMonth(currentItem.key, this);
             });
         }
 
@@ -157,10 +340,13 @@ public class AccountBillPagingAdapter extends PagingDataAdapter<AccountBillUiMod
             b.tvInflow.setText(m.inflowText);
             b.tvOutflow.setText(m.outflowText);
             
-            // 优化折叠箭头动画速度
-            b.ivArrow.animate().rotation(m.isCollapsed ? 0 : 180).setDuration(200).start();
+            showCollapsed(collapsedMonths.contains(m.key));
+        }
 
-            if (m.isCollapsed) {
+        private void showCollapsed(boolean collapsed) {
+            b.ivArrow.animate().cancel();
+            b.ivArrow.setRotation(collapsed ? 0f : 180f);
+            if (collapsed) {
                 b.getRoot().setBackgroundResource(R.drawable.bg_item_single);
                 b.divider.setVisibility(View.INVISIBLE);
             } else {

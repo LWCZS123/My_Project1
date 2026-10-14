@@ -48,7 +48,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
     private final MutableLiveData<String> accountId = new MutableLiveData<>();
     private final MutableLiveData<Long> localAccountId = new MutableLiveData<>(-1L);
     private final MutableLiveData<DateRange> dateRange = new MutableLiveData<>(new DateRange(null, null));
-    private final MutableLiveData<Set<String>> collapsedMonths = new MutableLiveData<>(new HashSet<>());
+    private final Set<String> collapsedMonths = new HashSet<>();
 
     private final MutableLiveData<Long> refreshTrigger = new MutableLiveData<>(System.currentTimeMillis());
     public final LiveData<Account> account;
@@ -174,8 +174,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
                 for (DailyStat s : stats.daily) dStatMap.put(s.day, s);
             }
             
-            return Transformations.switchMap(collapsedMonths, collapsed -> 
-                Transformations.map(rawPaging, pagingData -> {
+            return Transformations.map(rawPaging, pagingData -> {
                     Account currentAcc = account.getValue();
                     PagingData<AccountBillUiModel> mapped = PagingDataTransforms.map(pagingData, AppExecutors.get().computation(), 
                             bwb -> mapToUiModel(bwb.bill, currentAcc, bwb.balanceAfter));
@@ -189,14 +188,14 @@ public class AccountDetailViewModel extends AndroidViewModel {
                             String afterMonth = monthKeyFmt.get().format(afterDate);
                             
                             if (before == null) {
-                                return createMonthHeader(afterDate, collapsed.contains(afterMonth), mStatMap.get(afterMonth));
+                                return createMonthHeader(afterDate, mStatMap.get(afterMonth));
                             }
                             
                             Date beforeDate = before.originalBill.getBillTime();
                             if (beforeDate == null) return null;
                             String beforeMonth = monthKeyFmt.get().format(beforeDate);
                             if (!beforeMonth.equals(afterMonth)) {
-                                return createMonthHeader(afterDate, collapsed.contains(afterMonth), mStatMap.get(afterMonth));
+                                return createMonthHeader(afterDate, mStatMap.get(afterMonth));
                             }
                             return null;
                         }
@@ -226,18 +225,12 @@ public class AccountDetailViewModel extends AndroidViewModel {
                         }
                     );
 
-                    return PagingDataTransforms.filter(withSeparators, AppExecutors.get().computation(), item -> {
-                        if (item == null) return false;
-                        if (item.type == AccountBillUiModel.TYPE_MONTH_HEADER) return true;
-                        // 使用预计算的 key 进行过滤，避免在此频繁调用 format()
-                        return item.key == null || !collapsed.contains(item.key);
-                    });
-                })
-            );
+                    return withSeparators;
+                });
         });
     }
 
-    private AccountBillUiModel createMonthHeader(Date date, boolean isCollapsed, MonthlyStat stat) {
+    private AccountBillUiModel createMonthHeader(Date date, MonthlyStat stat) {
         String monthKey = monthKeyFmt.get().format(date);
         Calendar cal = Calendar.getInstance();
         cal.setTime(date);
@@ -264,7 +257,7 @@ public class AccountDetailViewModel extends AndroidViewModel {
                 billAmount,
                 inflow, 
                 outflow,
-                isCollapsed,
+                false,
                 monthKey
         );
     }
@@ -287,13 +280,13 @@ public class AccountDetailViewModel extends AndroidViewModel {
         refreshTrigger.setValue(System.currentTimeMillis());
     }
 
-    public void toggleMonth(String monthKey) {
-        if (monthKey == null) return;
-        Set<String> current = collapsedMonths.getValue();
-        Set<String> next = new HashSet<>(current != null ? current : new HashSet<>());
-        if (next.contains(monthKey)) next.remove(monthKey);
-        else next.add(monthKey);
-        collapsedMonths.setValue(next);
+    public Set<String> getCollapsedMonths() {
+        return new HashSet<>(collapsedMonths);
+    }
+
+    public void setMonthCollapsed(String monthKey, boolean collapsed) {
+        if (collapsed) collapsedMonths.add(monthKey);
+        else collapsedMonths.remove(monthKey);
     }
 
     public void setAccount(String id, long localId) {

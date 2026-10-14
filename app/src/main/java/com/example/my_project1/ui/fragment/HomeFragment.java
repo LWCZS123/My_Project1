@@ -25,6 +25,7 @@ import com.example.my_project1.data.model.user.UserProfile;
 import com.example.my_project1.databinding.FragmentHomeBinding;
 import com.example.my_project1.ui.activity.BillDetailActivity;
 import com.example.my_project1.ui.activity.BillStatisticsActivity;
+import com.example.my_project1.ui.activity.DailyReceiptActivity;
 import com.example.my_project1.ui.activity.EditProfileActivity;
 import com.example.my_project1.ui.activity.SearchActivity;
 import com.example.my_project1.ui.adapter.bill.BillAdapter;
@@ -271,6 +272,12 @@ public class HomeFragment extends Fragment {
         binding.ivAvatar.setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), EditProfileActivity.class);
             startActivity(intent);
+            if (getActivity() != null)
+                getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+        });
+
+        binding.ivAdd.setOnClickListener(v -> {
+            DailyReceiptActivity.start(requireContext());
             if (getActivity() != null)
                 getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
         });

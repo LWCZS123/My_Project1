@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -7,19 +7,14 @@
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="16dp"
     android:layout_marginTop="24dp"
-    android:layout_marginBottom="0dp"
-    app:cardBackgroundColor="@android:color/white"
-    app:cardElevation="0dp"
-    app:cardPreventCornerOverlap="false"
-    app:shapeAppearance="@style/TopRoundedAppearance">
+    android:layout_marginBottom="0dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/layout_month_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="14dp"
-        android:paddingVertical="10dp"
-        android:background="?attr/selectableItemBackground">
+        android:paddingVertical="10dp">
 
         <!-- 月份标题 -->
         <TextView
@@ -98,7 +93,7 @@
             android:id="@+id/iv_arrow"
             android:layout_width="20dp"
             android:layout_height="20dp"
-            android:src="@drawable/ic_down_arrow"
+            android:src="@drawable/ic_down_arrow1"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -116,4 +111,4 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-</com.google.android.material.card.MaterialCardView>
+</FrameLayout>

@@ -45,6 +45,7 @@ import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
+import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -186,6 +187,7 @@ public class BillDetailActivity extends AppCompatActivity {
 
         binding.rvBillDetail.setLayoutManager(new LinearLayoutManager(this));
         binding.rvBillDetail.setAdapter(concatAdapter);
+        ElasticOverScrollHelper.attach(binding.rvBillDetail);
     }
 
     private void setupToolbar() {
