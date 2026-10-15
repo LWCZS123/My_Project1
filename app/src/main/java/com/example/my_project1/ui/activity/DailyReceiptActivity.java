@@ -1,9 +1,6 @@
 package com.example.my_project1.ui.activity;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.app.DatePickerDialog;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -11,7 +8,6 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -20,7 +16,7 @@ import android.provider.MediaStore;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.PathInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -97,8 +93,8 @@ public class DailyReceiptActivity extends AppCompatActivity {
         binding = ActivityDailyReceiptBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // 状态栏颜色同步为页面背景色 #EAF1FB，图标设为深色
-        getWindow().setStatusBarColor(Color.parseColor("#EAF1FB"));
+        // 状态栏颜色同步为页面背景色 #E4EEF9，图标设为深色
+        getWindow().setStatusBarColor(Color.parseColor("#E4EEF9"));
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(true);
@@ -186,7 +182,40 @@ public class DailyReceiptActivity extends AppCompatActivity {
         binding.btnSaveImage.setOnClickListener(v -> saveReceiptAsImage());
     }
 
+    private boolean hasPrintedCurrentDate = false;
+
+    private void resetPrinterAndPaperState() {
+        stopLedBlinking();
+
+        View layoutPrinter = findViewById(R.id.layoutPrinter);
+        View target = binding.llReceiptPaperContainer;
+        View btnSaveImage = findViewById(R.id.btnSaveImage);
+
+        if (layoutPrinter != null) {
+            layoutPrinter.animate().cancel();
+            layoutPrinter.setVisibility(View.VISIBLE);
+            layoutPrinter.setAlpha(1.0f);
+            layoutPrinter.setTranslationY(0f);
+        }
+
+        if (target != null) {
+            target.animate().cancel();
+            target.setAlpha(0.0f);
+            target.setVisibility(View.INVISIBLE);
+            target.setTranslationY(0f);
+        }
+
+        if (btnSaveImage != null) {
+            btnSaveImage.animate().cancel();
+            btnSaveImage.setVisibility(View.GONE);
+            btnSaveImage.setAlpha(0.0f);
+        }
+    }
+
     private void loadReceiptForDate(Calendar calendar) {
+        hasPrintedCurrentDate = false;
+        resetPrinterAndPaperState();
+
         SimpleDateFormat dateSdf = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
         String dateStr = dateSdf.format(calendar.getTime());
         binding.tvCurrentDate.setText(dateStr);
@@ -207,7 +236,7 @@ public class DailyReceiptActivity extends AppCompatActivity {
         Date end = endCal.getTime();
 
         SimpleDateFormat timeSdf = new SimpleDateFormat("HH:mm:ss", Locale.CHINA);
-        binding.tvOrderTime.setText("下单时间：" + dateStr + " " + timeSdf.format(new Date()));
+        binding.tvOrderTime.setText("结算时间：" + dateStr + " " + timeSdf.format(new Date()));
 
         // 依据日期和用户哈希生成唯一的交易号
         long tradeSeed = Math.abs((start.getTime() / 1000) ^ (currentUserId != null ? currentUserId.hashCode() : 12345));
@@ -217,9 +246,6 @@ public class DailyReceiptActivity extends AppCompatActivity {
         int quoteIndex = Math.abs(dateStr.hashCode()) % POETIC_QUOTES.length;
         binding.tvPoeticQuote.setText(POETIC_QUOTES[quoteIndex]);
 
-        // 触发模拟购物小票从底部缓慢打印滑出的动画
-        playPrintAnimation();
-
         // 移除旧观察者
         if (currentBillsLiveData != null) {
             currentBillsLiveData.removeObservers(this);
@@ -227,11 +253,18 @@ public class DailyReceiptActivity extends AppCompatActivity {
 
         if (currentUserId == null || currentUserId.isEmpty()) {
             updateUI(Collections.emptyList());
+            playPrintAnimation();
             return;
         }
 
         currentBillsLiveData = billRepository.getBillsInTimeRange(currentUserId, start, end);
-        currentBillsLiveData.observe(this, this::updateUI);
+        currentBillsLiveData.observe(this, bills -> {
+            updateUI(bills);
+            if (!hasPrintedCurrentDate) {
+                hasPrintedCurrentDate = true;
+                playPrintAnimation();
+            }
+        });
     }
 
     /**
@@ -244,14 +277,19 @@ public class DailyReceiptActivity extends AppCompatActivity {
         View scrollView = findViewById(R.id.scrollView);
         if (target == null) return;
 
-        // 隐藏保存图片按钮
+        // 1. 隐藏保存图片按钮
         if (btnSaveImage != null) {
             btnSaveImage.animate().cancel();
             btnSaveImage.setVisibility(View.GONE);
             btnSaveImage.setAlpha(0.0f);
         }
 
-        // 重置并显现打印机
+        // 2. 立即隐藏小票，彻底防止 Activity 启动或重选日期时小票提前露出/闪烁
+        target.animate().cancel();
+        target.setAlpha(0.0f);
+        target.setVisibility(View.INVISIBLE);
+
+        // 3. 重置并显现打印机
         if (layoutPrinter != null) {
             layoutPrinter.animate().cancel();
             layoutPrinter.setVisibility(View.VISIBLE);
@@ -269,19 +307,20 @@ public class DailyReceiptActivity extends AppCompatActivity {
                 scrollView.scrollTo(0, 0);
             }
 
-            target.animate().cancel();
-            // 初始位置：隐藏在出纸槽上方，受 scrollView 严格裁剪不溢出
+            // 先将小票平移到出纸槽上方（此时处于隐藏状态，无任何视觉闪烁）
             target.setTranslationY(-targetHeight);
+            // 恢复可见度与不透明度，准备开始从打印机内部滑出
+            target.setVisibility(View.VISIBLE);
             target.setAlpha(1.0f);
 
             // 启动指示灯呼吸闪烁效果，模拟打印工作状态
             startLedBlinking();
 
-            // 开启硬件加速图层（withLayer），结合贝塞尔曲线，确保小票严格从打印机出纸口平滑滑出
+            // 开启硬件加速图层（withLayer），采用线性匀速插值器（LinearInterpolator），控制整个出纸过程严格匀速 6 秒 (6000ms)
             target.animate()
                     .translationY(0f)
-                    .setDuration(1600)
-                    .setInterpolator(new PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f))
+                    .setDuration(4000)
+                    .setInterpolator(new LinearInterpolator())
                     .withLayer()
                     .withEndAction(this::onPrintFinished)
                     .start();
@@ -369,9 +408,9 @@ public class DailyReceiptActivity extends AppCompatActivity {
             binding.rvReceiptBills.setVisibility(View.GONE);
             binding.tvEmptyHint.setVisibility(View.VISIBLE);
 
-            binding.tvRecordCount.setText("记录笔数： 0笔");
-            binding.tvIncomeTotal.setText("收入合计： ¥0.00");
-            binding.tvExpenseTotal.setText("¥0.00");
+            binding.tvRecordCount.setText("0 笔");
+            binding.tvIncomeTotal.setText("¥0.00");
+            binding.tvExpenseTotal.setText("0.00");
         } else {
             adapter.setBills(bills);
             binding.rvReceiptBills.setVisibility(View.VISIBLE);
@@ -390,9 +429,9 @@ public class DailyReceiptActivity extends AppCompatActivity {
                 }
             }
 
-            binding.tvRecordCount.setText(String.format(Locale.CHINA, "记录笔数： %d笔", count));
-            binding.tvIncomeTotal.setText(String.format(Locale.CHINA, "收入合计： ¥%.2f", totalIncome));
-            binding.tvExpenseTotal.setText(String.format(Locale.CHINA, "¥%.2f", totalExpense));
+            binding.tvRecordCount.setText(String.format(Locale.CHINA, "%d 笔", count));
+            binding.tvIncomeTotal.setText(String.format(Locale.CHINA, "¥%.2f", totalIncome));
+            binding.tvExpenseTotal.setText(String.format(Locale.CHINA, "%.2f", totalExpense));
         }
     }
 

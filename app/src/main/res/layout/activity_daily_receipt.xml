@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#EAF1FB"
+    android:background="#E4EEF9"
     tools:context=".ui.activity.DailyReceiptActivity">
 
     <!-- ══ 顶部导航栏 (透明背景) ══ -->
@@ -46,133 +46,271 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ══ 大号动漫迷你打印机 (位置上移，加宽加大完全覆盖小票) ══ -->
+    <!-- ══ KAPI复古蓝色热敏小票打印机 (加宽设计与蓝色彩调) ══ -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/layoutPrinter"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="4dp"
-        android:layout_marginTop="-6dp"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginTop="0dp"
+        android:background="@drawable/bg_printer_body"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="14dp"
         android:elevation="12dp"
         app:layout_constraintTop_toBottomOf="@id/topBar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 1. 打印机顶盖 (Top Cap) -->
+        <!-- 1. 顶部出纸口 (Exit Slit Bar) -->
         <View
-            android:id="@+id/vPrinterTopCap"
-            android:layout_width="230dp"
-            android:layout_height="16dp"
-            android:background="@drawable/bg_printer_top_cap"
+            android:id="@+id/vPrinterSlit"
+            android:layout_width="240dp"
+            android:layout_height="6dp"
+            android:background="@drawable/bg_printer_slit"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- 2. 打印机主机身 (Main Body) -->
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/clPrinterBody"
+        <!-- 2. 打印机品牌标语 (Brand Title & Subtitle) -->
+        <TextView
+            android:id="@+id/tvPrinterName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="K A P I   A I   P R I N T"
+            android:textColor="#2C3E50"
+            android:textSize="14.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.18"
+            app:layout_constraintTop_toBottomOf="@id/vPrinterSlit"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/tvPrinterSubName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="—— KEEP YOUR MOMENTS ——"
+            android:textColor="#5A738E"
+            android:textSize="10sp"
+            android:letterSpacing="0.12"
+            app:layout_constraintTop_toBottomOf="@id/tvPrinterName"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- 3. 中央黑屏显示区域 (LCD Screen Display) -->
+        <LinearLayout
+            android:id="@+id/llPrinterScreen"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/bg_printer_body"
-            android:paddingHorizontal="16dp"
-            app:layout_constraintTop_toTopOf="parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_printer_screen"
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            app:layout_constraintTop_toBottomOf="@id/tvPrinterSubName"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 
-            <!-- 左侧装饰点 -->
+            <!-- 第一行：下单人 & 结算时间 -->
             <LinearLayout
-                android:id="@+id/llLeftDots"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:orientation="horizontal"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toTopOf="@id/flPrinterSlit">
+                android:orientation="horizontal">
 
-                <View
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:background="@drawable/bg_printer_dot" />
+                <TextView
+                    android:id="@+id/tvOrderUser"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="下单人：毛毛球"
+                    android:textColor="#38BDF8"
+                    android:textSize="11.5sp" />
 
-                <View
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_printer_dot" />
+                <TextView
+                    android:id="@+id/tvOrderTime"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="end"
+                    android:text="结算时间：2026-09-05 23:55:53"
+                    android:textColor="#38BDF8"
+                    android:textSize="11.5sp" />
             </LinearLayout>
 
-            <!-- 中间标识 -->
-            <TextView
-                android:id="@+id/tvPrinterName"
+            <!-- 第二行：交易号 & 收银员 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvTradeNo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="交易号：1791993233467"
+                    android:textColor="#38BDF8"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tvCashier"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="end"
+                    android:text="收银员：胖咔"
+                    android:textColor="#38BDF8"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- 4. 底部控制排布 (Toggle Badge + Status LEDs + PRINT Button) -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:layout_constraintTop_toBottomOf="@id/llPrinterScreen"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <!-- 左侧双圈胶囊按钮组 -->
+            <LinearLayout
+                android:id="@+id/llTogglePill"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_printer_toggle_pill"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="3dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent">
+
+                <View
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:background="@drawable/bg_printer_red_dot" />
+
+                <FrameLayout
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/bg_printer_white_dot">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_sparkle"
+                        app:tint="#2563EB" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- 中间状态指示灯 (PWR & AI) -->
+            <LinearLayout
+                android:id="@+id/llLedContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="M I N I   P R I N T"
-                android:textColor="#C2DBFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.18"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                app:layout_constraintStart_toEndOf="@id/llTogglePill"
+                app:layout_constraintEnd_toStartOf="@id/flPrintButton"
                 app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toTopOf="@id/flPrinterSlit" />
+                app:layout_constraintBottom_toBottomOf="parent">
 
-            <!-- 右侧青蓝霓虹灯 CONTAINER -->
-            <FrameLayout
-                android:id="@+id/flPrinterLed"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_marginEnd="6dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toTopOf="@id/flPrinterSlit">
+                <!-- PWR 电源指示灯 (带闪烁动画) -->
+                <FrameLayout
+                    android:id="@+id/flPrinterLed"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp">
 
-                <View
-                    android:id="@+id/vLedGlow"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:background="@drawable/bg_printer_led_glow" />
+                    <View
+                        android:id="@+id/vLedGlow"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@drawable/bg_printer_led_green_glow" />
 
-                <View
-                    android:id="@+id/vLedCore"
+                    <View
+                        android:id="@+id/vLedCore"
+                        android:layout_width="7dp"
+                        android:layout_height="7dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_printer_led_green_core" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="PWR"
+                    android:textColor="#475569"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <!-- AI 工作指示灯 -->
+                <FrameLayout
                     android:layout_width="12dp"
                     android:layout_height="12dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_printer_led_core" />
-            </FrameLayout>
+                    android:layout_marginStart="14dp">
 
-            <!-- 3. 出纸口 (Paper Slit) -->
+                    <View
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@drawable/bg_printer_led_orange_glow" />
+
+                    <View
+                        android:layout_width="7dp"
+                        android:layout_height="7dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_printer_led_orange_core" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="AI"
+                    android:textColor="#475569"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- 右侧 PRINT 圆形主按键 -->
             <FrameLayout
-                android:id="@+id/flPrinterSlit"
-                android:layout_width="match_parent"
-                android:layout_height="20dp"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/bg_printer_slit_outer"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
+                android:id="@+id/flPrintButton"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_printer_print_btn"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent">
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="10dp"
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginHorizontal="6dp"
-                    android:background="@drawable/bg_printer_slit_inner" />
+                    android:text="PRINT"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </FrameLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ══ 滚动区域：包含完整小票卡片 ══ -->
+    <!-- ══ 滚动区域：包含完整小票卡片 (宽度拓展) ══ -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:clipChildren="true"
         android:clipToPadding="false"
-        android:paddingHorizontal="24dp"
+        android:paddingHorizontal="28dp"
         android:paddingTop="60dp"
         android:paddingBottom="120dp"
         app:layout_constraintTop_toBottomOf="@id/topBar"
@@ -180,14 +318,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 包含主体与锯齿边缘的容器（保存图片截取目标，保持透明背景） -->
+        <!-- 包含主体与锯齿边缘的容器（保存图片截取目标，初始隐藏防止动画前闪现） -->
         <LinearLayout
             android:id="@+id/llReceiptPaperContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@android:color/transparent"
             android:orientation="vertical"
-            android:elevation="6dp">
+            android:elevation="6dp"
+            android:alpha="0.0"
+            android:visibility="invisible">
 
             <!-- 小票主体白纸部分 -->
             <LinearLayout
@@ -196,50 +336,34 @@
                 android:layout_height="wrap_content"
                 android:background="#FFFFFF"
                 android:orientation="vertical"
-                android:paddingHorizontal="20dp"
+                android:paddingHorizontal="16dp"
                 android:paddingTop="20dp"
                 android:paddingBottom="12dp">
 
-                <!-- 票据顶部元信息 -->
-                <TextView
-                    android:id="@+id/tvOrderUser"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="下单人：小管家"
-                    android:textColor="#666666"
-                    android:textSize="12.5sp" />
-
-                <TextView
-                    android:id="@+id/tvOrderTime"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="下单时间：2026-09-05 23:59:59"
-                    android:textColor="#666666"
-                    android:textSize="12.5sp" />
-
+                <!-- 票据顶部标志 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="3dp">
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingBottom="4dp">
 
                     <TextView
-                        android:id="@+id/tvTradeNo"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="交易号：1781993233457"
-                        android:textColor="#666666"
-                        android:textSize="12.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvCashier"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="收银员：胖咔"
-                        android:textColor="#666666"
-                        android:textSize="12.5sp" />
+                        android:text="KAPI DAILY RECEIPT"
+                        android:textColor="#333333"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.1" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="—— 每日收支明细单 ——"
+                        android:textColor="#888888"
+                        android:textSize="11sp" />
                 </LinearLayout>
 
                 <!-- 分隔虚线 1 -->
@@ -312,7 +436,7 @@
                     android:background="@drawable/bg_receipt_dash_line"
                     android:layerType="software" />
 
-                <!-- 账单列表 -->
+                <!-- 账单列表 (合并相同分类) -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvReceiptBills"
                     android:layout_width="match_parent"
@@ -341,56 +465,130 @@
                     android:background="@drawable/bg_receipt_dash_line"
                     android:layerType="software" />
 
-                <!-- 底部统计区域 -->
+                <!-- 底部统计区域 (匹配用户截图布局) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/tvRecordCount"
-                        android:layout_width="wrap_content"
+                    <!-- 第一行：账单笔数 / 商品数量 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="记录笔数： 0笔"
-                        android:textColor="#333333"
-                        android:textSize="13.5sp" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                    <TextView
-                        android:id="@+id/tvIncomeTotal"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="收入合计： ¥0.00"
-                        android:textColor="#333333"
-                        android:textSize="13.5sp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="账单笔数"
+                            android:textColor="#666666"
+                            android:textSize="13.5sp" />
 
-                    <!-- 消费总计高亮块 -->
+                        <TextView
+                            android:id="@+id/tvRecordCount"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="end"
+                            android:text="0 笔"
+                            android:textColor="#333333"
+                            android:textSize="13.5sp" />
+                    </LinearLayout>
+
+                    <!-- 第二行：收入合计 -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginTop="6dp">
+                        android:layout_marginTop="8dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="消费总计："
-                            android:textColor="#333333"
+                            android:text="收入合计"
+                            android:textColor="#666666"
                             android:textSize="13.5sp" />
 
                         <TextView
-                            android:id="@+id/tvExpenseTotal"
+                            android:id="@+id/tvIncomeTotal"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="end"
+                            android:text="¥0.00"
+                            android:textColor="#333333"
+                            android:textSize="13.5sp" />
+                    </LinearLayout>
+
+                    <!-- 中间分隔虚线 -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="2dp"
+                        android:layout_marginVertical="12dp"
+                        android:background="@drawable/bg_receipt_dash_line"
+                        android:layerType="software" />
+
+                    <!-- 第三行：实付合计 / 消费总计高亮大字 (匹配截图) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <!-- 左侧标题与副标 -->
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:background="#FFEBD8"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="3dp"
-                            android:text="¥0.00"
-                            android:textColor="#D84315"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="消费总计"
+                                android:textColor="#1E293B"
+                                android:textSize="15.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="已计入当日明细"
+                                android:textColor="#999999"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <!-- 右侧大字金额 -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="end|bottom"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="2dp"
+                                android:text="￥"
+                                android:textColor="#F25622"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvExpenseTotal"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0.00"
+                                android:textColor="#F25622"
+                                android:textSize="23sp"
+                                android:textStyle="bold"
+                                android:fontFamily="sans-serif-medium" />
+                        </LinearLayout>
                     </LinearLayout>
+
                 </LinearLayout>
 
                 <!-- 分隔虚线 4 -->

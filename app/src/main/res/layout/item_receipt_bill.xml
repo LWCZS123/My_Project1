@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingVertical="6dp"
+    android:paddingVertical="6.5dp"
     android:paddingHorizontal="2dp">
 
     <!-- 票据小圆点前缀 -->
@@ -29,16 +29,27 @@
     <!-- 类目名称 -->
     <TextView
         android:id="@+id/tvCategoryName"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:text="服饰-内衣"
         android:textColor="#222222"
         android:textSize="13.5sp"
         android:singleLine="true"
         android:ellipsize="end" />
 
-    <!-- 价格金额 -->
+    <!-- 同一分类账单数量标记 (例如 x3) -->
+    <TextView
+        android:id="@+id/tvCategoryCount"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="6dp"
+        android:text="x 3"
+        android:textColor="#888888"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- 价格金额 (相同分类累加总价) -->
     <TextView
         android:id="@+id/tvAmount"
         android:layout_width="wrap_content"
