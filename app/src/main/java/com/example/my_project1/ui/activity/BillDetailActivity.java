@@ -43,6 +43,10 @@ import com.example.my_project1.ui.fragment.ReimburseBottomSheetFragment;
 import com.example.my_project1.ui.popup.FilterPopupMenu;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
+import com.example.my_project1.data.model.tag.TagEntity;
+import com.example.my_project1.data.repository.tag.TagRepository;
+import com.example.my_project1.ui.fragment.tag.SelectTagBottomSheetFragment;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
 import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
@@ -852,6 +856,38 @@ public class BillDetailActivity extends AppCompatActivity {
                 holder.tvDiscount.setText("¥0.00");
                 holder.tvDiscount.setTextColor(Color.parseColor("#64748B"));
             }
+
+            // 关联标签加载
+            TagRepository tagRepository = new TagRepository(holder.itemView.getContext());
+            AppExecutors.get().diskIO().execute(() -> {
+                List<TagEntity> tags = tagRepository.getTagsForBillSync(bill.getId());
+                AppExecutors.get().mainThread().execute(() -> {
+                    if (tags != null && !tags.isEmpty()) {
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < tags.size(); i++) {
+                            if (i > 0) sb.append(", ");
+                            sb.append(tags.get(i).getName());
+                        }
+                        holder.tvTag.setText(sb.toString());
+                        holder.tvTag.setTextColor(Color.parseColor("#2563EB"));
+                    } else {
+                        holder.tvTag.setText("无");
+                        holder.tvTag.setTextColor(Color.parseColor("#64748B"));
+                    }
+
+                    if (holder.layoutRowTag != null) {
+                        holder.layoutRowTag.setOnClickListener(v -> {
+                            SelectTagBottomSheetFragment fragment = SelectTagBottomSheetFragment.newInstance(tags);
+                            fragment.setOnTagsSelectedListener(newTags -> {
+                                tagRepository.saveBillTags(bill.getId(), bill.getUserId(), newTags, (success, message) -> {
+                                    notifyDataSetChanged();
+                                });
+                            });
+                            fragment.show(getSupportFragmentManager(), "SelectTagBottomSheetFragment");
+                        });
+                    }
+                });
+            });
         }
 
         @Override
@@ -860,7 +896,8 @@ public class BillDetailActivity extends AppCompatActivity {
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvAccount, tvBillTime, tvLocation, tvDiscount;
+            TextView tvAccount, tvBillTime, tvLocation, tvDiscount, tvTag;
+            View layoutRowTag;
 
             ViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -868,6 +905,8 @@ public class BillDetailActivity extends AppCompatActivity {
                 tvBillTime = itemView.findViewById(R.id.tv_bill_time);
                 tvLocation = itemView.findViewById(R.id.tv_location);
                 tvDiscount = itemView.findViewById(R.id.tv_discount);
+                tvTag = itemView.findViewById(R.id.tv_tag);
+                layoutRowTag = itemView.findViewById(R.id.layout_row_tag);
             }
         }
     }

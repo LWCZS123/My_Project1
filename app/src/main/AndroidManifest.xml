@@ -120,6 +120,16 @@
 
             />
         <activity
+            android:name=".ui.activity.TagManagementActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
+            android:name=".ui.activity.ArchivedTagsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransparentStatusBar"
+            />
+        <activity
             android:name=".ui.activity.AccountDetailActivity"
             android:exported="false"
             android:theme="@style/Theme.TransparentStatusBar"

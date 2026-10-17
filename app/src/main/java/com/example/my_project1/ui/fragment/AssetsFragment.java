@@ -32,6 +32,7 @@ import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
+import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -82,6 +83,9 @@ public class AssetsFragment extends Fragment {
             v.setPadding(0, bars.top, 0, 0);
             return insets;
         });
+
+        // 绑定上下边界弹性拉伸与回弹效果
+        ElasticOverScrollHelper.attach(binding.nestedScrollView);
 
         setupRecyclerView();
 

@@ -8,6 +8,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,6 +24,15 @@ public class DeleteConfirmDialogFragment extends DialogFragment {
         void onConfirm();
     }
 
+    public static DeleteConfirmDialogFragment newInstance(String title, String message) {
+        DeleteConfirmDialogFragment fragment = new DeleteConfirmDialogFragment();
+        Bundle args = new Bundle();
+        args.putString("arg_title", title);
+        args.putString("arg_message", message);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     public void setOnDeleteConfirmListener(OnDeleteConfirmListener listener) {
         this.listener = listener;
     }
@@ -36,7 +46,17 @@ public class DeleteConfirmDialogFragment extends DialogFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
+
+        TextView tvTitle = view.findViewById(R.id.tv_title);
+        TextView tvMessage = view.findViewById(R.id.tv_message);
+
+        if (getArguments() != null) {
+            String title = getArguments().getString("arg_title");
+            String message = getArguments().getString("arg_message");
+            if (title != null && tvTitle != null) tvTitle.setText(title);
+            if (message != null && tvMessage != null) tvMessage.setText(message);
+        }
+
         view.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
         view.findViewById(R.id.btn_delete).setOnClickListener(v -> {
             if (listener != null) listener.onConfirm();
@@ -59,7 +79,6 @@ public class DeleteConfirmDialogFragment extends DialogFragment {
     public void onStart() {
         super.onStart();
         if (getDialog() != null && getDialog().getWindow() != null) {
-            // 🔑 关键修复：显式设置对话框宽度，避免在部分设备上显示过窄
             int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.85);
             getDialog().getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
         }

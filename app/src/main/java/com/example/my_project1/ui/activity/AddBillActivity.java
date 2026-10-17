@@ -1,6 +1,7 @@
 package com.example.my_project1.ui.activity;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -23,6 +24,8 @@ import com.bumptech.glide.Glide;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.tag.TagEntity;
+import com.example.my_project1.data.repository.tag.TagRepository;
 import com.example.my_project1.databinding.ActivityAddBillBinding;
 import com.example.my_project1.ui.adapter.CategoryIconPagerAdapter;
 import com.example.my_project1.ui.dialog.UploadProgressDialog;
@@ -30,6 +33,7 @@ import com.example.my_project1.ui.fragment.AlbumPickerBottomFragment;
 import com.example.my_project1.ui.fragment.BillChooseAccountFragment;
 import com.example.my_project1.ui.fragment.DateTimePickerFragment;
 import com.example.my_project1.ui.fragment.RemarkBottomSheetFragment;
+import com.example.my_project1.ui.fragment.tag.SelectTagBottomSheetFragment;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.ImageUploadViewModel;
 import com.example.my_project1.utils.AppExecutors;
@@ -113,6 +117,10 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     // 预算与收支标记设置
     private boolean excludeBudget = false;
     private boolean excludeStat = false;
+
+    // 关联标签
+    private List<TagEntity> selectedTags = new ArrayList<>();
+    private TagRepository tagRepository;
 
     // 图片支持远程图片URL和本地Uri
     private List<Uri> selectedImages = new ArrayList<>();
@@ -444,6 +452,19 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         isReimburse = intent.getBooleanExtra("is_reimbursable", false);
         updateReimburseUi();
 
+        // 8.2 关联标签设置
+        if (editBillLocalId != -1 && tagRepository != null) {
+            AppExecutors.get().diskIO().execute(() -> {
+                List<TagEntity> tags = tagRepository.getTagsForBillSync(editBillLocalId);
+                if (tags != null && !tags.isEmpty()) {
+                    AppExecutors.get().mainThread().execute(() -> {
+                        selectedTags = tags;
+                        updateTagUi();
+                    });
+                }
+            });
+        }
+
         // 9. 图片URLs
         ArrayList<String> imageUrls = intent.getStringArrayListExtra("image_urls");
         if (imageUrls != null && !imageUrls.isEmpty()) {
@@ -491,6 +512,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         billViewModel = new ViewModelProvider(this).get(BillViewModel.class);
         accountViewModel = new ViewModelProvider(this).get(com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel.class);
         uploadViewModel = new ViewModelProvider(this).get(ImageUploadViewModel.class);
+        tagRepository = new TagRepository(this);
     }
 
     /**
@@ -693,7 +715,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         binding.cardCalendar.setOnClickListener(v -> selectCalendar());
         binding.cardDiscount.setOnClickListener(v -> showDiscountDialog());
         binding.cardReimburse.setOnClickListener(v -> toggleReimburse());
-        binding.cardLabel.setOnClickListener(v -> selectMark());
+        binding.cardLabel.setOnClickListener(v -> selectTags());
         binding.cardMark.setOnClickListener(v -> selectMark());
         binding.cardRecord.setOnClickListener(v -> selectLocation());
         binding.tvRemarkHint.setOnClickListener(v -> editRemark());
@@ -1174,7 +1196,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
 
         } else {
             // 新增模式：创建新账单
-            Bill bill = new Bill();
+            bill = new Bill();
             updateBillData(bill, imageObjectKeys);
 
             Log.d(TAG, "⭐ 调用insertBill: " + bill.getAmount());
@@ -1188,6 +1210,12 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private void handleBillSaveSuccess() {
         isSaving = false;
         uploadViewModel.resetBatchUploadState();
+
+        // 保存关联标签
+        long targetBillId = isEditMode ? editBillLocalId : (bill != null ? bill.getId() : -1);
+        if (targetBillId > 0 && tagRepository != null) {
+            tagRepository.saveBillTags(targetBillId, currentUserId, selectedTags, null);
+        }
 
         // 保存最后使用的账户ID
         if (selectedAccount != null) {
@@ -1368,6 +1396,31 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         }
     }
 
+    private void selectTags() {
+        SelectTagBottomSheetFragment fragment = SelectTagBottomSheetFragment.newInstance(selectedTags);
+        fragment.setOnTagsSelectedListener(tags -> {
+            this.selectedTags = tags != null ? tags : new ArrayList<>();
+            updateTagUi();
+        });
+        fragment.show(getSupportFragmentManager(), "select_tag_bottom_sheet");
+    }
+
+    private void updateTagUi() {
+        if (selectedTags != null && !selectedTags.isEmpty()) {
+            if (selectedTags.size() == 1) {
+                binding.tvLabel.setText(selectedTags.get(0).getName());
+            } else {
+                binding.tvLabel.setText("标签(" + selectedTags.size() + ")");
+            }
+            binding.tvLabel.setTextColor(Color.parseColor("#3478F6"));
+            binding.ivLabel.setColorFilter(Color.parseColor("#3478F6"));
+        } else {
+            binding.tvLabel.setText("标签");
+            binding.tvLabel.setTextColor(Color.parseColor("#666666"));
+            binding.ivLabel.setColorFilter(Color.parseColor("#666666"));
+        }
+    }
+
     private void selectLocation() {
         Intent intent = new Intent(this, LocationPickerActivity.class);
         startActivityForResult(intent, REQUEST_LOCATION);
@@ -1541,6 +1594,20 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
     }
 
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        checkTagVisibility();
+    }
+
+    private void checkTagVisibility() {
+        SharedPreferences sp = getSharedPreferences("app_settings", MODE_PRIVATE);
+        boolean isTagsEnabled = sp.getBoolean("pref_tags_enabled", true);
+        if (binding != null && binding.cardLabel != null) {
+            binding.cardLabel.setVisibility(isTagsEnabled ? View.VISIBLE : View.GONE);
+        }
+    }
 
     // ==================== 生命周期清理 ====================
 

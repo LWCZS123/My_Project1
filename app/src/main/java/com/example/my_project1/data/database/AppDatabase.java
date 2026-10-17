@@ -43,9 +43,12 @@ import com.example.my_project1.data.model.icon.DownloadRecord;
                 AccountGroup.class, Account.class, Bill.class,
                 SearchHistory.class, UserProfile.class, Budget.class,
                 Wish.class, WishRecord.class,
-                SavingPlan.class, SavingRecord.class, DownloadRecord.class
+                SavingPlan.class, SavingRecord.class, DownloadRecord.class,
+                com.example.my_project1.data.model.tag.TagGroupEntity.class,
+                com.example.my_project1.data.model.tag.TagEntity.class,
+                com.example.my_project1.data.model.tag.BillTagCrossRef.class
         },
-        version = 44,
+        version = 46,
         exportSchema = true
 )
 
@@ -94,6 +97,56 @@ public abstract class AppDatabase extends RoomDatabase {
             database.execSQL("ALTER TABLE `bills` ADD COLUMN `exclude_stat` INTEGER NOT NULL DEFAULT 0");
         }
     };
+    static final Migration MIGRATION_44_45 = new Migration(44, 45) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE IF NOT EXISTS `tag_groups` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`object_id` TEXT, " +
+                    "`user_id` TEXT, " +
+                    "`name` TEXT, " +
+                    "`sort_order` INTEGER NOT NULL, " +
+                    "`is_default` INTEGER NOT NULL, " +
+                    "`is_folded` INTEGER NOT NULL, " +
+                    "`is_deleted` INTEGER NOT NULL, " +
+                    "`created_at` INTEGER, " +
+                    "`updated_at` INTEGER, " +
+                    "`sync_state` INTEGER)");
+
+            database.execSQL("CREATE TABLE IF NOT EXISTS `tags` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`object_id` TEXT, " +
+                    "`user_id` TEXT, " +
+                    "`group_id` INTEGER NOT NULL, " +
+                    "`name` TEXT, " +
+                    "`bg_color` TEXT, " +
+                    "`text_color` TEXT, " +
+                    "`sort_order` INTEGER NOT NULL, " +
+                    "`is_archived` INTEGER NOT NULL, " +
+                    "`is_deleted` INTEGER NOT NULL, " +
+                    "`created_at` INTEGER, " +
+                    "`updated_at` INTEGER, " +
+                    "`sync_state` INTEGER)");
+
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tags_user_id_group_id` ON `tags` (`user_id`, `group_id`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tags_user_id_is_archived` ON `tags` (`user_id`, `is_archived`)");
+
+            database.execSQL("CREATE TABLE IF NOT EXISTS `bill_tag_cross_ref` (" +
+                    "`bill_id` INTEGER NOT NULL, " +
+                    "`tag_id` INTEGER NOT NULL, " +
+                    "`user_id` TEXT, " +
+                    "`tag_name` TEXT, " +
+                    "`tag_bg_color` TEXT, " +
+                    "`tag_text_color` TEXT, " +
+                    "`is_deleted` INTEGER NOT NULL, " +
+                    "`updated_at` INTEGER, " +
+                    "`sync_state` INTEGER, " +
+                    "PRIMARY KEY(`bill_id`, `tag_id`))");
+
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_bill_tag_cross_ref_bill_id` ON `bill_tag_cross_ref` (`bill_id`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_bill_tag_cross_ref_tag_id` ON `bill_tag_cross_ref` (`tag_id`)");
+        }
+    };
 
     public abstract CategoryDao categoryDao();
     public abstract SubCategoryDao subCategoryDao();
@@ -105,6 +158,9 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract WishDao wishDao();
     public abstract SavingPlanDao savingPlanDao();
     public abstract DownloadDao downloadDao();
+    public abstract com.example.my_project1.data.dao.TagGroupDao tagGroupDao();
+    public abstract com.example.my_project1.data.dao.TagDao tagDao();
+    public abstract com.example.my_project1.data.dao.BillTagCrossRefDao billTagCrossRefDao();
 
 
     public static AppDatabase getInstance(Context context) {
@@ -116,7 +172,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "accounting_app_db"
                     )
-                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43)
+                            .addMigrations(MIGRATION_27_28, MIGRATION_28_29, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43, MIGRATION_44_45)
                             .fallbackToDestructiveMigration() // 调试阶段允许重建数据库
                             .build();
                 }

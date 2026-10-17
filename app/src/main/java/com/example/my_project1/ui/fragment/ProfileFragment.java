@@ -32,6 +32,7 @@ import com.example.my_project1.ui.activity.TestBillGeneratorActivity;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.user.UserProfileViewModel;
 import com.example.my_project1.utils.ImageLoaderUtils;
+import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -150,6 +151,9 @@ public class ProfileFragment extends Fragment {
     }
 
     private void initViews() {
+        // 绑定上下边界弹性拉伸与回弹效果
+        ElasticOverScrollHelper.attach(binding.nestedScrollView);
+
         // 设置按钮 (原 ivBack 移除，改为 header 内的 ivSettings)
         binding.ivSettings.setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), EditProfileActivity.class);
@@ -179,6 +183,7 @@ public class ProfileFragment extends Fragment {
         binding.llAppSettings.setOnClickListener(v -> changePasswordActivity());
         binding.llBudget.setOnClickListener(v -> budgetActivity());
         binding.llCategoryManage.setOnClickListener(v -> iconMarketActivity());
+        binding.llTagManage.setOnClickListener(v -> tagManagementActivity());
         binding.llMyWish.setOnClickListener(v -> savingsOverviewActivity());
         binding.llFinancialTips.setOnClickListener(v-> savingPlanActivity());
         binding.llDataCenter.setOnClickListener(v->testBillGeneratorActivity());
@@ -199,6 +204,13 @@ public class ProfileFragment extends Fragment {
         // 其他点击项 (根据需要添加)
         binding.llCloudBackup.setOnClickListener(v -> Toast.makeText(getContext(), "云端备份功能即将上线", Toast.LENGTH_SHORT).show());
         binding.llDailyReceipt.setOnClickListener(v -> DailyReceiptActivity.start(requireContext()));
+    }
+
+    private void tagManagementActivity() {
+        startActivity(new Intent(getActivity(), com.example.my_project1.ui.activity.TagManagementActivity.class));
+        if (getActivity() != null) {
+            getActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+        }
     }
 
     private void testBillGeneratorActivity() {
