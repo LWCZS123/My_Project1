@@ -13,7 +13,9 @@ import androidx.annotation.Nullable;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.bill.SearchFilter;
+import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.databinding.FragmentSearchFilterBottomSheetBinding;
+import com.example.my_project1.ui.fragment.tag.SelectTagBottomSheetFragment;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
@@ -90,6 +92,15 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
             binding.tvSelectedAccount.setText("请选择账户 >");
             binding.tvSelectedAccount.setTextColor(Color.parseColor("#94A3B8"));
         }
+
+        if (filter.getTagIds() != null && !filter.getTagIds().isEmpty()) {
+            String summary = filter.getTagSummary() != null ? filter.getTagSummary() : "已选择 >";
+            binding.tvSelectedTag.setText(summary + " >");
+            binding.tvSelectedTag.setTextColor(Color.parseColor("#3B82F6"));
+        } else {
+            binding.tvSelectedTag.setText("请选择标签 >");
+            binding.tvSelectedTag.setTextColor(Color.parseColor("#94A3B8"));
+        }
     }
 
     private void setupListeners() {
@@ -111,6 +122,7 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         binding.btnSelectBook.setOnClickListener(v -> { /* Select Book */ });
         binding.btnSelectCategory.setOnClickListener(v -> showCategorySelector());
         binding.btnSelectAccount.setOnClickListener(v -> showAccountSelector());
+        binding.btnSelectTag.setOnClickListener(v -> showTagSelector());
 
         binding.btnReset.setOnClickListener(v -> {
             filter.clear();
@@ -121,6 +133,8 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
             binding.tvSelectedCategory.setTextColor(Color.parseColor("#94A3B8"));
             binding.tvSelectedAccount.setText("请选择账户 >");
             binding.tvSelectedAccount.setTextColor(Color.parseColor("#94A3B8"));
+            binding.tvSelectedTag.setText("请选择标签 >");
+            binding.tvSelectedTag.setTextColor(Color.parseColor("#94A3B8"));
             
             // 恢复日期预设 UI
             updateDatePresetUI(0);
@@ -180,6 +194,33 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
             }
         });
         fragment.show(getChildFragmentManager(), "AccountSelector");
+    }
+
+    private void showTagSelector() {
+        SelectTagBottomSheetFragment fragment = SelectTagBottomSheetFragment.newInstance(null);
+        fragment.setOnTagsSelectedListener(selectedTags -> {
+            if (selectedTags != null && !selectedTags.isEmpty()) {
+                java.util.List<Long> ids = new java.util.ArrayList<>();
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < selectedTags.size(); i++) {
+                    TagEntity t = selectedTags.get(i);
+                    ids.add(t.getId());
+                    if (i > 0) sb.append(", ");
+                    sb.append("#").append(t.getName());
+                }
+                String summary = sb.toString();
+                filter.setTagIds(ids);
+                filter.setTagSummary(summary);
+                binding.tvSelectedTag.setText(summary + " >");
+                binding.tvSelectedTag.setTextColor(Color.parseColor("#3B82F6"));
+            } else {
+                filter.setTagIds(new java.util.ArrayList<>());
+                filter.setTagSummary(null);
+                binding.tvSelectedTag.setText("请选择标签 >");
+                binding.tvSelectedTag.setTextColor(Color.parseColor("#94A3B8"));
+            }
+        });
+        fragment.show(getChildFragmentManager(), "TagSelector");
     }
 
     private void selectDatePreset(int type) {

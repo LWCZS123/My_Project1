@@ -369,7 +369,7 @@ public class AccountBillPagingAdapter extends RecyclerView.Adapter<RecyclerView.
         private final ItemAccountBillMiddleBinding b;
         BillMiddleViewHolder(ItemAccountBillMiddleBinding binding) { super(binding.getRoot()); this.b = binding; }
         void bind(AccountBillUiModel m) { 
-            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvOriginalAmount, b.tvDiscount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout); 
+            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvOriginalAmount, b.tvDiscount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout, b.flTags); 
         }
     }
 
@@ -377,13 +377,13 @@ public class AccountBillPagingAdapter extends RecyclerView.Adapter<RecyclerView.
         private final ItemAccountBillBottomBinding b;
         BillBottomViewHolder(ItemAccountBillBottomBinding binding) { super(binding.getRoot()); this.b = binding; }
         void bind(AccountBillUiModel m) { 
-            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvOriginalAmount, b.tvDiscount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout); 
+            bindData(m, b.ivCategoryIcon, b.tvCategoryName, b.tvTransactionTime, b.tvAmount, b.tvOriginalAmount, b.tvDiscount, b.tvBalanceAfter, b.contentView, b.btnDelete, b.btnRefund, b.btnEdit, b.swipeLayout, b.flTags); 
         }
     }
 
     private void bindData(AccountBillUiModel m, ImageView ivIcon, TextView tvName, TextView tvTime, 
                           TextView tvAmount, TextView tvOriginalAmount, TextView tvDiscount, TextView tvBalance, View content, View btnDel, 
-                          View btnRef, View btnEdit, SwipeMenuLayout swipe) {
+                          View btnRef, View btnEdit, SwipeMenuLayout swipe, ViewGroup flTags) {
         
         ImageLoaderUtils.loadThumbnail(context, m.categoryIconUrl, ivIcon);
         
@@ -401,6 +401,9 @@ public class AccountBillPagingAdapter extends RecyclerView.Adapter<RecyclerView.
         tvTime.setText(m.timeNote);
         tvAmount.setText(m.amountText);
         tvAmount.setTextColor(m.amountColor);
+
+        // 🏷️ 账户详情页展示全部标签
+        com.example.my_project1.utils.TagViewUtils.renderTags(flTags, m.tags, Integer.MAX_VALUE);
 
         if (m.hasDiscount) {
             tvOriginalAmount.setVisibility(View.VISIBLE);

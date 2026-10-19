@@ -282,7 +282,9 @@
         <RelativeLayout
             android:id="@+id/layout_row_tag"
             android:layout_width="match_parent"
-            android:layout_height="52dp">
+            android:layout_height="wrap_content"
+            android:minHeight="52dp"
+            android:paddingVertical="8dp">
 
             <FrameLayout
                 android:id="@+id/box_tag_icon"
@@ -339,6 +341,17 @@
                 android:textColor="#64748B"
                 android:textSize="14sp"
                 tools:ignore="HardcodedText" />
+
+            <com.example.my_project1.ui.view.FlowLayout
+                android:id="@+id/fl_tags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="6dp"
+                android:layout_toStartOf="@id/arrow_tag"
+                android:layout_toEndOf="@id/tv_tag_label"
+                android:visibility="gone" />
         </RelativeLayout>
 
     </LinearLayout>

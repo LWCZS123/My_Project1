@@ -121,7 +121,11 @@ public class TagGroupAdapter extends RecyclerView.Adapter<TagGroupAdapter.ViewHo
                     MaterialCardView cardTag = chipView.findViewById(R.id.card_tag);
                     TextView tvName = chipView.findViewById(R.id.tv_tag_name);
 
-                    tvName.setText(tag.getName());
+                    String name = tag.getName();
+                    if (name != null && !name.trim().startsWith("#")) {
+                        name = "#" + name.trim();
+                    }
+                    tvName.setText(name);
 
                     if (tag.getBgColor() != null && !tag.getBgColor().isEmpty()) {
                         try {

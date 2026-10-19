@@ -789,6 +789,9 @@ public class AccountViewModel extends AndroidViewModel {
                             discountText = String.format(Locale.getDefault(), "优惠¥%s", MONEY_FMT.format(discount));
                         }
 
+                        List<com.example.my_project1.data.model.tag.TagEntity> tags = com.example.my_project1.data.database.AppDatabase.getInstance(getApplication())
+                                .billTagCrossRefDao().getTagsForBillSync(bill.getId());
+
                         AccountBillUiModel newBillModel = new AccountBillUiModel(
                                 bill.getId(),
                                 bill.getObjectId(),
@@ -803,6 +806,9 @@ public class AccountViewModel extends AndroidViewModel {
                                 discountText,
                                 hasDiscount
                         );
+                        if (tags != null) {
+                            newBillModel.tags = tags;
+                        }
                         billUiModelCache.put(billKey, newBillModel);
                         uiModels.add(newBillModel);
                     }

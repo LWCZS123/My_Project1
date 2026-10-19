@@ -35,6 +35,7 @@ public class BillUiModel {
     public final String originalAmountText; // 原价文本，例如 "¥333.00"
     public final String discountText;       // 优惠文本，例如 "优惠¥35.00"
     public final boolean hasDiscount;       // 是否有优惠
+    public final java.util.List<com.example.my_project1.data.model.tag.TagEntity> tags; // 关联标签列表
 
     // ── 时间轴连线状态（Adapter 按位置判定后写入）────────
     /** true → 该 item 是当天第一笔，上方没有连线（隐藏上半段竖线） */
@@ -66,6 +67,7 @@ public class BillUiModel {
         this.originalAmountText = b.originalAmountText;
         this.discountText   = b.discountText;
         this.hasDiscount    = b.hasDiscount;
+        this.tags           = b.tags != null ? b.tags : new java.util.ArrayList<>();
         this.isFirstOfDay   = b.isFirstOfDay;
         this.isLastOfDay    = b.isLastOfDay;
         this.diffKey        = (objectId != null && !objectId.isEmpty())
@@ -97,7 +99,8 @@ public class BillUiModel {
                 java.util.Objects.equals(remarkText, that.remarkText) &&
                 java.util.Objects.equals(locationText, that.locationText) &&
                 java.util.Objects.equals(imageUrls, that.imageUrls) &&
-                java.util.Objects.equals(originalBill, that.originalBill);
+                java.util.Objects.equals(originalBill, that.originalBill) &&
+                java.util.Objects.equals(tags, that.tags);
     }
 
     @Override
@@ -105,7 +108,7 @@ public class BillUiModel {
         return java.util.Objects.hash(localId, objectId, timeText, categoryName, categoryIconUrl,
                 categoryIconBackgroundColor, amountText, amountColor, originalAmountText, discountText,
                 hasDiscount, accountName, toAccountName, accountIconUrl, billType, remarkText, locationText,
-                imageUrls, originalBill, isFirstOfDay, isLastOfDay);
+                imageUrls, originalBill, isFirstOfDay, isLastOfDay, tags);
     }
 
     public static Builder builder() { return new Builder(); }
@@ -130,6 +133,7 @@ public class BillUiModel {
         String originalAmountText = "";
         String discountText   = "";
         boolean hasDiscount   = false;
+        java.util.List<com.example.my_project1.data.model.tag.TagEntity> tags = new java.util.ArrayList<>();
         boolean isFirstOfDay  = false;
         boolean isLastOfDay   = false;
 
@@ -152,6 +156,7 @@ public class BillUiModel {
         public Builder originalAmountText(String v) { originalAmountText = v != null ? v : ""; return this; }
         public Builder discountText(String v)       { discountText = v != null ? v : ""; return this; }
         public Builder hasDiscount(boolean v)       { hasDiscount = v; return this; }
+        public Builder tags(java.util.List<com.example.my_project1.data.model.tag.TagEntity> v) { tags = v != null ? v : new java.util.ArrayList<>(); return this; }
         public Builder isFirstOfDay(boolean v){ isFirstOfDay = v; return this; }
         public Builder isLastOfDay(boolean v) { isLastOfDay = v; return this; }
 

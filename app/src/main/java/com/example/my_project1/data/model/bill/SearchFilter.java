@@ -16,6 +16,8 @@ public class SearchFilter implements Serializable {
     private String categoryName;
     private List<String> accountIds;
     private String accountSummary; // 用于回显显示的名称
+    private List<Long> tagIds;
+    private String tagSummary; // 用于回显显示的标签名称
     private Date startDate;
     private Date endDate;
     private Double minAmount;
@@ -26,6 +28,7 @@ public class SearchFilter implements Serializable {
     public SearchFilter() {
         this.billType = -1;
         this.accountIds = new ArrayList<>();
+        this.tagIds = new ArrayList<>();
     }
 
     // Getters and Setters
@@ -46,6 +49,12 @@ public class SearchFilter implements Serializable {
 
     public String getAccountSummary() { return accountSummary; }
     public void setAccountSummary(String accountSummary) { this.accountSummary = accountSummary; }
+
+    public List<Long> getTagIds() { return tagIds; }
+    public void setTagIds(List<Long> tagIds) { this.tagIds = tagIds; }
+
+    public String getTagSummary() { return tagSummary; }
+    public void setTagSummary(String tagSummary) { this.tagSummary = tagSummary; }
 
     public Date getStartDate() { return startDate; }
     public void setStartDate(Date startDate) { this.startDate = startDate; }
@@ -70,6 +79,7 @@ public class SearchFilter implements Serializable {
                 || (billType != null && billType != -1)
                 || (categoryId != null && !categoryId.isEmpty())
                 || (accountIds != null && !accountIds.isEmpty())
+                || (tagIds != null && !tagIds.isEmpty())
                 || startDate != null
                 || endDate != null
                 || minAmount != null
@@ -85,6 +95,8 @@ public class SearchFilter implements Serializable {
         categoryName = null;
         accountIds = new ArrayList<>();
         accountSummary = null;
+        tagIds = new ArrayList<>();
+        tagSummary = null;
         startDate = null;
         endDate = null;
         minAmount = null;

@@ -155,6 +155,34 @@ public class SearchActivity extends AppCompatActivity {
         binding.tvCancel.setOnClickListener(v -> finish());
         binding.tvClearHistory.setOnClickListener(v -> viewModel.clearHistory());
         binding.fabFilter.setOnClickListener(v -> showFilterBottomSheet());
+
+        handleInitialIntent();
+    }
+
+    private void handleInitialIntent() {
+        Intent intent = getIntent();
+        if (intent == null) return;
+
+        long searchTagId = intent.getLongExtra("search_tag_id", -1);
+        String searchTagName = intent.getStringExtra("search_tag_name");
+        if (searchTagId != -1) {
+            com.example.my_project1.data.model.bill.SearchFilter filter = new com.example.my_project1.data.model.bill.SearchFilter();
+            java.util.List<Long> tagIds = new java.util.ArrayList<>();
+            tagIds.add(searchTagId);
+            filter.setTagIds(tagIds);
+            if (searchTagName != null && !searchTagName.isEmpty()) {
+                filter.setTagSummary("#" + searchTagName);
+                binding.etSearch.setText("#" + searchTagName);
+            }
+            viewModel.updateFilter(filter);
+        } else {
+            String query = intent.getStringExtra("search_query");
+            if (query != null && !query.isEmpty()) {
+                binding.etSearch.setText(query);
+                viewModel.setKeyword(query);
+                viewModel.performSearch();
+            }
+        }
     }
 
     private void observeData() {

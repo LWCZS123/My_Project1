@@ -94,6 +94,17 @@
             app:layout_constraintStart_toEndOf="@id/ivTransferArrow"
             app:layout_constraintTop_toTopOf="@id/tvAccount" />
 
+        <!-- 标签列表 (最多显示3个) -->
+        <com.example.my_project1.ui.view.FlowLayout
+            android:id="@+id/flTags"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="@id/tvCategory"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvAccount" />
+
         <!-- 原价（带删除线） -->
         <TextView
             android:id="@+id/tvOriginalAmount"
@@ -150,7 +161,7 @@
             android:visibility="gone"
             app:layout_constraintStart_toStartOf="@id/tvCategory"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvAccount">
+            app:layout_constraintTop_toBottomOf="@id/flTags">
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/ivBillImage1"

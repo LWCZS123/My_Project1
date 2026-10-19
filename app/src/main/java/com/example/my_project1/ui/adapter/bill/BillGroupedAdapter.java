@@ -290,6 +290,15 @@ public class BillGroupedAdapter extends ListAdapter<Object, RecyclerView.ViewHol
             }
             bind.tvAmount.setText(amt);
             bind.tvAmount.setTextColor(color);
+
+            // 🏷️ 渲染标签 (最多显示3个)
+            AppExecutors.get().diskIO().execute(() -> {
+                List<com.example.my_project1.data.model.tag.TagEntity> tags = AppDatabase.getInstance(mContext)
+                        .billTagCrossRefDao().getTagsForBillSync(bill.getId());
+                AppExecutors.get().mainThread().execute(() -> {
+                    com.example.my_project1.utils.TagViewUtils.renderTags(bind.flTags, tags, 3);
+                });
+            });
         }
     }
 

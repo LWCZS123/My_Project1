@@ -129,6 +129,12 @@
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerVertical="true" android:text="账户" android:textColor="#1E293B" android:textSize="15sp"/>
                     <TextView android:id="@+id/tvSelectedAccount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:layout_centerVertical="true" android:text="请选择账户 >" android:textColor="#94A3B8" android:textSize="14sp"/>
                 </RelativeLayout>
+                <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#F1F5F9"/>
+
+                <RelativeLayout android:id="@+id/btnSelectTag" android:layout_width="match_parent" android:layout_height="56dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerVertical="true" android:text="标签" android:textColor="#1E293B" android:textSize="15sp"/>
+                    <TextView android:id="@+id/tvSelectedTag" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:layout_centerVertical="true" android:text="请选择标签 >" android:textColor="#94A3B8" android:textSize="14sp"/>
+                </RelativeLayout>
             </LinearLayout>
 
             <LinearLayout

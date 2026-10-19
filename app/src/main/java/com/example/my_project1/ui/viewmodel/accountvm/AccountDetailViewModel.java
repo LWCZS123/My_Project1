@@ -352,7 +352,10 @@ public class AccountDetailViewModel extends AndroidViewModel {
             originalAmountText = "¥" + moneyFmt.get().format(originalAmount);
             discountText = String.format(Locale.getDefault(), "优惠¥%s", moneyFmt.get().format(discount));
         }
-        
+
+        List<com.example.my_project1.data.model.tag.TagEntity> tags = com.example.my_project1.data.database.AppDatabase.getInstance(getApplication())
+                .billTagCrossRefDao().getTagsForBillSync(bill.getId());
+
         AccountBillUiModel m = new AccountBillUiModel(
                 bill.getId(),
                 bill.getObjectId(),
@@ -367,6 +370,9 @@ public class AccountDetailViewModel extends AndroidViewModel {
                 discountText,
                 hasDiscount
         );
+        if (tags != null) {
+            m.tags = tags;
+        }
         if (bill.getBillTime() != null) {
             m.key = monthKeyFmt.get().format(bill.getBillTime());
         }

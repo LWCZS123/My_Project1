@@ -50,6 +50,8 @@ public class BillUiModelMapper {
         DecimalFormat amountFormatter = new DecimalFormat("#,##0.00");
         SimpleDateFormat timeFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
+        com.example.my_project1.data.dao.BillTagCrossRefDao crossRefDao = com.example.my_project1.data.database.AppDatabase.getInstance(context).billTagCrossRefDao();
+
         Map<String, Account> accountMap = new HashMap<>();
         if (accounts != null) {
             for (Account acc : accounts) {
@@ -62,9 +64,11 @@ public class BillUiModelMapper {
         for (Bill bill : bills) {
             if (bill == null) continue;
 
-            // 生成唯一缓存 Key：ID + 更新时间点
+            List<com.example.my_project1.data.model.tag.TagEntity> tags = crossRefDao.getTagsForBillSync(bill.getId());
+
+            // 生成唯一缓存 Key：ID + 更新时间点 + 标签Hash
             long updateTime = bill.getUpdatedAt() != null ? bill.getUpdatedAt().getTime() : 0L;
-            String cacheKey = "B_" + bill.getId() + "_" + updateTime;
+            String cacheKey = "B_" + bill.getId() + "_" + updateTime + "_" + (tags != null ? tags.hashCode() : 0);
             BillUiModel cached = billUiCache.get(cacheKey);
             if (cached != null) {
                 uiModels.add(cached);
@@ -133,6 +137,7 @@ public class BillUiModelMapper {
                     .originalAmountText(originalAmountText)
                     .discountText(discountText)
                     .hasDiscount(hasDiscount)
+                    .tags(tags)
                     .build();
 
             billUiCache.put(cacheKey, newModel);

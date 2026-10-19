@@ -95,6 +95,9 @@ public class BillRowAdapter extends ListAdapter<BillUiModel, BillRowAdapter.RowV
                 b.tvToAccount.setVisibility(View.GONE);
             }
 
+            // 🏷️ 渲染标签 (普通账单项最多显示3个)
+            com.example.my_project1.utils.TagViewUtils.renderTags(b.flTags, bill.tags, 3);
+
             ImageLoaderUtils.loadThumbnail(context, bill.categoryIconUrl, b.ivCategoryIcon);
 
             // 🎨 设置图标背景色

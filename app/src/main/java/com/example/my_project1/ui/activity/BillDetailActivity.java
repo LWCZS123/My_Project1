@@ -41,6 +41,7 @@ import com.example.my_project1.ui.adapter.photo.ImagePagerAdapter;
 import com.example.my_project1.ui.dialog.ConfirmDialog;
 import com.example.my_project1.ui.fragment.ReimburseBottomSheetFragment;
 import com.example.my_project1.ui.popup.FilterPopupMenu;
+import com.example.my_project1.ui.view.FlowLayout;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.data.model.tag.TagEntity;
@@ -49,6 +50,7 @@ import com.example.my_project1.ui.fragment.tag.SelectTagBottomSheetFragment;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
+import com.example.my_project1.utils.TagViewUtils;
 import com.example.my_project1.utils.ui.ElasticOverScrollHelper;
 
 import java.text.SimpleDateFormat;
@@ -863,16 +865,18 @@ public class BillDetailActivity extends AppCompatActivity {
                 List<TagEntity> tags = tagRepository.getTagsForBillSync(bill.getId());
                 AppExecutors.get().mainThread().execute(() -> {
                     if (tags != null && !tags.isEmpty()) {
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 0; i < tags.size(); i++) {
-                            if (i > 0) sb.append(", ");
-                            sb.append(tags.get(i).getName());
+                        holder.tvTag.setVisibility(View.GONE);
+                        if (holder.flTags != null) {
+                            holder.flTags.setVisibility(View.VISIBLE);
+                            TagViewUtils.renderTags(holder.flTags, tags, Integer.MAX_VALUE);
                         }
-                        holder.tvTag.setText(sb.toString());
-                        holder.tvTag.setTextColor(Color.parseColor("#2563EB"));
                     } else {
+                        if (holder.flTags != null) {
+                            holder.flTags.setVisibility(View.GONE);
+                        }
+                        holder.tvTag.setVisibility(View.VISIBLE);
                         holder.tvTag.setText("无");
-                        holder.tvTag.setTextColor(Color.parseColor("#64748B"));
+                        holder.tvTag.setTextColor(Color.parseColor("#94A3B8"));
                     }
 
                     if (holder.layoutRowTag != null) {
@@ -897,6 +901,7 @@ public class BillDetailActivity extends AppCompatActivity {
 
         class ViewHolder extends RecyclerView.ViewHolder {
             TextView tvAccount, tvBillTime, tvLocation, tvDiscount, tvTag;
+            FlowLayout flTags;
             View layoutRowTag;
 
             ViewHolder(@NonNull View itemView) {
@@ -906,6 +911,7 @@ public class BillDetailActivity extends AppCompatActivity {
                 tvLocation = itemView.findViewById(R.id.tv_location);
                 tvDiscount = itemView.findViewById(R.id.tv_discount);
                 tvTag = itemView.findViewById(R.id.tv_tag);
+                flTags = itemView.findViewById(R.id.fl_tags);
                 layoutRowTag = itemView.findViewById(R.id.layout_row_tag);
             }
         }

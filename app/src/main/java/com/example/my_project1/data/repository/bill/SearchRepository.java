@@ -60,10 +60,12 @@ public class SearchRepository {
                 String searchPattern = (keyword == null || keyword.trim().isEmpty()) ? null : "%" + keyword.trim() + "%";
                 List<String> accountIds = filter.getAccountIds();
                 int accountIdsCount = accountIds != null ? accountIds.size() : 0;
+                List<Long> tagIds = filter.getTagIds();
+                int tagIdsCount = tagIds != null ? tagIds.size() : 0;
 
                 SearchSummary summary = billDao.searchBillsSummaryAdvanced(
                         userId, searchPattern, filter.getBillType(), filter.getCategoryId(),
-                        accountIds, accountIdsCount, filter.getStartDate(), filter.getEndDate(),
+                        accountIds, accountIdsCount, tagIds, tagIdsCount, filter.getStartDate(), filter.getEndDate(),
                         filter.getMinAmount(), filter.getMaxAmount(), filter.getIncludeBudget()
                 );
 
@@ -88,10 +90,12 @@ public class SearchRepository {
                 String searchPattern = (keyword == null || keyword.trim().isEmpty()) ? null : "%" + keyword.trim() + "%";
                 List<String> accountIds = filter.getAccountIds();
                 int accountIdsCount = accountIds != null ? accountIds.size() : 0;
+                List<Long> tagIds = filter.getTagIds();
+                int tagIdsCount = tagIds != null ? tagIds.size() : 0;
 
                 List<Bill> results = billDao.searchBillsAdvancedPaged(
                         userId, searchPattern, filter.getBillType(), filter.getCategoryId(),
-                        accountIds, accountIdsCount, filter.getStartDate(), filter.getEndDate(),
+                        accountIds, accountIdsCount, tagIds, tagIdsCount, filter.getStartDate(), filter.getEndDate(),
                         filter.getMinAmount(), filter.getMaxAmount(), filter.getIncludeBudget(),
                         limit, offset
                 );

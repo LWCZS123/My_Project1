@@ -205,6 +205,9 @@ public class HomeBillAdapter extends PagingDataAdapter<HomeBillUiModel, Recycler
                 b.tvToAccount.setVisibility(View.GONE);
             }
 
+            // 🏷️ 渲染标签 (首页/普通账单项最多显示3个)
+            com.example.my_project1.utils.TagViewUtils.renderTags(b.flTags, bill.tags, 3);
+
             ImageLoaderUtils.loadHomeBillCategoryIcon(context, bill.categoryIconUrl, b.ivCategoryIcon);
 
             // 背景色

@@ -87,6 +87,13 @@
                 android:visibility="gone"
                 tools:visibility="visible" />
         </LinearLayout>
+
+        <com.example.my_project1.ui.view.FlowLayout
+            android:id="@+id/fl_tags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 右侧金额区 -->

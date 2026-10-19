@@ -1408,7 +1408,11 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     private void updateTagUi() {
         if (selectedTags != null && !selectedTags.isEmpty()) {
             if (selectedTags.size() == 1) {
-                binding.tvLabel.setText(selectedTags.get(0).getName());
+                String name = selectedTags.get(0).getName();
+                if (name != null && !name.trim().startsWith("#")) {
+                    name = "#" + name.trim();
+                }
+                binding.tvLabel.setText(name);
             } else {
                 binding.tvLabel.setText("标签(" + selectedTags.size() + ")");
             }

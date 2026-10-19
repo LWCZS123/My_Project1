@@ -138,6 +138,7 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
 
                 b.tvAmount.setText(bill.amountText);
                 b.tvAmount.setTextColor(bill.amountColor);
+                com.example.my_project1.utils.TagViewUtils.renderTags(b.flTags, bill.tags, 3);
                 b.layoutAccountInfo.setVisibility(View.GONE);
 
                 // Hide last separator
@@ -233,6 +234,7 @@ public class BillListAdapter extends ListAdapter<BillListAdapter.ListItem, Recyc
             // 金额
             binding.tvAmount.setText(bill.amountText);
             binding.tvAmount.setTextColor(bill.amountColor);
+            com.example.my_project1.utils.TagViewUtils.renderTags(binding.flTags, bill.tags, 3);
 
             binding.layoutAccountInfo.setVisibility(View.GONE);
         }

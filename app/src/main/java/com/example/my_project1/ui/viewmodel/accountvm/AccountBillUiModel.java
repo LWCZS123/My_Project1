@@ -35,6 +35,7 @@ public class AccountBillUiModel {
     public String originalAmountText;
     public String discountText;
     public boolean hasDiscount;
+    public java.util.List<com.example.my_project1.data.model.tag.TagEntity> tags = new java.util.ArrayList<>();
 
     // Header Constructor
     public AccountBillUiModel(int type, String title, String subtitle, String billAmountText, 
@@ -100,13 +101,14 @@ public class AccountBillUiModel {
                 Objects.equals(balanceText, that.balanceText) &&
                 Objects.equals(originalBill, that.originalBill) &&
                 Objects.equals(originalAmountText, that.originalAmountText) &&
-                Objects.equals(discountText, that.discountText);
+                Objects.equals(discountText, that.discountText) &&
+                Objects.equals(tags, that.tags);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(type, title, subtitle, billAmountText, inflowText, outflowText, isCollapsed, 
                             key, id, objectId, categoryName, categoryIconUrl, timeNote, amountText, 
-                            amountColor, balanceText, originalBill, isLastInSection, originalAmountText, discountText, hasDiscount);
+                            amountColor, balanceText, originalBill, isLastInSection, originalAmountText, discountText, hasDiscount, tags);
     }
 }

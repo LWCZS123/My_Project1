@@ -233,7 +233,13 @@ public class SelectTagBottomSheetFragment extends BottomSheetDialogFragment {
                     MaterialCardView cardTag = chipView.findViewById(R.id.card_tag);
                     TextView tvName = chipView.findViewById(R.id.tv_tag_name);
 
-                    if (tvName != null) tvName.setText(tag.getName());
+                    if (tvName != null) {
+                        String name = tag.getName();
+                        if (name != null && !name.trim().startsWith("#")) {
+                            name = "#" + name.trim();
+                        }
+                        tvName.setText(name);
+                    }
 
                     boolean isSelected = isTagSelected(tag);
                     if (cardTag != null) {

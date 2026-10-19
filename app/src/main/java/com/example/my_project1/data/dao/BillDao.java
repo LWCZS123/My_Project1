@@ -258,6 +258,7 @@ public interface BillDao {
             "AND (:billType = -1 OR type = :billType) " +
             "AND (:categoryId IS NULL OR category_id = :categoryId) " +
             "AND (:accountIdsCount = 0 OR account_id IN (:accountIds)) " +
+            "AND (:tagIdsCount = 0 OR id IN (SELECT bill_id FROM bill_tag_cross_ref WHERE tag_id IN (:tagIds) AND is_deleted = 0)) " +
             "AND (:startTime IS NULL OR billTime >= :startTime) " +
             "AND (:endTime IS NULL OR billTime <= :endTime) " +
             "AND (:minAmount IS NULL OR amount >= :minAmount) " +
@@ -266,6 +267,7 @@ public interface BillDao {
             "ORDER BY billTime DESC LIMIT :limit OFFSET :offset")
     List<Bill> searchBillsAdvancedPaged(String userId, String keyword, int billType, String categoryId,
                                         List<String> accountIds, int accountIdsCount,
+                                        List<Long> tagIds, int tagIdsCount,
                                         Date startTime, Date endTime, Double minAmount, Double maxAmount,
                                         Boolean includeBudget,
                                         int limit, int offset);
@@ -284,6 +286,7 @@ public interface BillDao {
             "AND (:billType = -1 OR type = :billType) " +
             "AND (:categoryId IS NULL OR category_id = :categoryId) " +
             "AND (:accountIdsCount = 0 OR account_id IN (:accountIds)) " +
+            "AND (:tagIdsCount = 0 OR id IN (SELECT bill_id FROM bill_tag_cross_ref WHERE tag_id IN (:tagIds) AND is_deleted = 0)) " +
             "AND (:startTime IS NULL OR billTime >= :startTime) " +
             "AND (:endTime IS NULL OR billTime <= :endTime) " +
             "AND (:minAmount IS NULL OR amount >= :minAmount) " +
@@ -291,6 +294,7 @@ public interface BillDao {
             "AND (:includeBudget IS NULL OR excludeBudget != :includeBudget)")
     SearchSummary searchBillsSummaryAdvanced(String userId, String keyword, int billType, String categoryId,
                                            List<String> accountIds, int accountIdsCount,
+                                           List<Long> tagIds, int tagIdsCount,
                                            Date startTime, Date endTime, Double minAmount, Double maxAmount,
                                            Boolean includeBudget);
 

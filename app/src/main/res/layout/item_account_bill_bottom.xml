@@ -37,7 +37,8 @@
                     android:src="@drawable/ic_category"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent" />
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintVertical_bias="0.0" />
 
                 <TextView
                     android:id="@+id/tv_category_name"
@@ -64,6 +65,18 @@
                     app:layout_constraintEnd_toStartOf="@+id/ll_amount_area"
                     app:layout_constraintStart_toStartOf="@+id/tv_category_name"
                     app:layout_constraintTop_toBottomOf="@+id/tv_category_name" />
+
+                <!-- 标签列表 (账户详情页显示全部) -->
+                <com.example.my_project1.ui.view.FlowLayout
+                    android:id="@+id/fl_tags"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone"
+                    app:layout_constraintEnd_toStartOf="@+id/ll_amount_area"
+                    app:layout_constraintStart_toStartOf="@+id/tv_category_name"
+                    app:layout_constraintTop_toBottomOf="@+id/tv_transaction_time"
+                    app:layout_constraintBottom_toBottomOf="parent" />
 
                 <LinearLayout
                     android:id="@+id/ll_amount_area"

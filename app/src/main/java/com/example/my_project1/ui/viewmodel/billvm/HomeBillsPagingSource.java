@@ -311,6 +311,9 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
             discountText = String.format(java.util.Locale.getDefault(), "优惠¥%s", amountFormat.format(discount));
         }
 
+        List<com.example.my_project1.data.model.tag.TagEntity> tags = com.example.my_project1.data.database.AppDatabase.getInstance(application)
+                .billTagCrossRefDao().getTagsForBillSync(bill.getId());
+
         return BillUiModel.builder()
                 .localId(bill.getId())
                 .objectId(bill.getObjectId())
@@ -330,6 +333,7 @@ final class HomeBillsPagingSource extends PagingSource<Integer, HomeBillUiModel>
                 .originalAmountText(originalAmountText)
                 .discountText(discountText)
                 .hasDiscount(hasDiscount)
+                .tags(tags)
                 .build();
     }
 

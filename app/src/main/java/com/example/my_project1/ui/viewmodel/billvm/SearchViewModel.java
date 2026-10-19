@@ -104,6 +104,8 @@ public class SearchViewModel extends AndroidViewModel {
         currentFilter.setBillType(filter.getBillType());
         currentFilter.setCategoryId(filter.getCategoryId());
         currentFilter.setAccountIds(filter.getAccountIds());
+        currentFilter.setTagIds(filter.getTagIds());
+        currentFilter.setTagSummary(filter.getTagSummary());
         currentFilter.setStartDate(filter.getStartDate());
         currentFilter.setEndDate(filter.getEndDate());
         currentFilter.setMinAmount(filter.getMinAmount());
@@ -310,6 +312,9 @@ public class SearchViewModel extends AndroidViewModel {
         Account acc = accountMap != null ? accountMap.get(bill.getAccountId()) : null;
         Account toAcc = (accountMap != null && type == 2) ? accountMap.get(bill.getToAccountId()) : null;
 
+        List<com.example.my_project1.data.model.tag.TagEntity> tags = com.example.my_project1.data.database.AppDatabase.getInstance(getApplication())
+                .billTagCrossRefDao().getTagsForBillSync(bill.getId());
+
         return BillUiModel.builder()
                 .localId(bill.getId()).objectId(bill.getObjectId())
                 .timeText(timeFmt.format(bill.getBillTime()))
@@ -322,6 +327,7 @@ public class SearchViewModel extends AndroidViewModel {
                 .originalAmountText(originalAmountText)
                 .discountText(discountText)
                 .hasDiscount(hasDiscount)
+                .tags(tags)
                 .build();
     }
 

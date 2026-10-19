@@ -12,7 +12,6 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.my_project1.R;
@@ -25,9 +24,6 @@ import com.example.my_project1.utils.BottomSheetNavigationBarUtils;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
 
@@ -146,7 +142,8 @@ public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
             btnActionViewBills.setOnClickListener(v -> {
                 dismiss();
                 Intent intent = new Intent(requireContext(), SearchActivity.class);
-                intent.putExtra("search_query", tag.getName());
+                intent.putExtra("search_tag_id", tag.getId());
+                intent.putExtra("search_tag_name", tag.getName());
                 startActivity(intent);
             });
         }
@@ -214,27 +211,15 @@ public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
     private void showMoveGroupDialog() {
         tagViewModel.getActiveGroups().observe(getViewLifecycleOwner(), groups -> {
             if (groups == null || groups.isEmpty()) return;
-            List<String> names = new ArrayList<>();
-            int currentGroupIndex = -1;
-            for (int i = 0; i < groups.size(); i++) {
-                TagGroupEntity g = groups.get(i);
-                names.add(g.getName());
-                if (g.getId() == tag.getGroupId()) {
-                    currentGroupIndex = i;
-                }
-            }
-
-            String[] items = names.toArray(new String[0]);
-            new AlertDialog.Builder(requireContext())
-                    .setTitle("选择要移动到的分组")
-                    .setSingleChoiceItems(items, currentGroupIndex, (dialog, which) -> {
-                        TagGroupEntity selectedGroup = groups.get(which);
-                        tagViewModel.moveTagGroup(tag.getId(), selectedGroup.getId());
-                        dialog.dismiss();
-                        dismiss();
-                    })
-                    .setNegativeButton("取消", null)
-                    .show();
+            SelectTagGroupBottomSheetFragment fragment = SelectTagGroupBottomSheetFragment.newInstance(
+                    groups,
+                    tag != null ? tag.getGroupId() : -1
+            );
+            fragment.setOnGroupSelectedListener(selectedGroup -> {
+                tagViewModel.moveTagGroup(tag.getId(), selectedGroup.getId());
+                dismiss();
+            });
+            fragment.show(getParentFragmentManager(), "SelectTagGroupBottomSheetFragment");
         });
     }
 
