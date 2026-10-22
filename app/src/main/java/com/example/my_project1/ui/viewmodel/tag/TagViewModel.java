@@ -3,10 +3,12 @@ package com.example.my_project1.ui.viewmodel.tag;
 import android.app.Application;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
 import com.example.my_project1.data.model.tag.TagGroupWithTags;
@@ -16,12 +18,18 @@ import java.util.List;
 
 import cn.bmob.v3.BmobUser;
 
+/**
+ * TagViewModel
+ * -------------------------------------------------------
+ * 标签及标签组 ViewModel，负责 UI 与 Repository 之间交互
+ */
 public class TagViewModel extends AndroidViewModel {
 
     private final TagRepository tagRepository;
     private String currentUserId;
 
     private final MutableLiveData<String> toastMessage = new MutableLiveData<>();
+    private final MutableLiveData<ApiResponse<Void>> operationState = new MutableLiveData<>();
 
     public TagViewModel(@NonNull Application application) {
         super(application);
@@ -46,6 +54,10 @@ public class TagViewModel extends AndroidViewModel {
         return toastMessage;
     }
 
+    public LiveData<ApiResponse<Void>> getOperationState() {
+        return operationState;
+    }
+
     public LiveData<List<TagGroupWithTags>> getGroupsWithTags() {
         String userId = getCurrentUserId();
         return tagRepository.getGroupsWithTagsLiveData(userId);
@@ -67,15 +79,35 @@ public class TagViewModel extends AndroidViewModel {
     }
 
     public void createGroup(String groupName) {
+        createGroup(groupName, null);
+    }
+
+    public void createGroup(String groupName, @Nullable ApiResponse.Callback<Long> callback) {
         String userId = getCurrentUserId();
-        tagRepository.createGroup(userId, groupName, (success, message) -> {
-            toastMessage.postValue(message);
+        tagRepository.createGroup(userId, groupName, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response.mapMessage());
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
     public void updateGroupName(TagGroupEntity group, String newName) {
-        tagRepository.updateGroupName(group, newName, (success, message) -> {
-            toastMessage.postValue(message);
+        updateGroupName(group, newName, null);
+    }
+
+    public void updateGroupName(TagGroupEntity group, String newName, @Nullable ApiResponse.Callback<Void> callback) {
+        tagRepository.updateGroupName(group, newName, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response);
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
@@ -84,46 +116,106 @@ public class TagViewModel extends AndroidViewModel {
     }
 
     public void deleteGroup(TagGroupEntity group) {
-        tagRepository.deleteGroup(group, (success, message) -> {
-            toastMessage.postValue(message);
+        deleteGroup(group, null);
+    }
+
+    public void deleteGroup(TagGroupEntity group, @Nullable ApiResponse.Callback<Void> callback) {
+        tagRepository.deleteGroup(group, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response);
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
     public void saveTag(TagEntity tag) {
+        saveTag(tag, null);
+    }
+
+    public void saveTag(TagEntity tag, @Nullable ApiResponse.Callback<Long> callback) {
         String userId = getCurrentUserId();
         if (tag.getUserId() == null || tag.getUserId().isEmpty()) {
             tag.setUserId(userId);
         }
-        tagRepository.saveTag(tag, (success, message) -> {
-            toastMessage.postValue(message);
+        tagRepository.saveTag(tag, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response.mapMessage());
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
     public void moveTagGroup(long tagId, long newGroupId) {
+        moveTagGroup(tagId, newGroupId, null);
+    }
+
+    public void moveTagGroup(long tagId, long newGroupId, @Nullable ApiResponse.Callback<Void> callback) {
         String userId = getCurrentUserId();
-        tagRepository.moveTagGroup(tagId, newGroupId, userId, (success, message) -> {
-            toastMessage.postValue(message);
+        tagRepository.moveTagGroup(tagId, newGroupId, userId, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response);
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
     public void sortTagsInGroup(long groupId) {
+        sortTagsInGroup(groupId, null);
+    }
+
+    public void sortTagsInGroup(long groupId, @Nullable ApiResponse.Callback<Void> callback) {
         String userId = getCurrentUserId();
-        tagRepository.sortTagsInGroup(groupId, userId, (success, message) -> {
-            toastMessage.postValue(message);
+        tagRepository.sortTagsInGroup(groupId, userId, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response);
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
     public void toggleTagArchive(long tagId, boolean archive) {
+        toggleTagArchive(tagId, archive, null);
+    }
+
+    public void toggleTagArchive(long tagId, boolean archive, @Nullable ApiResponse.Callback<Void> callback) {
         String userId = getCurrentUserId();
-        tagRepository.toggleTagArchive(tagId, archive, userId, (success, message) -> {
-            toastMessage.postValue(message);
+        tagRepository.toggleTagArchive(tagId, archive, userId, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response);
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 
     public void deleteTag(long tagId) {
+        deleteTag(tagId, null);
+    }
+
+    public void deleteTag(long tagId, @Nullable ApiResponse.Callback<Void> callback) {
         String userId = getCurrentUserId();
-        tagRepository.deleteTag(tagId, userId, (success, message) -> {
-            toastMessage.postValue(message);
+        tagRepository.deleteTag(tagId, userId, response -> {
+            if (response.getMessage() != null) {
+                toastMessage.setValue(response.getMessage());
+            }
+            operationState.setValue(response);
+            if (callback != null) {
+                callback.onComplete(response);
+            }
         });
     }
 }

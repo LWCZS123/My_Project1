@@ -5,7 +5,10 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.work.Constraints;
+import androidx.work.ExistingWorkPolicy;
 import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
@@ -25,6 +28,14 @@ public class TagSyncWorker extends Worker {
         return new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build();
+    }
+
+    public static void enqueue(Context context) {
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(TagSyncWorker.class)
+                .setConstraints(getDefaultConstraints())
+                .build();
+        WorkManager.getInstance(context)
+                .enqueueUniqueWork("TagSync", ExistingWorkPolicy.REPLACE, request);
     }
 
     @NonNull

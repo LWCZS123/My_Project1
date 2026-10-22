@@ -369,8 +369,11 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
         editingTag.setBgColor(selectedBgColor);
         editingTag.setTextColor(selectedTextColor);
 
-        tagViewModel.saveTag(editingTag);
-        dismiss();
+        tagViewModel.saveTag(editingTag, response -> {
+            if (response.isSuccess()) {
+                dismiss();
+            }
+        });
     }
 
     @Override

@@ -10,36 +10,43 @@ import com.example.my_project1.data.dao.TagDao;
 import com.example.my_project1.data.dao.TagGroupDao;
 import com.example.my_project1.data.database.AppDatabase;
 import com.example.my_project1.data.model.SyncState;
+import com.example.my_project1.data.model.common.ApiResponse;
 import com.example.my_project1.data.model.tag.BillTagCrossRef;
 import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
 import com.example.my_project1.data.model.tag.TagGroupWithTags;
 import com.example.my_project1.data.remote.model.cloudtag.BmobTagApiImpl;
 import com.example.my_project1.utils.AppExecutors;
+import com.example.my_project1.work.TagSyncWorker;
 
 import java.util.Date;
 import java.util.List;
 
+/**
+ * TagRepository - 标签数据仓库
+ * -------------------------------------------------------
+ * 遵循离线优先原则与单向数据流 (UDF)：
+ * 1. 增删改查操作优先写本地 SQLite (Room)，写入成功后立刻触发 TagSyncWorker 后台同步。
+ * 2. 异步回调使用通用的 ApiResponse.Callback<T> 接口封装。
+ */
 public class TagRepository {
 
     private static final String TAG = "TagRepository";
     public static final String DEFAULT_GROUP_NAME = "默认分组";
 
+    private final Context context;
     private final TagGroupDao tagGroupDao;
     private final TagDao tagDao;
     private final BillTagCrossRefDao crossRefDao;
     private final BmobTagApiImpl bmobTagApi;
 
-    public interface ResultCallback {
-        void onResult(boolean success, String message);
-    }
-
     public TagRepository(Context context) {
-        AppDatabase db = AppDatabase.getInstance(context);
+        this.context = context.getApplicationContext();
+        AppDatabase db = AppDatabase.getInstance(this.context);
         this.tagGroupDao = db.tagGroupDao();
         this.tagDao = db.tagDao();
         this.crossRefDao = db.billTagCrossRefDao();
-        this.bmobTagApi = new BmobTagApiImpl(context);
+        this.bmobTagApi = new BmobTagApiImpl(this.context);
     }
 
     private void runInBackground(Runnable runnable) {
@@ -50,9 +57,17 @@ public class TagRepository {
         AppExecutors.get().mainThread().execute(runnable);
     }
 
+    private void triggerSync() {
+        try {
+            TagSyncWorker.enqueue(context);
+        } catch (Exception e) {
+            Log.e(TAG, "触发 TagSyncWorker 失败: " + e.getMessage());
+        }
+    }
+
     // ==================== 默认分组初始化 ====================
 
-    public void ensureDefaultGroupCreated(String userId, ResultCallback callback) {
+    public void ensureDefaultGroupCreated(String userId, ApiResponse.Callback<Boolean> callback) {
         runInBackground(() -> {
             try {
                 TagGroupEntity defaultGroup = tagGroupDao.getDefaultGroup(userId);
@@ -64,12 +79,12 @@ public class TagRepository {
                     defaultGroup.setId(id);
                 }
                 if (callback != null) {
-                    runOnMain(() -> callback.onResult(true, "Default group ready"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(true, "Default group ready")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "ensureDefaultGroupCreated error", e);
                 if (callback != null) {
-                    runOnMain(() -> callback.onResult(false, e.getMessage()));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
                 }
             }
         });
@@ -99,13 +114,13 @@ public class TagRepository {
         return tagGroupDao.getActiveGroupsLiveData(userId);
     }
 
-    public void createGroup(String userId, String groupName, ResultCallback callback) {
+    public void createGroup(String userId, String groupName, ApiResponse.Callback<Long> callback) {
         runInBackground(() -> {
             try {
                 TagGroupEntity existingGroup = tagGroupDao.getGroupByName(userId, groupName);
                 TagEntity existingTag = tagDao.getTagByName(userId, groupName);
                 if (existingGroup != null || existingTag != null) {
-                    runOnMain(() -> callback.onResult(false, "标签和标签组不能同名"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("标签和标签组不能同名")));
                     return;
                 }
                 List<TagGroupEntity> activeGroups = tagGroupDao.getActiveGroupsSync(userId);
@@ -113,40 +128,40 @@ public class TagRepository {
                 TagGroupEntity newGroup = new TagGroupEntity(userId, groupName, sortOrder, false);
                 long id = tagGroupDao.insertGroup(newGroup);
                 if (id > 0) {
-                    uploadPendingChanges(userId);
-                    runOnMain(() -> callback.onResult(true, "新建分组成功"));
+                    triggerSync();
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(id, "新建分组成功")));
                 } else {
-                    runOnMain(() -> callback.onResult(false, "新建分组失败"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("新建分组失败")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "createGroup error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
 
-    public void updateGroupName(TagGroupEntity group, String newName, ResultCallback callback) {
+    public void updateGroupName(TagGroupEntity group, String newName, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 if (group.isDefault()) {
-                    runOnMain(() -> callback.onResult(false, "默认分组不可重命名"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("默认分组不可重命名")));
                     return;
                 }
                 TagGroupEntity existingGroup = tagGroupDao.getGroupByName(group.getUserId(), newName);
                 TagEntity existingTag = tagDao.getTagByName(group.getUserId(), newName);
                 if ((existingGroup != null && existingGroup.getId() != group.getId()) || existingTag != null) {
-                    runOnMain(() -> callback.onResult(false, "标签和标签组不能同名"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("标签和标签组不能同名")));
                     return;
                 }
                 group.setName(newName);
                 group.setUpdatedAt(new Date());
                 group.setSyncState(SyncState.TO_UPDATE);
                 tagGroupDao.updateGroup(group);
-                uploadPendingChanges(group.getUserId());
-                runOnMain(() -> callback.onResult(true, "重命名成功"));
+                triggerSync();
+                runOnMain(() -> callback.onComplete(ApiResponse.success(null, "重命名成功")));
             } catch (Exception e) {
                 Log.e(TAG, "updateGroupName error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
@@ -155,15 +170,14 @@ public class TagRepository {
         runInBackground(() -> tagGroupDao.updateFoldState(groupId, isFolded));
     }
 
-    public void deleteGroup(TagGroupEntity group, ResultCallback callback) {
+    public void deleteGroup(TagGroupEntity group, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 if (group.isDefault()) {
-                    runOnMain(() -> callback.onResult(false, "默认分组不能删除"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("默认分组不能删除")));
                     return;
                 }
                 TagGroupEntity defaultGroup = getDefaultGroupSync(group.getUserId());
-                // 需求：如果删除标签分组，该分组下的所有标签都会移动到默认分组里
                 tagDao.moveTagsToGroup(group.getUserId(), group.getId(), defaultGroup.getId());
 
                 group.setDeleted(true);
@@ -171,11 +185,11 @@ public class TagRepository {
                 group.setSyncState(SyncState.TO_DELETE);
                 tagGroupDao.updateGroup(group);
 
-                uploadPendingChanges(group.getUserId());
-                runOnMain(() -> callback.onResult(true, "删除分组成功，标签已移至默认分组"));
+                triggerSync();
+                runOnMain(() -> callback.onComplete(ApiResponse.success(null, "删除分组成功，标签已移至默认分组")));
             } catch (Exception e) {
                 Log.e(TAG, "deleteGroup error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
@@ -190,13 +204,13 @@ public class TagRepository {
         return tagDao.getArchivedTagsLiveData(userId);
     }
 
-    public void saveTag(TagEntity tag, ResultCallback callback) {
+    public void saveTag(TagEntity tag, ApiResponse.Callback<Long> callback) {
         runInBackground(() -> {
             try {
                 TagGroupEntity existingGroup = tagGroupDao.getGroupByName(tag.getUserId(), tag.getName());
                 TagEntity existingTag = tagDao.getTagByName(tag.getUserId(), tag.getName());
                 if (existingGroup != null || (existingTag != null && existingTag.getId() != tag.getId())) {
-                    runOnMain(() -> callback.onResult(false, "标签和标签组不能同名"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("标签和标签组不能同名")));
                     return;
                 }
                 if (tag.getGroupId() <= 0) {
@@ -204,24 +218,26 @@ public class TagRepository {
                     tag.setGroupId(defaultGroup.getId());
                 }
                 tag.setUpdatedAt(new Date());
+                long resultId = tag.getId();
                 if (tag.getId() <= 0) {
                     tag.setSyncState(SyncState.TO_CREATE);
-                    long id = tagDao.insertTag(tag);
-                    tag.setId(id);
+                    resultId = tagDao.insertTag(tag);
+                    tag.setId(resultId);
                 } else {
                     tag.setSyncState(SyncState.TO_UPDATE);
                     tagDao.updateTag(tag);
                 }
-                uploadPendingChanges(tag.getUserId());
-                runOnMain(() -> callback.onResult(true, "保存成功"));
+                triggerSync();
+                final long savedId = resultId;
+                runOnMain(() -> callback.onComplete(ApiResponse.success(savedId, "保存成功")));
             } catch (Exception e) {
                 Log.e(TAG, "saveTag error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
 
-    public void moveTagGroup(long tagId, long newGroupId, String userId, ResultCallback callback) {
+    public void moveTagGroup(long tagId, long newGroupId, String userId, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 TagEntity tag = tagDao.getTagById(tagId);
@@ -230,19 +246,19 @@ public class TagRepository {
                     tag.setUpdatedAt(new Date());
                     tag.setSyncState(SyncState.TO_UPDATE);
                     tagDao.updateTag(tag);
-                    uploadPendingChanges(userId);
-                    runOnMain(() -> callback.onResult(true, "移动分组成功"));
+                    triggerSync();
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(null, "移动分组成功")));
                 } else {
-                    runOnMain(() -> callback.onResult(false, "标签不存在"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("标签不存在")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "moveTagGroup error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
 
-    public void sortTagsInGroup(long groupId, String userId, ResultCallback callback) {
+    public void sortTagsInGroup(long groupId, String userId, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 List<TagEntity> tags = tagDao.getTagsByGroupIdSync(userId, groupId);
@@ -259,19 +275,19 @@ public class TagRepository {
                         tag.setSyncState(SyncState.TO_UPDATE);
                         tagDao.updateTag(tag);
                     }
-                    uploadPendingChanges(userId);
-                    runOnMain(() -> callback.onResult(true, "标签已在当前分组内重新排序"));
+                    triggerSync();
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(null, "标签已在当前分组内重新排序")));
                 } else {
-                    runOnMain(() -> callback.onResult(true, "当前分组标签无需排序"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(null, "当前分组标签无需排序")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "sortTagsInGroup error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
 
-    public void toggleTagArchive(long tagId, boolean archive, String userId, ResultCallback callback) {
+    public void toggleTagArchive(long tagId, boolean archive, String userId, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 TagEntity tag = tagDao.getTagById(tagId);
@@ -280,20 +296,20 @@ public class TagRepository {
                     tag.setUpdatedAt(new Date());
                     tag.setSyncState(SyncState.TO_UPDATE);
                     tagDao.updateTag(tag);
-                    uploadPendingChanges(userId);
+                    triggerSync();
                     String msg = archive ? "已归档" : "已解档";
-                    runOnMain(() -> callback.onResult(true, msg));
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(null, msg)));
                 } else {
-                    runOnMain(() -> callback.onResult(false, "标签不存在"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("标签不存在")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "toggleTagArchive error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
 
-    public void deleteTag(long tagId, String userId, ResultCallback callback) {
+    public void deleteTag(long tagId, String userId, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 TagEntity tag = tagDao.getTagById(tagId);
@@ -304,14 +320,14 @@ public class TagRepository {
                     tagDao.updateTag(tag);
 
                     crossRefDao.deleteByTagId(tagId);
-                    uploadPendingChanges(userId);
-                    runOnMain(() -> callback.onResult(true, "删除标签成功"));
+                    triggerSync();
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(null, "删除标签成功")));
                 } else {
-                    runOnMain(() -> callback.onResult(false, "标签不存在"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error("标签不存在")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "deleteTag error", e);
-                runOnMain(() -> callback.onResult(false, e.getMessage()));
+                runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
             }
         });
     }
@@ -326,7 +342,7 @@ public class TagRepository {
         return crossRefDao.getTagsForBillSync(billId);
     }
 
-    public void saveBillTags(long billId, String userId, List<TagEntity> selectedTags, ResultCallback callback) {
+    public void saveBillTags(long billId, String userId, List<TagEntity> selectedTags, ApiResponse.Callback<Void> callback) {
         runInBackground(() -> {
             try {
                 crossRefDao.deleteByBillId(billId);
@@ -343,20 +359,20 @@ public class TagRepository {
                         crossRefDao.insertCrossRef(ref);
                     }
                 }
-                uploadPendingChanges(userId);
+                triggerSync();
                 if (callback != null) {
-                    runOnMain(() -> callback.onResult(true, "账单标签更新成功"));
+                    runOnMain(() -> callback.onComplete(ApiResponse.success(null, "账单标签更新成功")));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "saveBillTags error", e);
                 if (callback != null) {
-                    runOnMain(() -> callback.onResult(false, e.getMessage()));
+                    runOnMain(() -> callback.onComplete(ApiResponse.error(e)));
                 }
             }
         });
     }
 
-    // ==================== Bmob 云端同步 ====================
+    // ==================== Bmob 云端同步 (由 TagSyncWorker 异步执行) ====================
 
     public void uploadPendingChanges(String userId) {
         if (userId == null || userId.isEmpty()) return;

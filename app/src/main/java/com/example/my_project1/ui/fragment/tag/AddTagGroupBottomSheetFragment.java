@@ -128,11 +128,18 @@ public class AddTagGroupBottomSheetFragment extends BottomSheetDialogFragment {
         }
 
         if (editingGroup != null) {
-            tagViewModel.updateGroupName(editingGroup, name);
+            tagViewModel.updateGroupName(editingGroup, name, response -> {
+                if (response.isSuccess()) {
+                    dismiss();
+                }
+            });
         } else {
-            tagViewModel.createGroup(name);
+            tagViewModel.createGroup(name, response -> {
+                if (response.isSuccess()) {
+                    dismiss();
+                }
+            });
         }
-        dismiss();
     }
 
     @Override

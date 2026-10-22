@@ -15,7 +15,6 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -35,18 +34,18 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.account.Account;
 import com.example.my_project1.data.model.bill.Bill;
+import com.example.my_project1.data.model.tag.TagEntity;
+import com.example.my_project1.data.repository.tag.TagRepository;
 import com.example.my_project1.databinding.ActivityBillDetailBinding;
 import com.example.my_project1.ui.adapter.photo.FullImagePagerAdapter;
 import com.example.my_project1.ui.adapter.photo.ImagePagerAdapter;
 import com.example.my_project1.ui.dialog.ConfirmDialog;
 import com.example.my_project1.ui.fragment.ReimburseBottomSheetFragment;
+import com.example.my_project1.ui.fragment.tag.SelectTagBottomSheetFragment;
 import com.example.my_project1.ui.popup.FilterPopupMenu;
 import com.example.my_project1.ui.view.FlowLayout;
 import com.example.my_project1.ui.viewmodel.accountvm.AccountViewModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
-import com.example.my_project1.data.model.tag.TagEntity;
-import com.example.my_project1.data.repository.tag.TagRepository;
-import com.example.my_project1.ui.fragment.tag.SelectTagBottomSheetFragment;
 import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.ImageLoaderUtils;
 import com.example.my_project1.utils.SnackbarUtils;
@@ -883,7 +882,7 @@ public class BillDetailActivity extends AppCompatActivity {
                         holder.layoutRowTag.setOnClickListener(v -> {
                             SelectTagBottomSheetFragment fragment = SelectTagBottomSheetFragment.newInstance(tags);
                             fragment.setOnTagsSelectedListener(newTags -> {
-                                tagRepository.saveBillTags(bill.getId(), bill.getUserId(), newTags, (success, message) -> {
+                                tagRepository.saveBillTags(bill.getId(), bill.getUserId(), newTags, response -> {
                                     notifyDataSetChanged();
                                 });
                             });
