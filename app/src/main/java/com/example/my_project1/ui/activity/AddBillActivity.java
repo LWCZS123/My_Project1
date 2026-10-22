@@ -1205,7 +1205,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     }
 
     /**
-     * ⭐ 处理账单保存成功（支持编辑模式）
+     * 处理账单保存成功（支持编辑模式）
      */
     private void handleBillSaveSuccess() {
         isSaving = false;
@@ -1454,7 +1454,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
     }
 
     /**
-     * ⭐ 辅助方法：更新Bill对象的数据
+     * 辅助方法：更新Bill对象的数据
      */
     private void updateBillData(Bill bill, List<String> imageObjectKeys) {
         bill.setUserId(currentUserId);
@@ -1485,7 +1485,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
             bill.setLocalAccountId(-1L);
         }
 
-        // 🔑 转入账户 (用于转账/还款)
+        //  转入账户 (用于转账/还款)
         if ((billType == 2 || billType == 3) && selectedTargetAccount != null) {
             bill.setToAccountId(selectedTargetAccount.getObjectId());
             bill.setToLocalAccountId(selectedTargetAccount.getId());
@@ -1530,7 +1530,7 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         selectedLat = data.getDoubleExtra("location_lat", 0);
         selectedLng = data.getDoubleExtra("location_lng", 0);
 
-        // 🔴 修复：binding 可能因 Activity 重建或 onDestroy 后为 null，必须做保护
+        // binding 可能因 Activity 重建或 onDestroy 后为 null，必须做保护
         if (binding == null) return;
 
         if (selectedLocationName != null && !selectedLocationName.isEmpty()) {

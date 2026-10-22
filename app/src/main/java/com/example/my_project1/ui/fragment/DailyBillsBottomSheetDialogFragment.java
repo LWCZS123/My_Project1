@@ -171,12 +171,17 @@ public class DailyBillsBottomSheetDialogFragment extends BottomSheetDialogFragme
         binding.layoutEmpty.setVisibility(View.GONE);
         binding.rvDailyBills.setVisibility(View.VISIBLE);
 
-        List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(safeBills);
-        List<BillListAdapter.ListItem> items = new ArrayList<>(uiModels.size());
-        for (BillUiModel uiModel : uiModels) {
-            items.add(new BillListAdapter.ListItem(uiModel));
-        }
-        adapter.submitList(items);
+        AppExecutors.get().diskIO().execute(() -> {
+            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(safeBills);
+            List<BillListAdapter.ListItem> items = new ArrayList<>(uiModels.size());
+            for (BillUiModel uiModel : uiModels) {
+                items.add(new BillListAdapter.ListItem(uiModel));
+            }
+            AppExecutors.get().mainThread().execute(() -> {
+                if (binding == null) return;
+                adapter.submitList(items);
+            });
+        });
     }
 
     /**

@@ -4,19 +4,17 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.my_project1.R;
 import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
 import com.example.my_project1.data.model.tag.TagGroupWithTags;
+import com.example.my_project1.databinding.ItemAddTagChipBinding;
+import com.example.my_project1.databinding.ItemTagChipBinding;
 import com.example.my_project1.databinding.ItemTagGroupBinding;
 import com.example.my_project1.ui.view.FlowLayout;
-import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -117,49 +115,47 @@ public class TagGroupAdapter extends RecyclerView.Adapter<TagGroupAdapter.ViewHo
                 for (TagEntity tag : tags) {
                     if (tag.isArchived() || tag.isDeleted()) continue;
 
-                    View chipView = inflater.inflate(R.layout.item_tag_chip, flTags, false);
-                    MaterialCardView cardTag = chipView.findViewById(R.id.card_tag);
-                    TextView tvName = chipView.findViewById(R.id.tv_tag_name);
+                    ItemTagChipBinding chipBinding = ItemTagChipBinding.inflate(inflater, flTags, false);
 
                     String name = tag.getName();
                     if (name != null && !name.trim().startsWith("#")) {
                         name = "#" + name.trim();
                     }
-                    tvName.setText(name);
+                    chipBinding.tvTagName.setText(name);
 
                     if (tag.getBgColor() != null && !tag.getBgColor().isEmpty()) {
                         try {
-                            cardTag.setCardBackgroundColor(Color.parseColor(tag.getBgColor()));
+                            chipBinding.cardTag.setCardBackgroundColor(Color.parseColor(tag.getBgColor()));
                         } catch (Exception e) {
-                            cardTag.setCardBackgroundColor(Color.parseColor("#FFEEEF"));
+                            chipBinding.cardTag.setCardBackgroundColor(Color.parseColor("#FFEEEF"));
                         }
                     }
 
                     if (tag.getTextColor() != null && !tag.getTextColor().isEmpty()) {
                         try {
-                            tvName.setTextColor(Color.parseColor(tag.getTextColor()));
+                            chipBinding.tvTagName.setTextColor(Color.parseColor(tag.getTextColor()));
                         } catch (Exception e) {
-                            tvName.setTextColor(Color.parseColor("#FF5252"));
+                            chipBinding.tvTagName.setTextColor(Color.parseColor("#FF5252"));
                         }
                     }
 
-                    chipView.setOnClickListener(v -> {
+                    chipBinding.getRoot().setOnClickListener(v -> {
                         if (listener != null) {
                             listener.onTagClick(tag);
                         }
                     });
 
-                    flTags.addView(chipView);
+                    flTags.addView(chipBinding.getRoot());
                 }
             }
 
-            View addChipView = inflater.inflate(R.layout.item_add_tag_chip, flTags, false);
-            addChipView.setOnClickListener(v -> {
+            ItemAddTagChipBinding addChipBinding = ItemAddTagChipBinding.inflate(inflater, flTags, false);
+            addChipBinding.getRoot().setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onAddTagClick(group);
                 }
             });
-            flTags.addView(addChipView);
+            flTags.addView(addChipBinding.getRoot());
         }
     }
 }

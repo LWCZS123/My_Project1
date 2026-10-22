@@ -4,8 +4,6 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -13,33 +11,26 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.example.my_project1.R;
 import com.example.my_project1.data.model.tag.TagEntity;
+import com.example.my_project1.databinding.ActivityArchivedTagsBinding;
+import com.example.my_project1.databinding.ItemTagChipBinding;
 import com.example.my_project1.ui.fragment.DeleteConfirmDialogFragment;
-import com.example.my_project1.ui.view.FlowLayout;
 import com.example.my_project1.ui.viewmodel.tag.TagViewModel;
-import com.google.android.material.card.MaterialCardView;
 
 import java.util.List;
 
 public class ArchivedTagsActivity extends AppCompatActivity {
 
+    private ActivityArchivedTagsBinding binding;
     private TagViewModel tagViewModel;
-    private TextView tvEmpty;
-    private View cardContainer;
-    private FlowLayout flArchivedTags;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_archived_tags);
+        binding = ActivityArchivedTagsBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
-        ImageView ivBack = findViewById(R.id.iv_back);
-        if (ivBack != null) ivBack.setOnClickListener(v -> finish());
-
-        tvEmpty = findViewById(R.id.tv_empty);
-        cardContainer = findViewById(R.id.card_container);
-        flArchivedTags = findViewById(R.id.fl_archived_tags);
+        binding.ivBack.setOnClickListener(v -> finish());
 
         tagViewModel = new ViewModelProvider(this).get(TagViewModel.class);
 
@@ -53,48 +44,46 @@ public class ArchivedTagsActivity extends AppCompatActivity {
     }
 
     private void renderArchivedTags(List<TagEntity> tags) {
-        if (flArchivedTags == null) return;
-        flArchivedTags.removeAllViews();
+        if (binding == null) return;
+        binding.flArchivedTags.removeAllViews();
         if (tags == null || tags.isEmpty()) {
-            if (tvEmpty != null) tvEmpty.setVisibility(View.VISIBLE);
-            if (cardContainer != null) cardContainer.setVisibility(View.GONE);
+            binding.tvEmpty.setVisibility(View.VISIBLE);
+            binding.cardContainer.setVisibility(View.GONE);
             return;
         }
 
-        if (tvEmpty != null) tvEmpty.setVisibility(View.GONE);
-        if (cardContainer != null) cardContainer.setVisibility(View.VISIBLE);
+        binding.tvEmpty.setVisibility(View.GONE);
+        binding.cardContainer.setVisibility(View.VISIBLE);
 
         LayoutInflater inflater = LayoutInflater.from(this);
         for (TagEntity tag : tags) {
-            View chipView = inflater.inflate(R.layout.item_tag_chip, flArchivedTags, false);
-            MaterialCardView cardTag = chipView.findViewById(R.id.card_tag);
-            TextView tvName = chipView.findViewById(R.id.tv_tag_name);
+            ItemTagChipBinding chipBinding = ItemTagChipBinding.inflate(inflater, binding.flArchivedTags, false);
 
             String name = tag.getName();
             if (name != null && !name.trim().startsWith("#")) {
                 name = "#" + name.trim();
             }
-            tvName.setText(name);
+            chipBinding.tvTagName.setText(name);
 
             if (tag.getBgColor() != null && !tag.getBgColor().isEmpty()) {
                 try {
-                    cardTag.setCardBackgroundColor(Color.parseColor(tag.getBgColor()));
+                    chipBinding.cardTag.setCardBackgroundColor(Color.parseColor(tag.getBgColor()));
                 } catch (Exception e) {
-                    cardTag.setCardBackgroundColor(Color.parseColor("#EEEEEE"));
+                    chipBinding.cardTag.setCardBackgroundColor(Color.parseColor("#EEEEEE"));
                 }
             }
 
             if (tag.getTextColor() != null && !tag.getTextColor().isEmpty()) {
                 try {
-                    tvName.setTextColor(Color.parseColor(tag.getTextColor()));
+                    chipBinding.tvTagName.setTextColor(Color.parseColor(tag.getTextColor()));
                 } catch (Exception e) {
-                    tvName.setTextColor(Color.parseColor("#666666"));
+                    chipBinding.tvTagName.setTextColor(Color.parseColor("#666666"));
                 }
             }
 
-            chipView.setOnClickListener(v -> showArchivedTagOptions(tag));
+            chipBinding.getRoot().setOnClickListener(v -> showArchivedTagOptions(tag));
 
-            flArchivedTags.addView(chipView);
+            binding.flArchivedTags.addView(chipBinding.getRoot());
         }
     }
 
@@ -115,5 +104,11 @@ public class ArchivedTagsActivity extends AppCompatActivity {
                     }
                 })
                 .show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        binding = null;
     }
 }

@@ -5,11 +5,9 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.PopupWindow;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -21,10 +19,10 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
-import com.example.my_project1.R;
 import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
 import com.example.my_project1.databinding.ActivityTagManagementBinding;
+import com.example.my_project1.databinding.LayoutAddTagPopupBinding;
 import com.example.my_project1.ui.adapter.tag.TagGroupAdapter;
 import com.example.my_project1.ui.fragment.tag.AddTagGroupBottomSheetFragment;
 import com.example.my_project1.ui.fragment.tag.EditTagBottomSheetFragment;
@@ -79,7 +77,7 @@ public class TagManagementActivity extends AppCompatActivity {
             Toast.makeText(this, isChecked ? "已开启标签" : "已关闭标签", Toast.LENGTH_SHORT).show();
         });
 
-        binding.btnAdd.setOnClickListener(v -> showAddMenuPopupWindow(v));
+        binding.btnAdd.setOnClickListener(this::showAddMenuPopupWindow);
 
         adapter = new TagGroupAdapter();
         adapter.setOnTagGroupClickListener(new TagGroupAdapter.OnTagGroupClickListener() {
@@ -133,10 +131,10 @@ public class TagManagementActivity extends AppCompatActivity {
     }
 
     private void showAddMenuPopupWindow(View anchorView) {
-        View popupView = LayoutInflater.from(this).inflate(R.layout.layout_add_tag_popup, null);
+        LayoutAddTagPopupBinding popupBinding = LayoutAddTagPopupBinding.inflate(getLayoutInflater());
 
         PopupWindow popupWindow = new PopupWindow(
-                popupView,
+                popupBinding.getRoot(),
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 true
@@ -146,25 +144,28 @@ public class TagManagementActivity extends AppCompatActivity {
         popupWindow.setElevation(8f);
         popupWindow.setOutsideTouchable(true);
 
-        TextView tvAddTag = popupView.findViewById(R.id.tv_add_tag);
-        TextView tvAddGroup = popupView.findViewById(R.id.tv_add_group);
-
-        tvAddTag.setOnClickListener(v -> {
+        popupBinding.tvAddTag.setOnClickListener(v -> {
             popupWindow.dismiss();
             EditTagBottomSheetFragment fragment = EditTagBottomSheetFragment.newInstance();
             fragment.show(getSupportFragmentManager(), "EditTagBottomSheetFragment");
         });
 
-        tvAddGroup.setOnClickListener(v -> {
+        popupBinding.tvAddGroup.setOnClickListener(v -> {
             popupWindow.dismiss();
             AddTagGroupBottomSheetFragment fragment = AddTagGroupBottomSheetFragment.newInstance();
             fragment.show(getSupportFragmentManager(), "AddTagGroupBottomSheetFragment");
         });
 
-        popupView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        int popupWidth = popupView.getMeasuredWidth();
+        popupBinding.getRoot().measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int popupWidth = popupBinding.getRoot().getMeasuredWidth();
         int density = (int) getResources().getDisplayMetrics().density;
         int xOffset = anchorView.getWidth() - popupWidth;
         popupWindow.showAsDropDown(anchorView, xOffset, 8 * density);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        binding = null;
     }
 }

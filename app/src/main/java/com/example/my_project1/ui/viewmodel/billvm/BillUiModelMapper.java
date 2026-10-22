@@ -64,7 +64,12 @@ public class BillUiModelMapper {
         for (Bill bill : bills) {
             if (bill == null) continue;
 
-            List<com.example.my_project1.data.model.tag.TagEntity> tags = crossRefDao.getTagsForBillSync(bill.getId());
+            List<com.example.my_project1.data.model.tag.TagEntity> tags;
+            try {
+                tags = crossRefDao.getTagsForBillSync(bill.getId());
+            } catch (Exception e) {
+                tags = new ArrayList<>();
+            }
 
             // 生成唯一缓存 Key：ID + 更新时间点 + 标签Hash
             long updateTime = bill.getUpdatedAt() != null ? bill.getUpdatedAt().getTime() : 0L;

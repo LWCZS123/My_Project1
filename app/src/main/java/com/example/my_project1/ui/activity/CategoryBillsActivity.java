@@ -159,33 +159,39 @@ public class CategoryBillsActivity extends AppCompatActivity {
                 }
             }
 
-            AppExecutors.get().mainThread().execute(() -> filterAndProcess(targetId, targetName, bills));
+            filterAndProcessInternal(targetId, targetName, bills);
         });
     }
 
     private void filterAndProcess(String targetId, String targetName, List<Bill> bills) {
+        AppExecutors.get().diskIO().execute(() -> filterAndProcessInternal(targetId, targetName, bills));
+    }
+
+    private void filterAndProcessInternal(String targetId, String targetName, List<Bill> bills) {
         List<Bill> result = new ArrayList<>();
-        for (Bill b : bills) {
-            String bid = b.getCategoryId();
-            String bName = b.getCategoryName();
+        if (bills != null) {
+            for (Bill b : bills) {
+                String bid = b.getCategoryId();
+                String bName = b.getCategoryName();
 
-            // 1. 优先使用 ID 匹配
-            if (targetId != null && bid != null) {
-                if (bid.equals(targetId)) {
-                    result.add(b);
-                    continue;
+                // 1. 优先使用 ID 匹配
+                if (targetId != null && bid != null) {
+                    if (bid.equals(targetId)) {
+                        result.add(b);
+                        continue;
+                    }
+                    String pid = childToParentMap.get(bid);
+                    if (targetId.equals(pid)) {
+                        result.add(b);
+                        continue;
+                    }
                 }
-                String pid = childToParentMap.get(bid);
-                if (targetId.equals(pid)) {
-                    result.add(b);
-                    continue;
-                }
-            }
 
-            // 2. 兜底使用名称匹配
-            if (targetName != null && bName != null) {
-                if (targetName.equals(bName)) {
-                    result.add(b);
+                // 2. 兜底使用名称匹配
+                if (targetName != null && bName != null) {
+                    if (targetName.equals(bName)) {
+                        result.add(b);
+                    }
                 }
             }
         }
@@ -195,13 +201,10 @@ public class CategoryBillsActivity extends AppCompatActivity {
     private String lastFingerprint = "";
 
     private void processBills(List<Bill> bills) {
-        // 更新笔数
-        binding.tvBillCount.setText(bills.size() + "笔账单");
-
         // 2. 指纹比对：ID + 数量 + 最后更新时间 (简单版本)
         String fingerprint = buildFingerprint(bills);
         if (fingerprint.equals(lastFingerprint)) {
-            hideLoading();
+            AppExecutors.get().mainThread().execute(this::hideLoading);
             return;
         }
         lastFingerprint = fingerprint;
@@ -214,10 +217,16 @@ public class CategoryBillsActivity extends AppCompatActivity {
         });
 
         List<BillListAdapter.ListItem> listItems = buildGroupedList(bills);
-        boolean empty = listItems.isEmpty();
-        binding.rvBills.setVisibility(empty ? View.GONE : View.VISIBLE);
-        binding.layoutEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        adapter.submitList(listItems, this::hideLoading);
+
+        AppExecutors.get().mainThread().execute(() -> {
+            if (isFinishing() || isDestroyed() || binding == null) return;
+            // 更新笔数
+            binding.tvBillCount.setText(bills.size() + "笔账单");
+            boolean empty = listItems.isEmpty();
+            binding.rvBills.setVisibility(empty ? View.GONE : View.VISIBLE);
+            binding.layoutEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            adapter.submitList(listItems, this::hideLoading);
+        });
     }
 
     private String buildFingerprint(List<Bill> bills) {

@@ -32,6 +32,7 @@ import com.example.my_project1.ui.fragment.CategoryBudgetMenuFragment;
 import com.example.my_project1.ui.viewmodel.billvm.BillUiModel;
 import com.example.my_project1.ui.viewmodel.billvm.BillViewModel;
 import com.example.my_project1.ui.viewmodel.budget.CategoryBudgetDetailViewModel;
+import com.example.my_project1.utils.AppExecutors;
 import com.example.my_project1.utils.GlideImageLoader;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
@@ -355,18 +356,28 @@ public class CategoryBudgetDetailActivity extends AppCompatActivity {
         vm.billsLive.observe(this, bills -> {
             // Bills are queried by ViewModel according to effectiveStartTime/endTime
             binding.tvBillCount.setText(String.format(Locale.getDefault(), "共 %d 笔消费", bills != null ? bills.size() : 0));
-            List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
-            billAdapter.submitList(uiModels, this::hideLoading);
-            binding.tvEmptyBills.setVisibility(
-                    (bills == null || bills.isEmpty()) ? View.VISIBLE : View.GONE);
+            AppExecutors.get().diskIO().execute(() -> {
+                List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(bills);
+                AppExecutors.get().mainThread().execute(() -> {
+                    if (isFinishing() || isDestroyed() || binding == null) return;
+                    billAdapter.submitList(uiModels, this::hideLoading);
+                    binding.tvEmptyBills.setVisibility(
+                            (bills == null || bills.isEmpty()) ? View.VISIBLE : View.GONE);
+                });
+            });
         });
 
         // Trigger UI refresh when accounts are loaded to ensure correct account names
         billViewModel.getAllAccountsLive().observe(this, accounts -> {
             List<Bill> currentBills = vm.billsLive.getValue();
             if (currentBills != null && !currentBills.isEmpty()) {
-                List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(currentBills);
-                billAdapter.submitList(uiModels);
+                AppExecutors.get().diskIO().execute(() -> {
+                    List<BillUiModel> uiModels = billViewModel.mapBillsToUiModels(currentBills);
+                    AppExecutors.get().mainThread().execute(() -> {
+                        if (isFinishing() || isDestroyed() || binding == null) return;
+                        billAdapter.submitList(uiModels);
+                    });
+                });
             }
         });
     }

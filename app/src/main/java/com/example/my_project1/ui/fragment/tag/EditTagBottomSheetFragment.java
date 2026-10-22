@@ -9,7 +9,6 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -23,6 +22,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
+import com.example.my_project1.databinding.FragmentEditTagBottomSheetBinding;
 import com.example.my_project1.ui.dialog.CustomColorPickerDialog;
 import com.example.my_project1.ui.viewmodel.tag.TagViewModel;
 import com.example.my_project1.utils.BottomSheetNavigationBarUtils;
@@ -39,6 +39,7 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
     private static final String ARG_TAG = "arg_tag";
     private static final String ARG_GROUP_ID = "arg_group_id";
 
+    private FragmentEditTagBottomSheetBinding binding;
     private TagViewModel tagViewModel;
 
     private TagEntity editingTag;
@@ -48,21 +49,6 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
     private String selectedBgColor = "#FFF3E0";
     private String selectedTextColor = "#FF9800";
     private boolean isCustomColor = false;
-
-    // View references
-    private TextView tvTitleHeader;
-    private ImageView btnCancel;
-    private TextView btnComplete;
-    private EditText etTagName;
-    private ImageView ivClear;
-    private LinearLayout llGroupChips;
-    private TextView btnModeSystem;
-    private TextView btnModeCustom;
-    private LinearLayout llColorPalette;
-    private MaterialCardView cardTagPreview;
-    private ImageView ivTagPreviewIcon;
-    private TextView tvPreviewName;
-    private MaterialCardView btnSaveTag;
 
     public static EditTagBottomSheetFragment newInstance() {
         return new EditTagBottomSheetFragment();
@@ -115,27 +101,14 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_edit_tag_bottom_sheet, container, false);
+        binding = FragmentEditTagBottomSheetBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         tagViewModel = new ViewModelProvider(requireActivity()).get(TagViewModel.class);
-
-        tvTitleHeader = view.findViewById(R.id.tv_title_header);
-        btnCancel = view.findViewById(R.id.btn_cancel);
-        btnComplete = view.findViewById(R.id.btn_complete);
-        etTagName = view.findViewById(R.id.et_tag_name);
-        ivClear = view.findViewById(R.id.iv_clear);
-        llGroupChips = view.findViewById(R.id.ll_group_chips);
-        btnModeSystem = view.findViewById(R.id.btn_mode_system);
-        btnModeCustom = view.findViewById(R.id.btn_mode_custom);
-        llColorPalette = view.findViewById(R.id.ll_color_palette);
-        cardTagPreview = view.findViewById(R.id.card_tag_preview);
-        ivTagPreviewIcon = view.findViewById(R.id.iv_tag_preview_icon);
-        tvPreviewName = view.findViewById(R.id.tv_preview_name);
-        btnSaveTag = view.findViewById(R.id.btn_save_tag);
 
         initViews();
         loadGroupChips();
@@ -144,14 +117,12 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
 
     private void initViews() {
         if (editingTag != null) {
-            if (tvTitleHeader != null) tvTitleHeader.setText("修改标签");
-            if (etTagName != null) {
-                etTagName.setText(editingTag.getName());
-                if (editingTag.getName() != null) {
-                    etTagName.setSelection(editingTag.getName().length());
-                    if (tvPreviewName != null) tvPreviewName.setText(editingTag.getName());
-                    if (ivClear != null) ivClear.setVisibility(View.VISIBLE);
-                }
+            binding.tvTitleHeader.setText("修改标签");
+            binding.etTagName.setText(editingTag.getName());
+            if (editingTag.getName() != null) {
+                binding.etTagName.setSelection(editingTag.getName().length());
+                binding.tvPreviewName.setText(editingTag.getName());
+                binding.ivClear.setVisibility(View.VISIBLE);
             }
             selectedGroupId = editingTag.getGroupId();
             if (editingTag.getBgColor() != null) {
@@ -163,7 +134,7 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
                 selectedTextColor = TagColorUtils.calculateTextColor(selectedBgColor);
             }
         } else {
-            if (tvTitleHeader != null) tvTitleHeader.setText("添加标签");
+            binding.tvTitleHeader.setText("添加标签");
             selectedGroupId = preselectedGroupId;
             List<TagColorUtils.ColorOption> presets = TagColorUtils.getPresetColors();
             if (!presets.isEmpty()) {
@@ -174,85 +145,72 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
 
         updatePreviewColor();
 
-        if (btnCancel != null) btnCancel.setOnClickListener(v -> dismiss());
-        if (btnComplete != null) btnComplete.setOnClickListener(v -> saveTag());
-        if (btnSaveTag != null) btnSaveTag.setOnClickListener(v -> saveTag());
+        binding.btnCancel.setOnClickListener(v -> dismiss());
+        binding.btnComplete.setOnClickListener(v -> saveTag());
+        binding.btnSaveTag.setOnClickListener(v -> saveTag());
 
-        if (ivClear != null) {
-            ivClear.setOnClickListener(v -> {
-                if (etTagName != null) etTagName.setText("");
-                if (tvPreviewName != null) tvPreviewName.setText("预览标签");
-            });
-        }
+        binding.ivClear.setOnClickListener(v -> {
+            binding.etTagName.setText("");
+            binding.tvPreviewName.setText("预览标签");
+        });
 
-        if (etTagName != null) {
-            etTagName.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        binding.etTagName.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    int len = s != null ? s.length() : 0;
-                    if (ivClear != null) ivClear.setVisibility(len > 0 ? View.VISIBLE : View.GONE);
-                    if (tvPreviewName != null) {
-                        if (len > 0) {
-                            tvPreviewName.setText(s.toString());
-                        } else {
-                            tvPreviewName.setText("预览标签");
-                        }
-                    }
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                int len = s != null ? s.length() : 0;
+                binding.ivClear.setVisibility(len > 0 ? View.VISIBLE : View.GONE);
+                if (len > 0) {
+                    binding.tvPreviewName.setText(s.toString());
+                } else {
+                    binding.tvPreviewName.setText("预览标签");
                 }
+            }
 
-                @Override
-                public void afterTextChanged(Editable s) {}
-            });
-        }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
 
-        if (btnModeSystem != null) {
-            btnModeSystem.setOnClickListener(v -> {
-                isCustomColor = false;
-                btnModeSystem.setBackgroundResource(R.drawable.bg_button_blue_rounded);
-                btnModeSystem.setTextColor(Color.WHITE);
-                if (btnModeCustom != null) {
-                    btnModeCustom.setBackground(null);
-                    btnModeCustom.setTextColor(Color.parseColor("#666666"));
-                }
-                loadColorPalette();
-            });
-        }
+        binding.btnModeSystem.setOnClickListener(v -> {
+            isCustomColor = false;
+            binding.btnModeSystem.setBackgroundResource(R.drawable.bg_button_blue_rounded);
+            binding.btnModeSystem.setTextColor(Color.WHITE);
+            binding.btnModeCustom.setBackground(null);
+            binding.btnModeCustom.setTextColor(Color.parseColor("#666666"));
+            loadColorPalette();
+        });
 
-        if (btnModeCustom != null) {
-            btnModeCustom.setOnClickListener(v -> {
-                isCustomColor = true;
-                btnModeCustom.setBackgroundResource(R.drawable.bg_button_blue_rounded);
-                btnModeCustom.setTextColor(Color.WHITE);
-                if (btnModeSystem != null) {
-                    btnModeSystem.setBackground(null);
-                    btnModeSystem.setTextColor(Color.parseColor("#666666"));
-                }
-                showCustomColorDialog();
-            });
-        }
+        binding.btnModeCustom.setOnClickListener(v -> {
+            isCustomColor = true;
+            binding.btnModeCustom.setBackgroundResource(R.drawable.bg_button_blue_rounded);
+            binding.btnModeCustom.setTextColor(Color.WHITE);
+            binding.btnModeSystem.setBackground(null);
+            binding.btnModeSystem.setTextColor(Color.parseColor("#666666"));
+            showCustomColorDialog();
+        });
     }
 
     private void updatePreviewColor() {
+        if (binding == null) return;
         try {
             int bg = Color.parseColor(selectedBgColor);
             int txt = Color.parseColor(selectedTextColor);
-            if (cardTagPreview != null) cardTagPreview.setCardBackgroundColor(bg);
-            if (ivTagPreviewIcon != null) ivTagPreviewIcon.setColorFilter(txt);
-            if (tvPreviewName != null) tvPreviewName.setTextColor(txt);
+            binding.cardTagPreview.setCardBackgroundColor(bg);
+            binding.ivTagPreviewIcon.setColorFilter(txt);
+            binding.tvPreviewName.setTextColor(txt);
         } catch (Exception e) {
-            if (cardTagPreview != null) cardTagPreview.setCardBackgroundColor(Color.parseColor("#FFF3E0"));
-            if (ivTagPreviewIcon != null) ivTagPreviewIcon.setColorFilter(Color.parseColor("#FF9800"));
-            if (tvPreviewName != null) tvPreviewName.setTextColor(Color.parseColor("#FF9800"));
+            binding.cardTagPreview.setCardBackgroundColor(Color.parseColor("#FFF3E0"));
+            binding.ivTagPreviewIcon.setColorFilter(Color.parseColor("#FF9800"));
+            binding.tvPreviewName.setTextColor(Color.parseColor("#FF9800"));
         }
     }
 
     private void loadGroupChips() {
         tagViewModel.getActiveGroups().observe(getViewLifecycleOwner(), groups -> {
-            if (llGroupChips == null) return;
-            llGroupChips.removeAllViews();
+            if (binding == null || binding.llGroupChips == null) return;
+            binding.llGroupChips.removeAllViews();
             if (groups == null || groups.isEmpty()) return;
 
             if (selectedGroupId <= 0) {
@@ -265,7 +223,7 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
 
             LayoutInflater inflater = LayoutInflater.from(requireContext());
             for (TagGroupEntity group : groups) {
-                TextView chip = (TextView) inflater.inflate(android.R.layout.simple_list_item_1, llGroupChips, false);
+                TextView chip = (TextView) inflater.inflate(android.R.layout.simple_list_item_1, binding.llGroupChips, false);
                 chip.setText(group.getName());
                 chip.setTextSize(13f);
                 chip.setPadding(36, 16, 36, 16);
@@ -291,14 +249,14 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
                     loadGroupChips();
                 });
 
-                llGroupChips.addView(chip);
+                binding.llGroupChips.addView(chip);
             }
         });
     }
 
     private void loadColorPalette() {
-        if (llColorPalette == null) return;
-        llColorPalette.removeAllViews();
+        if (binding == null || binding.llColorPalette == null) return;
+        binding.llColorPalette.removeAllViews();
         List<TagColorUtils.ColorOption> presets = TagColorUtils.getPresetColors();
         int density = (int) getResources().getDisplayMetrics().density;
         int size = 42 * density;
@@ -325,18 +283,14 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
 
         rainbowCard.setOnClickListener(v -> {
             isCustomColor = true;
-            if (btnModeCustom != null) {
-                btnModeCustom.setBackgroundResource(R.drawable.bg_button_blue_rounded);
-                btnModeCustom.setTextColor(Color.WHITE);
-            }
-            if (btnModeSystem != null) {
-                btnModeSystem.setBackground(null);
-                btnModeSystem.setTextColor(Color.parseColor("#666666"));
-            }
+            binding.btnModeCustom.setBackgroundResource(R.drawable.bg_button_blue_rounded);
+            binding.btnModeCustom.setTextColor(Color.WHITE);
+            binding.btnModeSystem.setBackground(null);
+            binding.btnModeSystem.setTextColor(Color.parseColor("#666666"));
             showCustomColorDialog();
         });
 
-        llColorPalette.addView(rainbowCard);
+        binding.llColorPalette.addView(rainbowCard);
 
         // Preset Colors
         for (TagColorUtils.ColorOption option : presets) {
@@ -367,14 +321,10 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
 
             card.setOnClickListener(v -> {
                 isCustomColor = false;
-                if (btnModeSystem != null) {
-                    btnModeSystem.setBackgroundResource(R.drawable.bg_button_blue_rounded);
-                    btnModeSystem.setTextColor(Color.WHITE);
-                }
-                if (btnModeCustom != null) {
-                    btnModeCustom.setBackground(null);
-                    btnModeCustom.setTextColor(Color.parseColor("#666666"));
-                }
+                binding.btnModeSystem.setBackgroundResource(R.drawable.bg_button_blue_rounded);
+                binding.btnModeSystem.setTextColor(Color.WHITE);
+                binding.btnModeCustom.setBackground(null);
+                binding.btnModeCustom.setTextColor(Color.parseColor("#666666"));
 
                 selectedBgColor = option.bgColor;
                 selectedTextColor = option.textColor;
@@ -382,7 +332,7 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
                 loadColorPalette();
             });
 
-            llColorPalette.addView(card);
+            binding.llColorPalette.addView(card);
         }
     }
 
@@ -399,7 +349,7 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     private void saveTag() {
-        String name = (etTagName != null && etTagName.getText() != null) ? etTagName.getText().toString().trim() : "";
+        String name = (binding != null && binding.etTagName.getText() != null) ? binding.etTagName.getText().toString().trim() : "";
         if (name.isEmpty()) {
             Toast.makeText(requireContext(), "请输入标签名称", Toast.LENGTH_SHORT).show();
             return;
@@ -421,5 +371,11 @@ public class EditTagBottomSheetFragment extends BottomSheetDialogFragment {
 
         tagViewModel.saveTag(editingTag);
         dismiss();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 }

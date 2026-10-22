@@ -10,10 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -22,6 +19,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
+import com.example.my_project1.databinding.FragmentAddTagGroupBottomSheetBinding;
 import com.example.my_project1.ui.viewmodel.tag.TagViewModel;
 import com.example.my_project1.utils.BottomSheetNavigationBarUtils;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -32,11 +30,9 @@ public class AddTagGroupBottomSheetFragment extends BottomSheetDialogFragment {
 
     private static final String ARG_GROUP = "arg_group";
 
+    private FragmentAddTagGroupBottomSheetBinding binding;
     private TagViewModel tagViewModel;
     private TagGroupEntity editingGroup;
-
-    private EditText etGroupName;
-    private ImageView ivClear;
 
     public static AddTagGroupBottomSheetFragment newInstance() {
         return new AddTagGroupBottomSheetFragment();
@@ -83,7 +79,8 @@ public class AddTagGroupBottomSheetFragment extends BottomSheetDialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_add_tag_group_bottom_sheet, container, false);
+        binding = FragmentAddTagGroupBottomSheetBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
     @Override
@@ -91,55 +88,39 @@ public class AddTagGroupBottomSheetFragment extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
         tagViewModel = new ViewModelProvider(requireActivity()).get(TagViewModel.class);
 
-        TextView tvTitleGroup = view.findViewById(R.id.tv_title_group);
-        ImageView btnCancel = view.findViewById(R.id.btn_cancel);
-        TextView btnComplete = view.findViewById(R.id.btn_complete);
-        etGroupName = view.findViewById(R.id.et_group_name);
-        ivClear = view.findViewById(R.id.iv_clear);
-
         if (editingGroup != null) {
-            if (tvTitleGroup != null) tvTitleGroup.setText("修改分组");
-            if (etGroupName != null) {
-                etGroupName.setText(editingGroup.getName());
-                if (editingGroup.getName() != null) {
-                    etGroupName.setSelection(editingGroup.getName().length());
-                }
+            binding.tvTitleGroup.setText("修改分组");
+            binding.etGroupName.setText(editingGroup.getName());
+            if (editingGroup.getName() != null) {
+                binding.etGroupName.setSelection(editingGroup.getName().length());
             }
-            if (ivClear != null) ivClear.setVisibility(View.VISIBLE);
+            binding.ivClear.setVisibility(View.VISIBLE);
         } else {
-            if (tvTitleGroup != null) tvTitleGroup.setText("创建新分组");
+            binding.tvTitleGroup.setText("创建新分组");
         }
 
-        if (btnCancel != null) btnCancel.setOnClickListener(v -> dismiss());
-        if (btnComplete != null) btnComplete.setOnClickListener(v -> submit());
+        binding.btnCancel.setOnClickListener(v -> dismiss());
+        binding.btnComplete.setOnClickListener(v -> submit());
 
-        if (ivClear != null) {
-            ivClear.setOnClickListener(v -> {
-                if (etGroupName != null) etGroupName.setText("");
-            });
-        }
+        binding.ivClear.setOnClickListener(v -> binding.etGroupName.setText(""));
 
-        if (etGroupName != null) {
-            etGroupName.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        binding.etGroupName.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    if (ivClear != null) {
-                        ivClear.setVisibility(s != null && s.length() > 0 ? View.VISIBLE : View.GONE);
-                    }
-                }
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                binding.ivClear.setVisibility(s != null && s.length() > 0 ? View.VISIBLE : View.GONE);
+            }
 
-                @Override
-                public void afterTextChanged(Editable s) {}
-            });
-            etGroupName.requestFocus();
-        }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+        binding.etGroupName.requestFocus();
     }
 
     private void submit() {
-        String name = (etGroupName != null && etGroupName.getText() != null) ? etGroupName.getText().toString().trim() : "";
+        String name = binding.etGroupName.getText() != null ? binding.etGroupName.getText().toString().trim() : "";
 
         if (TextUtils.isEmpty(name)) {
             Toast.makeText(requireContext(), "请输入分组名称", Toast.LENGTH_SHORT).show();
@@ -152,5 +133,11 @@ public class AddTagGroupBottomSheetFragment extends BottomSheetDialogFragment {
             tagViewModel.createGroup(name);
         }
         dismiss();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 }

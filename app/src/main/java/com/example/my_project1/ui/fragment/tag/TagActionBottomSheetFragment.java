@@ -8,7 +8,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,6 +16,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.my_project1.R;
 import com.example.my_project1.data.model.tag.TagEntity;
 import com.example.my_project1.data.model.tag.TagGroupEntity;
+import com.example.my_project1.databinding.FragmentTagActionBottomSheetBinding;
 import com.example.my_project1.ui.activity.SearchActivity;
 import com.example.my_project1.ui.fragment.DeleteConfirmDialogFragment;
 import com.example.my_project1.ui.viewmodel.tag.TagViewModel;
@@ -30,17 +30,10 @@ public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
     private static final String ARG_TAG = "arg_tag";
     private static final String ARG_GROUP = "arg_group";
 
+    private FragmentTagActionBottomSheetBinding binding;
     private TagEntity tag;
     private TagGroupEntity group;
     private TagViewModel tagViewModel;
-
-    private TextView tvTagTitle;
-    private TextView btnActionEdit;
-    private TextView btnActionSort;
-    private TextView btnActionMoveGroup;
-    private TextView btnActionViewBills;
-    private TextView btnActionArchive;
-    private TextView btnActionDelete;
 
     public static TagActionBottomSheetFragment newInstance(TagEntity tag) {
         TagActionBottomSheetFragment fragment = new TagActionBottomSheetFragment();
@@ -89,21 +82,14 @@ public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_tag_action_bottom_sheet, container, false);
+        binding = FragmentTagActionBottomSheetBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         tagViewModel = new ViewModelProvider(requireActivity()).get(TagViewModel.class);
-
-        tvTagTitle = view.findViewById(R.id.tv_tag_title);
-        btnActionEdit = view.findViewById(R.id.btn_action_edit);
-        btnActionSort = view.findViewById(R.id.btn_action_sort);
-        btnActionMoveGroup = view.findViewById(R.id.btn_action_move_group);
-        btnActionViewBills = view.findViewById(R.id.btn_action_view_bills);
-        btnActionArchive = view.findViewById(R.id.btn_action_archive);
-        btnActionDelete = view.findViewById(R.id.btn_action_delete);
 
         if (tag != null) {
             setupForTag();
@@ -115,96 +101,78 @@ public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     private void setupForTag() {
-        if (tvTagTitle != null) tvTagTitle.setText(tag.getName());
-        if (btnActionEdit != null) btnActionEdit.setText("修改");
-        if (btnActionSort != null) btnActionSort.setText("排序");
-        if (btnActionMoveGroup != null) btnActionMoveGroup.setText("移动分组");
-        if (btnActionArchive != null) btnActionArchive.setText(tag.isArchived() ? "取消归档" : "归档");
+        binding.tvTagTitle.setText(tag.getName());
+        binding.btnActionEdit.setText("修改");
+        binding.btnActionSort.setText("排序");
+        binding.btnActionMoveGroup.setText("移动分组");
+        binding.btnActionArchive.setText(tag.isArchived() ? "取消归档" : "归档");
 
-        if (btnActionEdit != null) {
-            btnActionEdit.setOnClickListener(v -> {
-                dismiss();
-                EditTagBottomSheetFragment editFragment = EditTagBottomSheetFragment.newInstance(tag);
-                editFragment.show(getParentFragmentManager(), "EditTagBottomSheetFragment");
-            });
-        }
+        binding.btnActionEdit.setOnClickListener(v -> {
+            dismiss();
+            EditTagBottomSheetFragment editFragment = EditTagBottomSheetFragment.newInstance(tag);
+            editFragment.show(getParentFragmentManager(), "EditTagBottomSheetFragment");
+        });
 
-        if (btnActionSort != null) {
-            btnActionSort.setOnClickListener(v -> {
-                dismiss();
-                tagViewModel.sortTagsInGroup(tag.getGroupId());
-            });
-        }
+        binding.btnActionSort.setOnClickListener(v -> {
+            dismiss();
+            tagViewModel.sortTagsInGroup(tag.getGroupId());
+        });
 
-        if (btnActionMoveGroup != null) btnActionMoveGroup.setOnClickListener(v -> showMoveGroupDialog());
+        binding.btnActionMoveGroup.setOnClickListener(v -> showMoveGroupDialog());
 
-        if (btnActionViewBills != null) {
-            btnActionViewBills.setOnClickListener(v -> {
-                dismiss();
-                Intent intent = new Intent(requireContext(), SearchActivity.class);
-                intent.putExtra("search_tag_id", tag.getId());
-                intent.putExtra("search_tag_name", tag.getName());
-                startActivity(intent);
-            });
-        }
+        binding.btnActionViewBills.setOnClickListener(v -> {
+            dismiss();
+            Intent intent = new Intent(requireContext(), SearchActivity.class);
+            intent.putExtra("search_tag_id", tag.getId());
+            intent.putExtra("search_tag_name", tag.getName());
+            startActivity(intent);
+        });
 
-        if (btnActionArchive != null) {
-            btnActionArchive.setOnClickListener(v -> {
-                dismiss();
-                tagViewModel.toggleTagArchive(tag.getId(), !tag.isArchived());
-            });
-        }
+        binding.btnActionArchive.setOnClickListener(v -> {
+            dismiss();
+            tagViewModel.toggleTagArchive(tag.getId(), !tag.isArchived());
+        });
 
-        if (btnActionDelete != null) {
-            btnActionDelete.setOnClickListener(v -> {
-                dismiss();
-                showDeleteConfirmDialog();
-            });
-        }
+        binding.btnActionDelete.setOnClickListener(v -> {
+            dismiss();
+            showDeleteConfirmDialog();
+        });
     }
 
     private void setupForGroup() {
-        if (tvTagTitle != null) tvTagTitle.setText(group.getName());
-        if (btnActionEdit != null) btnActionEdit.setText("修改分组");
-        if (btnActionSort != null) btnActionSort.setText("标签排序");
-        if (btnActionMoveGroup != null) btnActionMoveGroup.setText("新建标签");
+        binding.tvTagTitle.setText(group.getName());
+        binding.btnActionEdit.setText("修改分组");
+        binding.btnActionSort.setText("标签排序");
+        binding.btnActionMoveGroup.setText("新建标签");
 
-        if (btnActionViewBills != null) btnActionViewBills.setVisibility(View.GONE);
-        if (btnActionArchive != null) btnActionArchive.setVisibility(View.GONE);
+        binding.btnActionViewBills.setVisibility(View.GONE);
+        binding.btnActionArchive.setVisibility(View.GONE);
 
-        if (btnActionEdit != null) {
-            btnActionEdit.setOnClickListener(v -> {
-                dismiss();
-                AddTagGroupBottomSheetFragment addGroupFragment = AddTagGroupBottomSheetFragment.newInstance(group);
-                addGroupFragment.show(getParentFragmentManager(), "AddTagGroupBottomSheetFragment");
-            });
-        }
+        binding.btnActionEdit.setOnClickListener(v -> {
+            dismiss();
+            AddTagGroupBottomSheetFragment addGroupFragment = AddTagGroupBottomSheetFragment.newInstance(group);
+            addGroupFragment.show(getParentFragmentManager(), "AddTagGroupBottomSheetFragment");
+        });
 
-        if (btnActionSort != null) {
-            btnActionSort.setOnClickListener(v -> {
-                dismiss();
-                tagViewModel.sortTagsInGroup(group.getId());
-            });
-        }
+        binding.btnActionSort.setOnClickListener(v -> {
+            dismiss();
+            tagViewModel.sortTagsInGroup(group.getId());
+        });
 
-        if (btnActionMoveGroup != null) {
-            btnActionMoveGroup.setOnClickListener(v -> {
-                dismiss();
-                EditTagBottomSheetFragment editTagFragment = EditTagBottomSheetFragment.newInstanceForGroup(group.getId());
-                editTagFragment.show(getParentFragmentManager(), "EditTagBottomSheetFragment");
-            });
-        }
+        binding.btnActionMoveGroup.setOnClickListener(v -> {
+            dismiss();
+            EditTagBottomSheetFragment editTagFragment = EditTagBottomSheetFragment.newInstanceForGroup(group.getId());
+            editTagFragment.show(getParentFragmentManager(), "EditTagBottomSheetFragment");
+        });
 
         if (group.isDefault()) {
-            if (btnActionDelete != null) btnActionDelete.setVisibility(View.GONE);
+            binding.btnActionDelete.setVisibility(View.GONE);
         } else {
-            if (btnActionDelete != null) {
-                btnActionDelete.setText("删除分组");
-                btnActionDelete.setOnClickListener(v -> {
-                    dismiss();
-                    showDeleteGroupConfirmDialog();
-                });
-            }
+            binding.btnActionDelete.setText("删除分组");
+            binding.btnActionDelete.setOnClickListener(v -> {
+                dismiss();
+                showDeleteGroupConfirmDialog();
+            });
         }
     }
 
@@ -239,5 +207,11 @@ public class TagActionBottomSheetFragment extends BottomSheetDialogFragment {
         );
         dialog.setOnDeleteConfirmListener(() -> tagViewModel.deleteTag(tag.getId()));
         dialog.show(getParentFragmentManager(), "DeleteConfirmDialogFragment");
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 }
