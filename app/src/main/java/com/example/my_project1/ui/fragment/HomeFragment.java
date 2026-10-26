@@ -168,10 +168,9 @@ public class HomeFragment extends Fragment {
                 intent.putExtra("mode", "edit");
                 
                 // 1. ID 处理
+                intent.putExtra("bill_local_id", bill.getId());
                 if (bill.getObjectId() != null && !bill.getObjectId().isEmpty()) {
                     intent.putExtra("bill_id", bill.getObjectId());
-                } else {
-                    intent.putExtra("bill_local_id", bill.getId());
                 }
                 
                 // 2. 基础字段

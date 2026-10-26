@@ -10,6 +10,7 @@ import androidx.work.WorkManager;
 import com.example.my_project1.work.CategorySyncWorker;
 import com.example.my_project1.work.SubCategorySyncWorker;
 import com.example.my_project1.work.AccountSyncWorker;
+import com.example.my_project1.work.TagSyncWorker;
 import com.example.my_project1.work.WishSyncWorker;
 
 /**
@@ -31,7 +32,7 @@ public class SyncRepository {
     }
 
     /**
-     * 🔄 全量同步 (分类 → 子分类 → 账户组/账户)
+     * 🔄 全量同步 (分类 → 子分类 → 账户组/账户 → 标签 → 愿望)
      * ⭐ 一条链完成所有数据同步！
      */
     public void syncAll() {
@@ -54,14 +55,18 @@ public class SyncRepository {
                         .setConstraints(AccountSyncWorker.getDefaultConstraints())
                         .build();
 
+        OneTimeWorkRequest tagSync =
+                new OneTimeWorkRequest.Builder(TagSyncWorker.class)
+                        .setConstraints(TagSyncWorker.getDefaultConstraints())
+                        .build();
+
         OneTimeWorkRequest wishSync =
                 new OneTimeWorkRequest.Builder(WishSyncWorker.class)
                         .setConstraints(WishSyncWorker.getDefaultConstraints())
                         .build();
 
-        /** 🔥 链式执行顺序非常关键！
-         *  第一步必须是分类 → 再子分类
-         *  AccountSyncWorker 内部已处理 先删→组→账户
+        /** 🔥 链式执行顺序：
+         *  分类 → 子分类 → 账户 → 标签 → 愿望
          */
         wm.beginUniqueWork(
                 "sync_all_work",
@@ -69,6 +74,7 @@ public class SyncRepository {
                 categorySync
         ).then(subCategorySync)
                 .then(accountSync)
+                .then(tagSync)
                 .then(wishSync)
                 .enqueue();
 
@@ -106,6 +112,11 @@ public class SyncRepository {
                         .setConstraints(AccountSyncWorker.getDefaultConstraints())
                         .build()
         );
+    }
+
+    /** 仅同步标签部分 */
+    public void syncTagsOnly() {
+        TagSyncWorker.enqueue(context);
     }
 
     public void syncWishesOnly() {

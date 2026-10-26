@@ -355,11 +355,10 @@ public class BillDetailActivity extends AppCompatActivity {
 
             Intent intent = new Intent(BillDetailActivity.this, AddBillActivity.class);
             intent.putExtra("mode", "edit");
+            intent.putExtra("bill_local_id", currentBill.getId());
 
             if (currentBill.getObjectId() != null && !currentBill.getObjectId().isEmpty()) {
                 intent.putExtra("bill_id", currentBill.getObjectId());
-            } else {
-                intent.putExtra("bill_local_id", currentBill.getId());
             }
 
             intent.putExtra("bill_type", currentBill.getType());

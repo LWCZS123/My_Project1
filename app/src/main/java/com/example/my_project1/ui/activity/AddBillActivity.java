@@ -453,14 +453,24 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         updateReimburseUi();
 
         // 8.2 关联标签设置
-        if (editBillLocalId != -1 && tagRepository != null) {
+        if (tagRepository != null) {
             AppExecutors.get().diskIO().execute(() -> {
-                List<TagEntity> tags = tagRepository.getTagsForBillSync(editBillLocalId);
-                if (tags != null && !tags.isEmpty()) {
-                    AppExecutors.get().mainThread().execute(() -> {
-                        selectedTags = tags;
-                        updateTagUi();
-                    });
+                long targetLocalId = editBillLocalId;
+                if (targetLocalId <= 0 && editBillId != null && !editBillId.isEmpty()) {
+                    Bill b = billViewModel.saveBill(editBillId);
+                    if (b != null) {
+                        targetLocalId = b.getId();
+                        editBillLocalId = targetLocalId;
+                    }
+                }
+                if (targetLocalId > 0) {
+                    List<TagEntity> tags = tagRepository.getTagsForBillSync(targetLocalId);
+                    if (tags != null && !tags.isEmpty()) {
+                        AppExecutors.get().mainThread().execute(() -> {
+                            selectedTags = tags;
+                            updateTagUi();
+                        });
+                    }
                 }
             });
         }
@@ -1211,31 +1221,38 @@ public class AddBillActivity extends AppCompatActivity implements com.example.my
         isSaving = false;
         uploadViewModel.resetBatchUploadState();
 
-        // 保存关联标签
-        long targetBillId = isEditMode ? editBillLocalId : (bill != null ? bill.getId() : -1);
+        // 核心修复：优先使用保存后最新的 bill.getId()，其次回退到 editBillLocalId
+        long targetBillId = (bill != null && bill.getId() > 0) ? bill.getId() : editBillLocalId;
+
+        Runnable onCompleteAction = () -> {
+            // 保存最后使用的账户ID
+            if (selectedAccount != null) {
+                getSharedPreferences("bill_prefs", MODE_PRIVATE)
+                        .edit()
+                        .putString(PREF_LAST_ACCOUNT_ID, selectedAccount.getObjectId())
+                        .apply();
+            }
+
+            if (isEditMode) {
+                // 编辑模式：返回详情页
+                setResult(RESULT_OK);
+                finish();
+            } else if (isRepeatMode) {
+                // 再记一笔：重置输入
+                resetForRepeat();
+            } else {
+                // 完成：返回上一页
+                setResult(RESULT_OK);
+                finish();
+            }
+        };
+
         if (targetBillId > 0 && tagRepository != null) {
-            tagRepository.saveBillTags(targetBillId, currentUserId, selectedTags, null);
-        }
-
-        // 保存最后使用的账户ID
-        if (selectedAccount != null) {
-            getSharedPreferences("bill_prefs", MODE_PRIVATE)
-                    .edit()
-                    .putString(PREF_LAST_ACCOUNT_ID, selectedAccount.getObjectId())
-                    .apply();
-        }
-
-        if (isEditMode) {
-            // 编辑模式：返回详情页
-            setResult(RESULT_OK);
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 100);
-        } else if (isRepeatMode) {
-            // 再记一笔：重置输入
-            resetForRepeat();
+            tagRepository.saveBillTags(targetBillId, currentUserId, selectedTags, response -> {
+                onCompleteAction.run();
+            });
         } else {
-            // 完成：返回上一页
-            setResult(RESULT_OK);
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 100);
+            onCompleteAction.run();
         }
     }
 

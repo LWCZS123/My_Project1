@@ -9,6 +9,7 @@ import androidx.work.WorkManager;
 
 import com.example.my_project1.work.CategorySyncWorker;
 import com.example.my_project1.work.SubCategorySyncWorker;
+import com.example.my_project1.work.TagSyncWorker;
 import com.example.my_project1.work.WishSyncWorker;
 
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,11 @@ public class SyncScheduler {
                         .setConstraints(SubCategorySyncWorker.getDefaultConstraints())
                         .build();
 
+        PeriodicWorkRequest tagPeriodicSync =
+                new PeriodicWorkRequest.Builder(TagSyncWorker.class, 1, TimeUnit.HOURS)
+                        .setConstraints(TagSyncWorker.getDefaultConstraints())
+                        .build();
+
         PeriodicWorkRequest wishPeriodicSync =
                 new PeriodicWorkRequest.Builder(WishSyncWorker.class, 1, TimeUnit.HOURS)
                         .setConstraints(WishSyncWorker.getDefaultConstraints())
@@ -57,6 +63,11 @@ public class SyncScheduler {
                 "SubCategoryPeriodicSync",
                 ExistingPeriodicWorkPolicy.KEEP,
                 subCategoryPeriodicSync);
+
+        wm.enqueueUniquePeriodicWork(
+                "TagPeriodicSync",
+                ExistingPeriodicWorkPolicy.KEEP,
+                tagPeriodicSync);
 
         wm.enqueueUniquePeriodicWork(
                 "WishPeriodicSync",
